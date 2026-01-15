@@ -1,0 +1,21 @@
+--- 新数据 ---
+TIER: TIER3
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.phsolrg01wn3zcehpmjoycTESTOFFER
+Phone: 18225692191
+生成时间: 2025-12-05 17:52:56
+--- 分隔符 ---
+
+--- 新数据 ---
+TIER: TIER3
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.t89abp3tp6uuywd2r2uf3cTESTOFFER
+Phone: 18225692191
+生成时间: 2025-12-05 17:57:43
+--- 分隔符 ---
+
+--- 新数据 ---
+TIER: TIER3
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.cohhu8duggwhg133trck5tTESTOFFER
+Phone: 18225692191
+生成时间: 2025-12-05 18:00:17
+--- 分隔符 ---
+

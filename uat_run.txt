@@ -1,0 +1,7 @@
+--- 新数据 ---
+TIER: TIER1
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.w4ckxbz554yz79kvdw0xp9TESTOFFER
+Phone: 18278623376
+生成时间: 2025-12-02 10:14:56
+--- 分隔符 ---
+

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python ui自动化到3PL.py:*)",
+      "Bash(python -c:*)",
+      "Bash(where python:*)",
+      "Bash(D:/software/Anaconda3/python.exe:*)",
+      "Bash(d:/data/project/test/.venv/Scripts/pip.exe list:*)"
+    ]
+  }
+}

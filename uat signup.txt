@@ -1,0 +1,129 @@
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.wmuszedadr3dby5bsjs5epTESTOFFER
+18267445560
+
+TIER1
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.a7w0qogvtek3re4c8kww5uTESTOFFER
+18251758255
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.32l873fnvi63fci3c6mfl4TESTOFFER
+18290502664
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.36xrihtgymfbrz1bfsxgj1TESTOFFER
+18261646970
+
+TIER: TIER1
+手机号: 18219123550
+邮箱: 18219123550@qq.com
+Offer ID: amzn1.lending.offer.us.t4yqt74dtraf9efvhxxdyzTESTOFFER
+跳转链接: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.t4yqt74dtraf9efvhxxdyzTESTOFFER
+------------------------------------------------------------
+
+TIER1|18288603799|18288603799@qq.com|amzn1.lending.offer.us.sph5sst9ygt7lh48lkykd4TESTOFFER|e0b0c05cf7cf44158da2d5a51797eae1|spshouquanfs735085|NkyWQSJRE37ZcD2FEfnGkoW2xwrrzuVbKL1sNWgsuCb3XMduF7A2PHDBxGIzub3y|False
+TIER2|18264169517|18264169517@qq.com|amzn1.lending.offer.us.bo5lcsuni9gdzlhh4rwjpgTESTOFFER|d5f4f370df33459292d7ef0941c96267|spshouquanfs527529|ShXVIpwn9h8muAjtPwiquvoXzxWBblDLra62oJqwNKc5Ozi9psNeQSn1bAvwrqyX|False|多次重试后仍失败 - 最后状态码: 400
+TIER2|18264014525|18264014525@qq.com|amzn1.lending.offer.us.92s41zpftyr75lcwiabkvsTESTOFFER|f26ffee107a247b9aace115daa329bd0|spshouquanfs780920|2hF26pA3ITG51qYqsxXHWlVsgqZPEJAkY78CBeVmT1RhEEWf6Z1WTuAXpvOyk8Fq|False|多次重试后仍失败 - 最后状态码: 400
+TIER2|18271280942|18271280942@qq.com|amzn1.lending.offer.us.rxbxfg13e14ktatz2e8yuhTESTOFFER|aa8a41ff04f64e19a9afa1a93afe6c3d|spshouquanfs947385|JiwXgWWUWOINyLNmlPJPz7gvPxsgZUlNUjLKkzbfKbYX4bpb4wlsPJ51MN3tK1P6|False|多次重试后仍失败 - 最后状态码: 400
+TIER2|18263774294|18263774294@qq.com|amzn1.lending.offer.us.rgpfg1glurb99zcoub0j7wTESTOFFER|42af5b38b8c6490c973f38b46e5625d3|spshouquanfs360471|ccn12b4Szj9vt95vvdCKPkFjQ4DFWckWavA7NzijNu04R4JFNZHtxFN6IuMT5B8m|False|多次重试后仍失败 - 最后状态码: 400
+TIER2|18295159817|18295159817@qq.com|amzn1.lending.offer.us.o9zixe12dpyxngcemg9huaTESTOFFER|659ba6f26b0c45398ffa877e20e1fdc1|spshouquanfs856311|q7fjcvTXkAygLsNGoYrCLJokmQwE0wsFO6oTvo7TTEtnNmGFaQvWF2UNSpa7c6ux|False|多次重试失败 - 最后状态码: 400
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.qmg2dhbntilvrvuvg9o449TESTOFFER
+18259069352
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.k264uvdchtbueedt7n1w4nTESTOFFER
+18279059886
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.6moznbozj9wq9p01mfpkp9TESTOFFER
+18275604751
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.4gs60bjlvkz5zp8oqtm01uTESTOFFER
+18291986719
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.71n9ot93hlqw3ujltfc8s9TESTOFFER
+18222644364
+
+TIER1
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.1qmbjmhimelvucgq6poupeTESTOFFER
+18288200811
+
+TIER1
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.j6uw93u77nwqp5wzawndapTESTOFFER
+18283072940
+
+TIER1
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.x4usedz39mpzee1hohlsajTESTOFFER
+18282420478
+
+TIER1
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.vemiw2dayh2lzyl7beiuuvTESTOFFER
+18211896877
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.z0qxwoljs3avu3xx9ou893TESTOFFER 
+18294428246
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.c278m57zr07hfd1nn6nj30TESTOFFER 800k
+18210784384
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.j3xz0bjjsp7myxz3z2rfo5TESTOFFER 800k
+18283539154
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.ken4vxwqupzfp30j4mbpbwTESTOFFER 800k
+18293324106
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.tiq0buaym08erzoqoqmaj4TESTOFFER 800k
+18246360141
+
+TIER3
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.vimqa51ypiweb8wkbvg60lTESTOFFER 800k
+18244463154
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.vijyzx6rrz6ekia47t376jTESTOFFER
+18299542509
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.xzzvsjyix6t0z4tnvj2umhTESTOFFER
+18238427183
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.mgja144djpzgy60xn2i1pbTESTOFFER
+18233981401
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.9vvfvnye1jy7f5k9nrhbptTESTOFFER
+18244901950
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.mex4rinp5nwegox0ikq0erTESTOFFER
+18240664124
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.0ga4pcpgx9thc41q64yn0bTESTOFFER
+18267646868
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.7y98w87kbsxc3fk3szed7cTESTOFFER
+18297470568
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.9ahd2ji4y3q4dmsqfcc245TESTOFFER
+18226401505
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.o0jlogre7g3o3hk1iih6wkTESTOFFER
+18222496662
+
+TIER2
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.wqzakwc0k5j11gm803vxlpTESTOFFER
+18262921748
+

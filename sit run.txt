@@ -1,0 +1,15 @@
+TIER: TIER3
+URL: https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.zg23l3codvga2gj9prgoikTESTOFFER
+Phone: 18280143106
+生成时间: 2026-01-15 14:57:33
+
+TIER: TIER2
+URL: https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.3qf4qp9lpmk1mzzoxlt4s7TESTOFFER
+Phone: 18290153308
+生成时间: 2026-01-15 15:00:19
+
+TIER: TIER3
+URL: https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.o8hxa85rokw3di4e2vd0w3TESTOFFER
+Phone: 18269026010
+生成时间: 2026-01-15 15:08:56
+
