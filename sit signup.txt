@@ -1,13 +1,13 @@
 TIER3
-https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.djr9txydo5cknckhu8or11TESTOFFER
+https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.djr9txydo5cknckhu8or11TESTOFFER rejected
 18262177643
 
 TIER3
-https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.jvbaa4w8m0bxu8tutq1ulqTESTOFFER
+https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.jvbaa4w8m0bxu8tutq1ulqTESTOFFER 不用
 18236532845
 
 TIER3
-https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.77wgo2ndohqmhr6s22e9zxTESTOFFER
+https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.77wgo2ndohqmhr6s22e9zxTESTOFFER RETURNED
 18235088691
 
 TIER2

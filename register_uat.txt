@@ -1524,3 +1524,15 @@ https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?of
 500K
 18235414374
 https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.o641841gexg1feodpk5uo7TESTOFFER
+
+2000K
+13193366310
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.1bs4mba0n9gu9s1vwqku2nTESTOFFER
+
+500K
+15088613302
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.zngipnngiq1z5z15k49ep4TESTOFFER
+
+500K
+15899462707
+https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.v9a2e0nu65iaf2c6e293rkTESTOFFER
