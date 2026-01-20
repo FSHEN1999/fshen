@@ -734,29 +734,30 @@ class DPUMockService:
             log.error(error_detail)
             return cls.register_new_account()
 
-    def mock_spapi_auth(self) -> None:
-        """模拟SPAPI授权回调"""
-        shop_num = input_with_validation(
-            prompt="请输入店铺编号(1,2,3...): \n",
-            validator=lambda x: x.isdigit() and int(x) >= 1,
-            error_msg="请输入正整数！"
-        )
-        self.seller_id = f"{shop_num}BTC6RWJD{self.phone_number}"
-        payload = {
-            "phone": self.phone_number,
-            "status": "ACTIVE",
-            "dpu_token": "dpu_token",
-            "sellerId": self.seller_id,
-            "authorization_code": "authorization_code",
-            "refresh_token_expires_time": "2025-09-19T10:09:07.921Z",
-            "access_token": "access_token sunt",
-            "refresh_token": "refresh_token minim et anim sunt"
-        }
-        response = self._send_request(self.api_config.spapi_auth_url, json=payload)
-        if response and response.get("code") == 200:
-            log.info(f"SPAPI授权成功，seller_id: {self.seller_id}")
-        else:
-            log.error(f"SPAPI授权失败: {response}")
+    # 功能1已注释：模拟SPAPI授权回调
+    # def mock_spapi_auth(self) -> None:
+    #     """模拟SPAPI授权回调"""
+    #     shop_num = input_with_validation(
+    #         prompt="请输入店铺编号(1,2,3...): \n",
+    #         validator=lambda x: x.isdigit() and int(x) >= 1,
+    #         error_msg="请输入正整数！"
+    #     )
+    #     self.seller_id = f"{shop_num}BTC6RWJD{self.phone_number}"
+    #     payload = {
+    #         "phone": self.phone_number,
+    #         "status": "ACTIVE",
+    #         "dpu_token": "dpu_token",
+    #         "sellerId": self.seller_id,
+    #         "authorization_code": "authorization_code",
+    #         "refresh_token_expires_time": "2025-09-19T10:09:07.921Z",
+    #         "access_token": "access_token sunt",
+    #         "refresh_token": "refresh_token minim et anim sunt"
+    #     }
+    #     response = self._send_request(self.api_config.spapi_auth_url, json=payload)
+    #     if response and response.get("code") == 200:
+    #         log.info(f"SPAPI授权成功，seller_id: {self.seller_id}")
+    #     else:
+    #         log.error(f"SPAPI授权失败: {response}")
 
     def mock_link_sp_3pl_shop(self) -> None:
         """模拟关联SP和3PL店铺"""
@@ -983,16 +984,17 @@ class DPUMockService:
         }
         self._send_webhook_request(request_body)
 
-    def mock_create_psp_record(self) -> None:
-        """创建PSP授权记录"""
-        if not self.seller_id:
-            log.error("请先执行SPAPI授权获取seller_id")
-            return
-
-        params = {"authorizationId": self.seller_id, "pspId": f"PSP{self.seller_id}"}
-        result = self._send_request(self.api_config.create_psp_auth_url, params=params)
-        log.info("创建PSP授权记录成功" if result else "创建PSP授权记录失败")
-        time.sleep(1)
+    # 功能5已注释：创建PSP授权记录
+    # def mock_create_psp_record(self) -> None:
+    #     """创建PSP授权记录"""
+    #     if not self.seller_id:
+    #         log.error("请先执行SPAPI授权获取seller_id")
+    #         return
+    #
+    #     params = {"authorizationId": self.seller_id, "pspId": f"PSP{self.seller_id}"}
+    #     result = self._send_request(self.api_config.create_psp_auth_url, params=params)
+    #     log.info("创建PSP授权记录成功" if result else "创建PSP授权记录失败")
+    #     time.sleep(1)
 
     def _mock_psp_status(self, is_start: bool = True) -> None:
         """模拟PSP状态更新（复用逻辑，支持开始/完成状态）"""
@@ -1257,30 +1259,27 @@ def main():
         # 初始化服务
         mock_service = DPUMockService(phone_number, db_executor)
 
-        # 主菜单配置（结构化管理，便于维护）- 移除了14号清空缓存选项
+        # 主菜单配置（结构化管理，便于维护）- 移除了1(spapi授权)、5(创建psp记录)、14(清空缓存)选项
         menu = """
 请输入要执行的操作：
-1 - spapi授权回调        2 - link-sp-3pl关联      3 - 核保(underwritten)
-4 - 审批(approved)       5 - 创建psp记录(不用做)  6 - psp开始(psp_start)
-7 - psp完成(psp_completed)  8 - 电子签(esign)     9 - 放款(drawdown)
-10 - 还款开始(repayment_start)  11 - 还款(repayment)     12 - SP店铺绑定（多店铺第一步）
-13 - 3PL重定向（多店铺第二步）
+1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)
+4 - psp开始(psp_start)   5 - psp完成(psp_completed)  6 - 电子签(esign)
+7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
+10 - SP店铺绑定（多店铺第一步）  11 - 3PL重定向（多店铺第二步）
 q - 退出
 """
         operation_map = {
-            "1": mock_service.mock_spapi_auth,
-            "2": mock_service.mock_link_sp_3pl_shop,
-            "3": mock_service.mock_underwritten_status,
-            "4": mock_service.mock_approved_offer_status,
-            "5": mock_service.mock_create_psp_record,
-            "6": mock_service.mock_psp_start_status,
-            "7": mock_service.mock_psp_completed_status,
-            "8": mock_service.mock_esign_status,
-            "9": mock_service.mock_drawdown_status,
-            "10": mock_service.mock_repayment_start_status,
-            "11": mock_service.mock_repayment_status,
-            "12": mock_service.mock_multi_shop_binding,
-            "13": mock_service.mock_multi_shop_3pl_redirect
+            "1": mock_service.mock_link_sp_3pl_shop,
+            "2": mock_service.mock_underwritten_status,
+            "3": mock_service.mock_approved_offer_status,
+            "4": mock_service.mock_psp_start_status,
+            "5": mock_service.mock_psp_completed_status,
+            "6": mock_service.mock_esign_status,
+            "7": mock_service.mock_drawdown_status,
+            "8": mock_service.mock_repayment_start_status,
+            "9": mock_service.mock_repayment_status,
+            "10": mock_service.mock_multi_shop_binding,
+            "11": mock_service.mock_multi_shop_3pl_redirect
         }
 
         # 菜单循环
