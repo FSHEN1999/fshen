@@ -293,7 +293,9 @@ class DatabaseExecutor:
     ) -> Any:
         """带重试机制的执行包装器（统一处理连接失效）"""
         try:
-            log.debug(f"执行SQL: {sql.strip().replace('\n', ' ')}")
+            # f-string中不能使用反斜杠，需要提前处理
+            sql_display = sql.strip().replace('\n', ' ')
+            log.debug(f"执行SQL: {sql_display}")
             return func(sql)
         except OperationalError as e:
             # 处理常见连接失效错误码
@@ -301,10 +303,12 @@ class DatabaseExecutor:
                 log.warning(f"数据库连接失效，剩余{retry}次重连尝试...")
                 self.reconnect()
                 return self._execute_with_retry(func, sql, retry - 1)
-            log.error(f"SQL执行出错: {e}, SQL: {sql.strip().replace('\n', ' ')}")
+            sql_display = sql.strip().replace('\n', ' ')
+            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
             raise
         except Exception as e:
-            log.error(f"SQL执行出错: {e}, SQL: {sql.strip().replace('\n', ' ')}")
+            sql_display = sql.strip().replace('\n', ' ')
+            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
             raise
 
     def execute_sql(self, sql: str, retry: int = 3) -> Optional[Any]:
@@ -474,7 +478,7 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_limit_application 
+            SELECT limit_application_unique_id FROM dpu_application 
             WHERE merchant_id = '{self.merchant_id}' 
             ORDER BY created_at DESC LIMIT 1
         """
@@ -865,7 +869,7 @@ class DPUMockService:
                 "details": {
                     "merchantId": self.merchant_id,
                     "dpuApplicationId": self.application_unique_id,
-                    "originalRequestId": " ",
+                    "originalRequestId": "req_1111113579",
                     "status": approved_status,
                     "failureReason": failure_reason,
                     "lenderApprovedOfferId": self.lender_approved_offer_id,

@@ -478,7 +478,7 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_limit_application 
+            SELECT limit_application_unique_id FROM dpu_application 
             WHERE merchant_id = '{self.merchant_id}' 
             ORDER BY created_at DESC LIMIT 1
         """
@@ -869,7 +869,7 @@ class DPUMockService:
                 "details": {
                     "merchantId": self.merchant_id,
                     "dpuApplicationId": self.application_unique_id,
-                    "originalRequestId": " ",
+                    "originalRequestId": "req_1111113579",
                     "status": approved_status,
                     "failureReason": failure_reason,
                     "lenderApprovedOfferId": self.lender_approved_offer_id,
