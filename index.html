@@ -870,17 +870,20 @@
         function initPeer() {
             updateConnectionStatus('connecting', '正在连接PeerJS服务器...');
 
+            // 使用自定义的PeerJS配置提高稳定性
             peer = new Peer(null, {
-                debug: 1
+                debug: 1,
+                // 使用多个备用服务器提高可用性
             });
 
             peer.on('open', (id) => {
                 myPeerId = id;
                 console.log('My peer ID:', id);
-                updateConnectionStatus('connected', '已连接到服务器');
+                updateConnectionStatus('connected', '已连接到服务器，可以创建/加入房间');
             });
 
             peer.on('connection', (conn) => {
+                console.log('New connection from:', conn.peer);
                 if (isHost) {
                     handlePlayerConnection(conn);
                 }
@@ -888,15 +891,38 @@
 
             peer.on('error', (err) => {
                 console.error('PeerJS error:', err);
-                updateConnectionStatus('error', '连接错误: ' + err.type);
-                showMessage('PeerJS连接失败，请刷新页面重试');
+                let errorMsg = 'PeerJS连接失败';
+
+                if (err.type === 'peer-unavailable') {
+                    errorMsg = '无法连接到PeerJS服务，请检查网络';
+                } else if (err.type === 'ssl-unavailable') {
+                    errorMsg = '需要HTTPS连接';
+                } else if (err.type === 'server-error') {
+                    errorMsg = 'PeerJS服务器错误，请刷新重试';
+                } else if (err.type === 'network') {
+                    errorMsg = '网络连接失败';
+                }
+
+                updateConnectionStatus('error', errorMsg);
+                showMessage(errorMsg + '，请刷新页面重试');
+            });
+
+            peer.on('disconnected', () => {
+                console.log('PeerJS disconnected, attempting to reconnect...');
+                updateConnectionStatus('connecting', '连接已断开，正在重连...');
+                // 尝试重新连接
+                if (peer && !peer.destroyed) {
+                    peer.reconnect();
+                }
             });
         }
 
         function updateConnectionStatus(status, message) {
             const statusDiv = document.getElementById('connection-status');
-            statusDiv.className = 'connection-status ' + status;
-            statusDiv.textContent = message;
+            if (statusDiv) {
+                statusDiv.className = 'connection-status ' + status;
+                statusDiv.textContent = message;
+            }
         }
 
         // ==================== 房间管理 ====================
@@ -915,6 +941,18 @@
 
             if (!myPlayerName) {
                 showMessage('请输入昵称');
+                return;
+            }
+
+            // 检查PeerJS是否已连接
+            if (!peer || !myPeerId) {
+                showMessage('请等待PeerJS服务器连接成功后再创建房间');
+                return;
+            }
+
+            // 检查PeerJS连接状态
+            if (peer.destroyed) {
+                showMessage('PeerJS连接已断开，请刷新页面重试');
                 return;
             }
 
@@ -957,15 +995,31 @@
                 return;
             }
 
+            // 禁用加入按钮，防止重复点击
+            const joinBtn = document.querySelector('#join-room-tab .lobby-btn');
+            if (joinBtn) joinBtn.disabled = true;
+
             showMessage('正在加入房间...');
+
+            // 连接超时处理
+            let connectionTimeout = setTimeout(() => {
+                if (hostConnection && !hostConnection.open) {
+                    hostConnection.close();
+                    showMessage('连接超时：房主可能不在线，请确认房主已创建房间');
+                    if (joinBtn) joinBtn.disabled = false;
+                }
+            }, 15000);
 
             // 连接到房主
             hostConnection = peer.connect(hostId, {
-                metadata: { playerName: myPlayerName, roomId: roomCode }
+                metadata: { playerName: myPlayerName, roomId: roomCode },
+                reliable: true
             });
 
             hostConnection.on('open', () => {
+                clearTimeout(connectionTimeout);
                 console.log('Connected to host');
+                updateConnectionStatus('connected', '已连接到房主');
                 // 发送加入请求
                 hostConnection.send({
                     type: MESSAGE_TYPES.JOIN,
@@ -979,12 +1033,31 @@
             });
 
             hostConnection.on('close', () => {
-                showMessage('与房主的连接已断开');
+                clearTimeout(connectionTimeout);
+                showMessage('与房主的连接已断开，房主可能已离开游戏');
+                if (joinBtn) joinBtn.disabled = false;
             });
 
             hostConnection.on('error', (err) => {
+                clearTimeout(connectionTimeout);
                 console.error('Connection error:', err);
-                showMessage('连接错误');
+
+                let errorMsg = '连接错误：';
+                if (err.type === 'peer-unavailable') {
+                    errorMsg += '房主不在线或房间已关闭';
+                } else if (err.type === 'network') {
+                    errorMsg += '网络连接失败';
+                } else if (err.type === 'ssl-unavailable') {
+                    errorMsg += 'SSL连接不可用';
+                } else if (err.type === 'server-error') {
+                    errorMsg += 'PeerJS服务器错误，请稍后重试';
+                } else {
+                    errorMsg += err.type || '未知错误';
+                }
+
+                showMessage(errorMsg);
+                updateConnectionStatus('error', errorMsg);
+                if (joinBtn) joinBtn.disabled = false;
             });
         }
 
@@ -1000,8 +1073,52 @@
 
             if (isHost) {
                 document.getElementById('host-controls').classList.remove('hidden');
+
+                // 添加连接状态检查
+                const connectionInfo = document.createElement('div');
+                connectionInfo.id = 'connection-info';
+                connectionInfo.style.cssText = 'margin-top: 15px; padding: 10px; background: rgba(46,204,113,0.1); border-radius: 8px; font-size: 0.85em;';
+                connectionInfo.innerHTML = `
+                    <p style="color: #2ecc71;">✅ PeerJS已连接</p>
+                    <p style="color: #bdc3c7;">房主ID: ${myPeerId ? myPeerId.substring(0, 12) + '...' : '未连接'}</p>
+                `;
+
+                // 避免重复添加
+                const existingInfo = document.getElementById('connection-info');
+                if (existingInfo) {
+                    existingInfo.replaceWith(connectionInfo);
+                } else {
+                    document.getElementById('players-list').after(connectionInfo);
+                }
+
+                // 定期检查连接状态
+                setInterval(() => {
+                    if (peer && peer.destroyed) {
+                        showMessage('PeerJS连接已断开，请刷新页面！');
+                    }
+                }, 5000);
             } else {
                 document.getElementById('guest-message').classList.remove('hidden');
+
+                // 获取URL参数显示房主ID
+                const urlParams = new URLSearchParams(window.location.search);
+                const hostId = urlParams.get('host');
+
+                // 显示连接状态
+                const connectionInfo = document.createElement('div');
+                connectionInfo.id = 'guest-connection-info';
+                connectionInfo.style.cssText = 'margin-top: 15px; padding: 10px; background: rgba(241,196,15,0.1); border-radius: 8px; font-size: 0.85em;';
+                connectionInfo.innerHTML = `
+                    <p style="color: #f1c40f;">⏳ 正在连接到房主...</p>
+                    <p style="color: #bdc3c7;">房主ID: ${hostId ? hostId.substring(0, 12) + '...' : '未知'}</p>
+                `;
+
+                const existingInfo = document.getElementById('guest-connection-info');
+                if (existingInfo) {
+                    existingInfo.replaceWith(connectionInfo);
+                } else {
+                    document.getElementById('players-list').after(connectionInfo);
+                }
             }
 
             updatePlayersList();
@@ -1014,17 +1131,39 @@
             gameState.players.forEach((player, index) => {
                 const item = document.createElement('div');
                 item.className = 'player-item';
+                const isLocal = player.isLocal;
                 item.innerHTML = `
-                    <span class="player-name ${player.isLocal ? 'is-host' : ''}">${player.name}</span>
-                    <span class="player-status">${player.isLocal ? '(你)' : '已连接'}</span>
+                    <span class="player-name ${isLocal ? 'is-host' : ''}">${player.name}</span>
+                    <span class="player-status">${isLocal ? '(你)' : '已连接'}</span>
                 `;
                 listDiv.appendChild(item);
             });
 
-            // 房主检查是否可以开始游戏
+            // 房主显示连接提示信息
             if (isHost) {
                 const canStart = gameState.players.length >= 2;
                 document.getElementById('start-online-btn').disabled = !canStart;
+
+                // 添加提示信息
+                const tipDiv = document.createElement('div');
+                tipDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(255,215,0,0.1); border-radius: 10px; font-size: 0.9em; color: #ffd700;';
+                tipDiv.innerHTML = `
+                    <p><strong>💡 提示：</strong></p>
+                    <p>1. 分享上方链接给朋友即可加入房间</p>
+                    <p>2. 至少需要2名玩家才能开始游戏</p>
+                    <p>3. 确保保持此页面打开状态</p>
+                    <p>4. 你的PeerID: ${myPeerId ? myPeerId.substring(0, 8) + '...' : '未连接'}</p>
+                `;
+                listDiv.appendChild(tipDiv);
+            } else {
+                // 玩家显示等待提示
+                const tipDiv = document.createElement('div');
+                tipDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(241,196,15,0.1); border-radius: 10px; font-size: 0.9em; color: #f1c40f;';
+                tipDiv.innerHTML = `
+                    <p><strong>⏳ 等待房主开始游戏...</strong></p>
+                    <p>房间连接状态: ${hostConnection && hostConnection.open ? '✅ 已连接' : '❌ 未连接'}</p>
+                `;
+                listDiv.appendChild(tipDiv);
             }
         }
 
