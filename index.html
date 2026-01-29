@@ -849,32 +849,50 @@
             initGame();
         }
 
+        // 发牌标志，防止重复发牌
+        let cardsDealt = false;
+
         function initGame() {
             // 初始化游戏界面
             showMessage('游戏开始！发牌中...');
             createPlayerSeats();
 
-            // 模拟发牌
-            setTimeout(() => {
-                dealCards();
-            }, 1000);
+            // 只发一次牌
+            if (!cardsDealt) {
+                setTimeout(() => {
+                    dealCards();
+                }, 1000);
+            } else {
+                updateDisplay();
+                showMessage('发牌完成，游戏开始！');
+            }
         }
 
         function dealCards() {
-            // 简化版发牌逻辑
+            // 防止重复发牌
+            if (cardsDealt) return;
+            cardsDealt = true;
+
+            // 创建一副牌并洗牌
             const suits = ['♠', '♥', '♦', '♣'];
             const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+            const deck = [];
 
+            for (let suit of suits) {
+                for (let rank of ranks) {
+                    deck.push({ suit, rank });
+                }
+            }
+
+            // Fisher-Yates 洗牌算法
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            // 给每个玩家发两张牌
             gameState.players.forEach((player, index) => {
-                const card1 = {
-                    suit: suits[Math.floor(Math.random() * suits.length)],
-                    rank: ranks[Math.floor(Math.random() * ranks.length)]
-                };
-                const card2 = {
-                    suit: suits[Math.floor(Math.random() * suits.length)],
-                    rank: ranks[Math.floor(Math.random() * ranks.length)]
-                };
-                player.cards = [card1, card2];
+                player.cards = [deck.pop(), deck.pop()];
             });
 
             updateDisplay();
