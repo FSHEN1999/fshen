@@ -478,7 +478,7 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_application 
+            SELECT limit_application_unique_id FROM dpu_limit_application 
             WHERE merchant_id = '{self.merchant_id}' 
             ORDER BY created_at DESC LIMIT 1
         """
@@ -491,6 +491,7 @@ class DPUMockService:
             SELECT authorization_id FROM dpu_auth_token 
             WHERE merchant_id = '{self.merchant_id}' 
             AND authorization_party = 'SP' 
+            AND authorization_id IS NOT NULL
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)

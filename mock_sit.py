@@ -334,6 +334,17 @@ class DatabaseExecutor:
 
         return self._execute_with_retry(_query, sql, retry)
 
+    def execute_query_all(self, sql: str, retry: int = 3) -> list:
+        """执行查询并返回所有记录（列表格式）"""
+
+        def _query_all(sql: str):
+            self.cursor.execute(sql)
+            columns = [desc[0] for desc in self.cursor.description]
+            results = self.cursor.fetchall()
+            return [dict(zip(columns, row)) for row in results] if results else []
+
+        return self._execute_with_retry(_query_all, sql, retry)
+
     def __enter__(self):
         """上下文管理器进入（支持with语句）"""
         self.connect()
@@ -448,8 +459,8 @@ class DPUMockService:
     def application_unique_id(self) -> Optional[str]:
         """获取application_unique_id"""
         sql = f"""
-            SELECT application_unique_id FROM dpu_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT application_unique_id FROM dpu_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -478,7 +489,7 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_application 
+            SELECT limit_application_unique_id FROM dpu_limit_application 
             WHERE merchant_id = '{self.merchant_id}' 
             ORDER BY created_at DESC LIMIT 1
         """
@@ -491,6 +502,7 @@ class DPUMockService:
             SELECT authorization_id FROM dpu_auth_token 
             WHERE merchant_id = '{self.merchant_id}' 
             AND authorization_party = 'SP' 
+            AND authorization_id IS NOT NULL
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
