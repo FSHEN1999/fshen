@@ -10,7 +10,7 @@ from pymysql.constants import CLIENT
 from pymysql.err import OperationalError
 
 # ============================ 基础配置 ============================
-ENV = "uat"
+ENV = "sit"
 
 # 保留原始完整配置结构（无任何修改）
 AUTO_CONFIG = {

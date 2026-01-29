@@ -5,7 +5,8 @@
       "Bash(python -c:*)",
       "Bash(where python:*)",
       "Bash(D:/software/Anaconda3/python.exe:*)",
-      "Bash(d:/data/project/test/.venv/Scripts/pip.exe list:*)"
+      "Bash(d:/data/project/test/.venv/Scripts/pip.exe list:*)",
+      "Bash(del .pause)"
     ]
   }
 }

@@ -260,4 +260,74 @@ EFA17688931876615674 3456000005 已放弃
 
 13543443243  EFA17688938878858255 3243000001 已放弃
 
-13424536456 EFA17689049350798428 6456000002
+13424536456 EFA17689049350798428 6456000002  已放弃
+
+13754353475 EFA17689620751484590 3475000130
+
+13564534543 EFA17689625669067452 4543000001 已放弃
+
+13534433454 EFA17689647438853920  3454000001 已放弃
+
+13766554354 4354000002 EFA17689672991931746 已放弃
+
+
+500K
+13121848948
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.y567jy27kkk0bc17om2itgTESTOFFER  缺陷
+
+13543532465 EFA17689740826364680 2465000001
+
+
+
+2000K
+18094704580
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.6kqwzkt6fimajs768de77tTESTOFFER 800k EFA17689782884363054
+
+2000K
+13496459933
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.zh7syqlpd2tjm0d4h7tkjjTESTOFFER 800k cancel
+
+500K
+18743075151
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.1nvnkcp5gexk7p2j8vbkn3TESTOFFER EFA17689805828076400 5151000003
+
+
+4654000002 EFA17689837326239857
+
+
+EFA17689846602089444 5657000001
+500K
+18738202746
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.26bbar7fe072nzphkbkm4uTESTOFFER  缺陷
+
+
+
+500K
+14704676330
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.y6lsdhnofwhlpkowrlsusbTESTOFFER EFA17689889084971876 6330000001
+
+13543534534 4534000001 EFA17689892788142218 已放弃
+
+500K
+13459082041
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.0cyurh4s212qo3cv1kz3vvTESTOFFER cancel
+
+500K
+15802008156
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.391zmz4u5ngyout6rpuo98TESTOFFER 500k
+
+500K
+15627492431
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.5fx6p87y3pw0ibzxqvhln1TESTOFFER 500k
+
+500K
+13646555051
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.07iw1kne9adohkik2oxmfiTESTOFFER 2k
+
+500K
+18001831609
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.x35w9l8ejmlrnprpljdt2aTESTOFFER
+
+500K
+13026852494
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.rb5k5a2bzfkfu3jqufmscaTESTOFFER

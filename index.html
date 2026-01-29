@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多人德州扑克 - 在线版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            background: linear-gradient(90deg, #ffd700, #ffed4e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* API日志面板 */
+        .api-log-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 350px;
+            height: 100vh;
+            background: rgba(0,0,0,0.95);
+            border-left: 2px solid #333;
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            z-index: 1000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .api-log-panel.open {
+            transform: translateX(0);
+        }
+
+        .api-log-header {
+            padding: 15px;
+            background: #1a1a2e;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .api-log-header h3 {
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+
+        .api-log-close {
+            background: #e74c3c;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .api-log-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .api-log-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.05);
+            border-left: 3px solid #333;
+        }
+
+        .api-log-item.request {
+            border-left-color: #3498db;
+        }
+
+        .api-log-item.response {
+            border-left-color: #2ecc71;
+        }
+
+        .api-log-item.websocket {
+            border-left-color: #9b59b6;
+        }
+
+        .api-log-item.error {
+            border-left-color: #e74c3c;
+        }
+
+        .api-log-time {
+            color: #7f8c8d;
+            font-size: 0.8em;
+        }
+
+        .api-log-method {
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        .api-log-status {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .toggle-log-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #2c3e50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 999;
+            font-size: 0.9em;
+        }
+
+        .toggle-log-btn:hover {
+            background: #34495e;
+        }
+
+        /* 游戏大厅 */
+        .lobby-panel {
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            margin: 50px auto;
+            text-align: center;
+        }
+
+        .lobby-panel h2 {
+            color: #ffd700;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .lobby-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            margin: 10px 0;
+            outline: none;
+        }
+
+        .lobby-input:focus {
+            border-color: #ffd700;
+        }
+
+        .lobby-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.3s;
+        }
+
+        .lobby-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .lobby-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 等待房间 */
+        .waiting-room {
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            margin: 50px auto;
+            text-align: center;
+            display: none;
+        }
+
+        .waiting-room h2 {
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+
+        .room-info {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .room-info p {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+
+        .room-info strong {
+            color: #ffd700;
+        }
+
+        .players-list {
+            margin: 20px 0;
+            min-height: 150px;
+        }
+
+        .player-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-item .player-name {
+            font-size: 1.2em;
+            color: #ffd700;
+        }
+
+        .player-item .player-status {
+            font-size: 0.9em;
+            color: #2ecc71;
+        }
+
+        .connection-status {
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .connection-status.connected {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        /* 游戏界面 */
+        .game-area {
+            display: none;
+        }
+
+        .game-info {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+
+        .game-info span {
+            margin: 0 20px;
+            color: #ffd700;
+        }
+
+        /* 牌桌 */
+        .poker-table-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .poker-table {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(ellipse at center, #2d5a27 0%, #1e3d1a 100%);
+            border-radius: 50%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3);
+            border: 15px solid #4a2c18;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+        }
+
+        .pot-display {
+            font-size: 1.8em;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        .community-cards {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 100px;
+        }
+
+        .card {
+            width: 60px;
+            height: 84px;
+            background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .card.red {
+            color: #e74c3c;
+        }
+
+        .card.black {
+            color: #2c3e50;
+        }
+
+        .card-suit {
+            font-size: 24px;
+        }
+
+        .card-rank {
+            font-size: 20px;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 50%, #c0392b 100%);
+            background-size: 15px 15px;
+        }
+
+        .card-back::before {
+            content: '🂠';
+            font-size: 40px;
+            color: #fff;
+            opacity: 0.3;
+        }
+
+        /* 玩家座位 */
+        .player-seat {
+            position: absolute;
+            width: 180px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 15px;
+            padding: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.3s;
+            z-index: 2;
+        }
+
+        .player-seat.active {
+            border-color: #ffd700;
+            box-shadow: 0 0 30px rgba(255,215,0,0.5);
+            transform: scale(1.1);
+        }
+
+        .player-seat.folded {
+            opacity: 0.4;
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .player-name {
+            font-size: 1.1em;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .player-chips {
+            font-size: 1em;
+            color: #fff;
+        }
+
+        .player-cards {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-bottom: 8px;
+            min-height: 45px;
+        }
+
+        .player-cards .card {
+            width: 40px;
+            height: 56px;
+            font-size: 14px;
+        }
+
+        .player-bet {
+            text-align: center;
+            font-size: 1em;
+            color: #2ecc71;
+        }
+
+        /* 控制按钮 */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .controls button {
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-fold {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+        }
+
+        .btn-check {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: white;
+        }
+
+        .btn-call {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn-raise {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+        }
+
+        .btn-allin {
+            background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+            color: white;
+        }
+
+        .controls button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .controls button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 消息显示 */
+        .message-area {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            min-height: 50px;
+            font-size: 1.1em;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🃏 多人德州扑克 🃏</h1>
+
+        <!-- API日志面板 -->
+        <button class="toggle-log-btn" onclick="toggleApiLog()">📡 API日志</button>
+
+        <div class="api-log-panel" id="api-log-panel">
+            <div class="api-log-header">
+                <h3>📡 API调用日志</h3>
+                <button class="api-log-close" onclick="toggleApiLog()">×</button>
+            </div>
+            <div class="api-log-content" id="api-log-content">
+                <!-- 日志条目 -->
+            </div>
+        </div>
+
+        <!-- 游戏大厅 -->
+        <div class="lobby-panel" id="lobby-panel">
+            <h2>🎮 游戏大厅</h2>
+            <input type="text" id="player-name" class="lobby-input" placeholder="输入你的昵称" maxlength="20">
+            <button class="lobby-btn" onclick="createRoom()">创建房间</button>
+            <div style="margin-top: 30px; text-align: left;">
+                <h3 style="color: #ffd700; margin-bottom: 15px;">或加入现有房间：</h3>
+                <input type="text" id="room-id-input" class="lobby-input" placeholder="输入房间ID" maxlength="10">
+                <button class="lobby-btn" onclick="joinRoom()">加入房间</button>
+            </div>
+            <div class="connection-status" id="connection-status">
+                后端状态: 检查中...
+            </div>
+        </div>
+
+        <!-- 等待房间 -->
+        <div class="waiting-room" id="waiting-room">
+            <h2>等待其他玩家加入...</h2>
+            <div class="room-info">
+                <p>房间ID: <strong id="display-room-id">-</strong></p>
+                <p>你的ID: <strong id="display-player-id">-</strong></p>
+                <p>分享房间ID给朋友即可加入</p>
+            </div>
+            <div class="players-list" id="players-list">
+                <!-- 动态生成 -->
+            </div>
+            <button class="lobby-btn" onclick="startGame()" id="start-game-btn" style="display:none;">开始游戏</button>
+        </div>
+
+        <!-- 游戏区域 -->
+        <div class="game-area" id="game-area">
+            <div class="game-info">
+                <span>房间ID: <span id="game-room-id">-</span></span>
+                <button onclick="exitGame()" style="padding: 8px 15px; border-radius: 15px; border: none; background: #e74c3c; color: white; cursor: pointer;">退出游戏</button>
+            </div>
+
+            <div class="poker-table-container">
+                <div class="poker-table">
+                    <div class="pot-display">底池: <span id="pot">0</span></div>
+                    <div class="community-cards" id="community-cards">
+                        <div class="card card-back"></div>
+                        <div class="card card-back"></div>
+                        <div class="card card-back"></div>
+                        <div class="card card-back"></div>
+                        <div class="card card-back"></div>
+                    </div>
+                </div>
+                <div id="player-seats">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <div class="message-area" id="message">等待游戏开始...</div>
+
+            <div class="controls">
+                <button class="btn-fold" onclick="sendAction('fold')" id="btn-fold" disabled>弃牌</button>
+                <button class="btn-check" onclick="sendAction('check')" id="btn-check" disabled>过牌</button>
+                <button class="btn-call" onclick="sendAction('call')" id="btn-call" disabled>跟注</button>
+                <button class="btn-raise" onclick="sendAction('raise')" id="btn-raise" disabled>加注</button>
+                <button class="btn-allin" onclick="sendAction('allin')" id="btn-allin" disabled>全押</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 配置 ====================
+        // 公网访问地址 (Cloudflare Tunnel)
+        const API_BASE = 'https://baseline-five-ceremony-logged.trycloudflare.com';
+        let apiLogOpen = false;
+
+        // 游戏状态
+        let gameState = {
+            roomId: null,
+            playerId: null,
+            playerName: '',
+            isHost: false,
+            players: [],
+            ws: null,
+            pot: 0,
+            communityCards: [],
+            currentPlayerIndex: 0
+        };
+
+        // ==================== API日志 ====================
+        function toggleApiLog() {
+            const panel = document.getElementById('api-log-panel');
+            apiLogOpen = !apiLogOpen;
+            panel.classList.toggle('open', apiLogOpen);
+        }
+
+        function addApiLog(type, data) {
+            const content = document.getElementById('api-log-content');
+            const item = document.createElement('div');
+            item.className = `api-log-item ${type.toLowerCase()}`;
+
+            const time = new Date().toLocaleTimeString();
+            let html = `<div class="api-log-time">${time}</div>`;
+
+            if (type === 'REQUEST') {
+                html += `<div class="api-log-method">${data.method}</div>`;
+                html += `<div>${data.url}</div>`;
+                if (data.body) html += `<div>Body: ${JSON.stringify(data.body)}</div>`;
+            } else if (type === 'RESPONSE') {
+                html += `<div class="api-log-status">${data.status}</div>`;
+                html += `<div>${JSON.stringify(data.data, null, 2)}</div>`;
+            } else if (type === 'WEBSOCKET') {
+                html += `<div>📡 ${data.direction}</div>`;
+                html += `<div>${JSON.stringify(data.message, null, 2)}</div>`;
+            } else if (type === 'ERROR') {
+                html += `<div style="color: #e74c3c;">❌ ${data.message}</div>`;
+            }
+
+            item.innerHTML = html;
+            content.appendChild(item);
+            content.scrollTop = content.scrollHeight;
+        }
+
+        // ==================== HTTP API ====================
+        async function apiRequest(method, url, data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            addApiLog('REQUEST', { method, url, body: data });
+
+            try {
+                const response = await fetch(`${API_BASE}${url}`, options);
+                const result = await response.json();
+
+                addApiLog('RESPONSE', { status: response.status, data: result });
+
+                if (!response.ok) {
+                    throw new Error(result.detail || '请求失败');
+                }
+
+                return result;
+            } catch (error) {
+                addApiLog('ERROR', { message: error.message });
+                throw error;
+            }
+        }
+
+        // ==================== WebSocket ====================
+        function connectWebSocket(roomId, playerId) {
+            const ws = new WebSocket(`wss://baseline-five-ceremony-logged.trycloudflare.com/ws/${roomId}/${playerId}`);
+
+            ws.onopen = () => {
+                addApiLog('WEBSOCKET', { direction: '🔌 连接建立', message: { roomId, playerId } });
+                console.log('WebSocket connected');
+
+                // 更新连接状态
+                updateConnectionStatus(true);
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                addApiLog('WEBSOCKET', { direction: '📥 收到消息', message });
+                handleWebSocketMessage(message);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addApiLog('ERROR', { message: 'WebSocket连接错误' });
+            };
+
+            ws.onclose = () => {
+                addApiLog('WEBSOCKET', { direction: '🔌 连接关闭', message: {} });
+                console.log('WebSocket closed');
+                updateConnectionStatus(false);
+            };
+
+            return ws;
+        }
+
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'connected':
+                    showMessage(message.message);
+                    break;
+
+                case 'player_joined':
+                    gameState.players.push(message.player);
+                    updatePlayersList();
+                    showMessage(`${message.player.name} 加入了房间`);
+                    break;
+
+                case 'player_left':
+                    gameState.players = gameState.players.filter(p => p.id !== message.player_id);
+                    updatePlayersList();
+                    showMessage(`${message.message}`);
+                    break;
+
+                case 'game_start':
+                    startGame();
+                    break;
+
+                case 'game_action':
+                    handleGameAction(message);
+                    break;
+
+                case 'state_update':
+                    handleStateUpdate(message.state);
+                    break;
+            }
+        }
+
+        // ==================== 房间管理 ====================
+        async function createRoom() {
+            const playerName = document.getElementById('player-name').value.trim();
+            if (!playerName) {
+                showMessage('请输入昵称');
+                return;
+            }
+
+            try {
+                const result = await apiRequest('POST', '/api/rooms/create', {
+                    player_name: playerName
+                });
+
+                gameState.roomId = result.room_id;
+                gameState.playerId = result.player_id;
+                gameState.playerName = result.player_name;
+                gameState.isHost = true;
+                gameState.players = [{
+                    id: result.player_id,
+                    name: result.player_name,
+                    chips: 1000
+                }];
+
+                showWaitingRoom();
+            } catch (error) {
+                showMessage('创建房间失败: ' + error.message);
+            }
+        }
+
+        async function joinRoom() {
+            const playerName = document.getElementById('player-name').value.trim();
+            const roomId = document.getElementById('room-id-input').value.trim();
+
+            if (!playerName || !roomId) {
+                showMessage('请输入昵称和房间ID');
+                return;
+            }
+
+            try {
+                const result = await apiRequest('POST', '/api/rooms/join', {
+                    player_name: playerName,
+                    room_id: roomId
+                });
+
+                gameState.roomId = result.room_id;
+                gameState.playerId = result.player_id;
+                gameState.playerName = result.player_name;
+                gameState.isHost = false;
+                gameState.players = result.players;
+
+                showWaitingRoom();
+            } catch (error) {
+                showMessage('加入房间失败: ' + error.message);
+            }
+        }
+
+        function showWaitingRoom() {
+            document.getElementById('lobby-panel').style.display = 'none';
+            document.getElementById('waiting-room').style.display = 'block';
+
+            document.getElementById('display-room-id').textContent = gameState.roomId;
+            document.getElementById('display-player-id').textContent = gameState.playerId;
+
+            // 连接WebSocket
+            gameState.ws = connectWebSocket(gameState.roomId, gameState.playerId);
+
+            updatePlayersList();
+
+            // 房主显示开始按钮
+            if (gameState.isHost) {
+                document.getElementById('start-game-btn').style.display = 'block';
+            }
+        }
+
+        function updatePlayersList() {
+            const listDiv = document.getElementById('players-list');
+            listDiv.innerHTML = '';
+
+            gameState.players.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'player-item';
+                item.innerHTML = `
+                    <span class="player-name">${player.name}</span>
+                    <span class="player-status">${player.chips} 筹码</span>
+                `;
+                listDiv.appendChild(item);
+            });
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDiv = document.getElementById('connection-status');
+            if (connected) {
+                statusDiv.className = 'connection-status connected';
+                statusDiv.textContent = '✅ 后端已连接';
+            } else {
+                statusDiv.className = 'connection-status disconnected';
+                statusDiv.textContent = '❌ 后端未连接';
+            }
+        }
+
+        // ==================== 游戏逻辑 ====================
+        function startGame() {
+            document.getElementById('waiting-room').style.display = 'none';
+            document.getElementById('game-area').style.display = 'block';
+
+            document.getElementById('game-room-id').textContent = gameState.roomId;
+
+            // 房主发送开始游戏消息
+            if (gameState.isHost && gameState.ws) {
+                gameState.ws.send(JSON.stringify({ type: 'game_start' }));
+                addApiLog('WEBSOCKET', { direction: '📤 发送消息', message: { type: 'game_start' } });
+            }
+
+            initGame();
+        }
+
+        function initGame() {
+            // 初始化游戏界面
+            showMessage('游戏开始！发牌中...');
+            createPlayerSeats();
+
+            // 模拟发牌
+            setTimeout(() => {
+                dealCards();
+            }, 1000);
+        }
+
+        function dealCards() {
+            // 简化版发牌逻辑
+            const suits = ['♠', '♥', '♦', '♣'];
+            const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+            gameState.players.forEach((player, index) => {
+                const card1 = {
+                    suit: suits[Math.floor(Math.random() * suits.length)],
+                    rank: ranks[Math.floor(Math.random() * ranks.length)]
+                };
+                const card2 = {
+                    suit: suits[Math.floor(Math.random() * suits.length)],
+                    rank: ranks[Math.floor(Math.random() * ranks.length)]
+                };
+                player.cards = [card1, card2];
+            });
+
+            updateDisplay();
+            showMessage('发牌完成，游戏开始！');
+        }
+
+        function sendAction(action) {
+            if (!gameState.ws) return;
+
+            const message = {
+                type: 'game_action',
+                action: action
+            };
+
+            gameState.ws.send(JSON.stringify(message));
+            addApiLog('WEBSOCKET', { direction: '📤 发送消息', message });
+        }
+
+        function handleGameAction(message) {
+            showMessage(`${message.player_id} 执行了 ${message.action}`);
+            // 这里添加实际的游戏逻辑处理
+        }
+
+        function handleStateUpdate(state) {
+            Object.assign(gameState, state);
+            updateDisplay();
+        }
+
+        function createPlayerSeats() {
+            const container = document.getElementById('player-seats');
+            container.innerHTML = '';
+
+            const count = gameState.players.length;
+            const radius = 280;
+
+            gameState.players.forEach((player, index) => {
+                const angle = (index * 360 / count - 90) * Math.PI / 180;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+
+                const seat = document.createElement('div');
+                seat.className = 'player-seat';
+                seat.id = `player-seat-${index}`;
+                seat.style.left = `calc(50% + ${x}px - 90px)`;
+                seat.style.top = `calc(50% + ${y}px - 60px)`;
+                seat.innerHTML = `
+                    <div class="player-info">
+                        <span class="player-name">${player.name}</span>
+                        <span class="player-chips">${player.chips}</span>
+                    </div>
+                    <div class="player-cards" id="player-cards-${index}"></div>
+                `;
+                container.appendChild(seat);
+            });
+        }
+
+        function updateDisplay() {
+            // 更新公共牌
+            const communityDiv = document.getElementById('community-cards');
+            communityDiv.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                if (i < gameState.communityCards.length) {
+                    const card = gameState.communityCards[i];
+                    communityDiv.innerHTML += createCardHTML(card);
+                } else {
+                    communityDiv.innerHTML += '<div class="card card-back"></div>';
+                }
+            }
+
+            // 更新玩家手牌
+            gameState.players.forEach((player, index) => {
+                const cardsDiv = document.getElementById(`player-cards-${index}`);
+                if (!cardsDiv) return;
+
+                cardsDiv.innerHTML = '';
+                if (player.cards) {
+                    player.cards.forEach(card => {
+                        cardsDiv.innerHTML += createCardHTML(card);
+                    });
+                }
+            });
+
+            // 更新底池
+            document.getElementById('pot').textContent = gameState.pot;
+
+            // 高亮当前玩家
+            gameState.players.forEach((player, index) => {
+                const seat = document.getElementById(`player-seat-${index}`);
+                if (seat) {
+                    seat.classList.toggle('active', index === gameState.currentPlayerIndex);
+                }
+            });
+        }
+
+        function createCardHTML(card) {
+            const isRed = card.suit === '♥' || card.suit === '♦';
+            return `<div class="card ${isRed ? 'red' : 'black'}">
+                <span class="card-rank">${card.rank}</span>
+                <span class="card-suit">${card.suit}</span>
+            </div>`;
+        }
+
+        function showMessage(msg) {
+            document.getElementById('message').textContent = msg;
+        }
+
+        function exitGame() {
+            if (confirm('确定要退出游戏吗？')) {
+                if (gameState.ws) {
+                    gameState.ws.close();
+                }
+                location.reload();
+            }
+        }
+
+        // ==================== 初始化 ====================
+        async function checkBackend() {
+            try {
+                await apiRequest('GET', '/');
+                updateConnectionStatus(true);
+            } catch (error) {
+                updateConnectionStatus(false);
+                showMessage('无法连接到后端服务器，请确保 server.py 正在运行');
+            }
+        }
+
+        // 页面加载时检查后端连接
+        checkBackend();
+    </script>
+</body>
+</html>

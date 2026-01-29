@@ -400,3 +400,65 @@ URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redire
 Phone: 18259438247
 生成时间: 2026-01-15 14:59:10
 
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.f3ai7heomdgplleochvg5hTESTOFFER
+Phone: 18234579887
+生成时间: 2026-01-22 17:19:46
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.mf3mppo1f36i3mmt8u0hfcTESTOFFER
+Phone: 18228816160
+生成时间: 2026-01-22 17:23:47
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.l2iz47jzp7k0deids9m9skTESTOFFER
+Phone: 18266335992
+生成时间: 2026-01-22 17:29:59
+
+TIER: TIER3
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.3zdcgf2cpjce39f1fkuhlnTESTOFFER
+Phone: 18241502987
+生成时间: 2026-01-22 17:30:44
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.p4jq65ulg0d11gw1agb82wTESTOFFER
+Phone: 18257468411
+生成时间: 2026-01-22 17:34:10
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.s31ude2qllay133hnffvzyTESTOFFER
+Phone: 18224938568
+生成时间: 2026-01-22 17:39:29
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.9eitevwnip4w8rjwvckgpgTESTOFFER
+Phone: 18271228622
+生成时间: 2026-01-22 17:44:07
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.ba7kuqmizhfo89uixy7mp9TESTOFFER
+Phone: 18258950116
+生成时间: 2026-01-22 17:50:14
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.1zvprvlqjraehuvt8fimdrTESTOFFER
+Phone: 18290762907
+生成时间: 2026-01-22 18:21:32
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.eih87fluz6v6kappia817tTESTOFFER
+Phone: 18278434204
+生成时间: 2026-01-22 18:39:59
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.htku9jfrbmnewfflb0g7iiTESTOFFER
+Phone: 18217358291
+OfferID: amzn1.lending.offer.us.htku9jfrbmnewfflb0g7iiTESTOFFER
+生成时间: 2026-01-22 19:02:46
+
+TIER: TIER2
+URL: https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.rf3zcxyk7qf8opdg6l2kl9TESTOFFER
+Phone: 18241047994
+OfferID: amzn1.lending.offer.us.rf3zcxyk7qf8opdg6l2kl9TESTOFFER
+生成时间: 2026-01-23 10:03:05
+

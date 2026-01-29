@@ -12,7 +12,7 @@ from pymysql.constants import CLIENT
 from pymysql.err import OperationalError, ProgrammingError
 
 # ============================ 基础配置 ============================
-ENV = "uat"
+ENV = "sit"
 
 AUTO_CONFIG = {
     "approved_amount": 2000.00,

@@ -13,3 +13,45 @@ URL: https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redire
 Phone: 18269026010
 生成时间: 2026-01-15 15:08:56
 
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.ndy4b1thhh4q1og8rb0p6fTESTOFFER
+Phone: 18275000509
+OfferID: amzn1.lending.offer.us.ndy4b1thhh4q1og8rb0p6fTESTOFFER
+生成时间: 2026-01-23 11:56:53
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.8abjshtup2v9uaiyixt258TESTOFFER
+Phone: 18263040440
+OfferID: amzn1.lending.offer.us.8abjshtup2v9uaiyixt258TESTOFFER
+生成时间: 2026-01-23 12:24:39
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.5we2kq2z79fjaswz06rekuTESTOFFER
+Phone: 18238950679
+OfferID: amzn1.lending.offer.us.5we2kq2z79fjaswz06rekuTESTOFFER
+生成时间: 2026-01-23 13:34:13
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.79imutrdnoghdbzahl3se2TESTOFFER
+Phone: 18236108841
+OfferID: amzn1.lending.offer.us.79imutrdnoghdbzahl3se2TESTOFFER
+生成时间: 2026-01-23 13:42:08
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.ikuijzsslw1jdrekt9ysmnTESTOFFER
+Phone: 18245599105
+OfferID: amzn1.lending.offer.us.ikuijzsslw1jdrekt9ysmnTESTOFFER
+生成时间: 2026-01-23 13:49:35
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.no45k8tj5udsljjlsaapocTESTOFFER
+Phone: 18232020525
+OfferID: amzn1.lending.offer.us.no45k8tj5udsljjlsaapocTESTOFFER
+生成时间: 2026-01-23 13:56:47
+
+TIER: TIER2
+URL: https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.hm2ddrv2pvcfn62zt42z87TESTOFFER
+Phone: 18243496391
+OfferID: amzn1.lending.offer.us.hm2ddrv2pvcfn62zt42z87TESTOFFER
+生成时间: 2026-01-23 14:21:05
+
