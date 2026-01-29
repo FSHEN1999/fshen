@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多人德州扑克</title>
+    <title>多人在线德州扑克</title>
+    <!-- PeerJS库 -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -36,7 +38,222 @@
             background-clip: text;
         }
 
-        /* 配置面板 */
+        /* 游戏模式选择 */
+        .mode-selector {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.local {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: white;
+        }
+
+        .mode-btn.online {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        /* 游戏大厅 */
+        .lobby-panel {
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            margin: 50px auto;
+            text-align: center;
+        }
+
+        .lobby-panel h2 {
+            color: #ffd700;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .lobby-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 12px 30px;
+            font-size: 1em;
+            font-weight: bold;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 25px;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            border-color: #ffd700;
+        }
+
+        .tab-btn:hover {
+            border-color: #ffd700;
+        }
+
+        .lobby-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            margin: 10px 0;
+            outline: none;
+        }
+
+        .lobby-input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .lobby-input:focus {
+            border-color: #ffd700;
+        }
+
+        .lobby-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.3s;
+        }
+
+        .lobby-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .lobby-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 等待房间 */
+        .waiting-room {
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            margin: 50px auto;
+            text-align: center;
+        }
+
+        .waiting-room h2 {
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+
+        .room-info {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .room-info p {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+
+        .room-info strong {
+            color: #ffd700;
+        }
+
+        .room-info input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1em;
+        }
+
+        .players-list {
+            margin: 20px 0;
+            min-height: 150px;
+        }
+
+        .player-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-item .player-name {
+            font-size: 1.2em;
+            color: #ffd700;
+        }
+
+        .player-item .player-status {
+            font-size: 0.9em;
+            color: #2ecc71;
+        }
+
+        .player-item .is-host::after {
+            content: ' (房主)';
+            color: #e74c3c;
+        }
+
+        .connection-status {
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .connection-status.connected {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .connection-status.connecting {
+            background: rgba(241, 196, 15, 0.2);
+            color: #f1c40f;
+        }
+
+        .connection-status.error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        /* 单机模式面板 */
         .setup-panel {
             background: rgba(0,0,0,0.5);
             border-radius: 20px;
@@ -143,6 +360,16 @@
         .game-info span {
             margin: 0 20px;
             color: #ffd700;
+        }
+
+        .back-btn {
+            padding: 8px 15px;
+            border-radius: 15px;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
         }
 
         /* 环形布局 */
@@ -384,7 +611,7 @@
             font-size: 1.1em;
         }
 
-        /* 手牌强度显示（仅对真人玩家） */
+        /* 手牌强度显示 */
         .hand-strength {
             text-align: center;
             margin-top: 10px;
@@ -414,14 +641,24 @@
                 font-size: 14px;
             }
         }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🃏 多人德州扑克 🃏</h1>
 
-        <!-- 配置面板 -->
-        <div class="setup-panel" id="setup-panel">
+        <!-- 模式选择 -->
+        <div class="mode-selector" id="mode-selector">
+            <button class="mode-btn local" onclick="selectMode('local')">🎮 单机模式</button>
+            <button class="mode-btn online" onclick="selectMode('online')">🌐 在线对战</button>
+        </div>
+
+        <!-- 单机模式配置面板 -->
+        <div class="setup-panel hidden" id="setup-panel">
             <h2>游戏设置</h2>
             <div class="setup-option">
                 <label>玩家数量</label>
@@ -431,7 +668,45 @@
             <div class="player-config-list" id="player-config-list">
                 <!-- 动态生成 -->
             </div>
-            <button class="btn-start" onclick="startGame()">开始游戏</button>
+            <button class="btn-start" onclick="startLocalGame()">开始游戏</button>
+        </div>
+
+        <!-- 在线模式大厅 -->
+        <div class="lobby-panel hidden" id="lobby-panel">
+            <h2>🎮 游戏大厅</h2>
+            <div class="lobby-tabs">
+                <button class="tab-btn active" onclick="showLobbyTab('create')">创建房间</button>
+                <button class="tab-btn" onclick="showLobbyTab('join')">加入房间</button>
+            </div>
+            <div id="create-room-tab">
+                <input type="text" id="player-name" class="lobby-input" placeholder="输入你的昵称" maxlength="20">
+                <button class="lobby-btn" onclick="createRoom()">创建房间</button>
+            </div>
+            <div id="join-room-tab" class="hidden">
+                <input type="text" id="join-player-name" class="lobby-input" placeholder="输入你的昵称" maxlength="20">
+                <input type="text" id="room-code-input" class="lobby-input" placeholder="输入房间码" maxlength="6" style="text-transform: uppercase;">
+                <button class="lobby-btn" onclick="joinRoom()">加入房间</button>
+            </div>
+            <div id="connection-status" class="connection-status connecting">正在连接PeerJS服务器...</div>
+        </div>
+
+        <!-- 等待房间 -->
+        <div class="waiting-room hidden" id="waiting-room">
+            <h2>等待其他玩家加入...</h2>
+            <div class="room-info">
+                <p>房间码: <strong id="display-room-code">-</strong></p>
+                <p>复制链接分享给朋友:</p>
+                <input type="text" id="share-link" readonly onclick="this.select()">
+            </div>
+            <div class="players-list" id="players-list">
+                <!-- 动态生成 -->
+            </div>
+            <div id="host-controls" class="hidden">
+                <button class="lobby-btn" onclick="startOnlineGame()" id="start-online-btn" disabled>开始游戏</button>
+            </div>
+            <div id="guest-message" class="hidden" style="color: #f1c40f; margin-top: 20px;">
+                等待房主开始游戏...
+            </div>
         </div>
 
         <!-- 游戏区域 -->
@@ -440,7 +715,7 @@
                 <span>回合: <span id="round-num">1</span></span>
                 <span>小盲: <span id="small-blind">10</span></span>
                 <span>大盲: <span id="big-blind">20</span></span>
-                <button onclick="showSetupPanel()" style="padding: 8px 15px; border-radius: 15px; border: none; background: #e74c3c; color: white; cursor: pointer;">返回设置</button>
+                <button class="back-btn" onclick="exitGame()">退出游戏</button>
             </div>
 
             <div class="poker-table-container">
@@ -464,7 +739,7 @@
 
             <div class="hand-strength" id="hand-strength"></div>
 
-            <div class="message-area" id="message">点击"新游戏"开始</div>
+            <div class="message-area" id="message">等待游戏开始...</div>
 
             <div class="controls">
                 <button class="btn-fold" onclick="playerAction('fold')" id="btn-fold" disabled>弃牌</button>
@@ -472,47 +747,47 @@
                 <button class="btn-call" onclick="playerAction('call')" id="btn-call" disabled>跟注 <span id="call-amount"></span></button>
                 <button class="btn-raise" onclick="playerAction('raise')" id="btn-raise" disabled>加注 50</button>
                 <button class="btn-allin" onclick="playerAction('allin')" id="btn-allin" disabled>全押</button>
-                <button class="btn-start" onclick="newGame()" id="btn-new-game" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">新游戏</button>
+                <button class="btn-start" onclick="requestNewGame()" id="btn-new-game" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">下一局</button>
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== 数据结构 ====================
+        // ==================== 常量定义 ====================
         const SUITS = ['♠', '♥', '♦', '♣'];
         const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         const RANK_VALUES = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14};
 
-        // 玩家类
-        class Player {
-            constructor(id, name, isHuman = false, chips = 1000) {
-                this.id = id;
-                this.name = name;
-                this.isHuman = isHuman;
-                this.chips = chips;
-                this.initialChips = chips;
-                this.cards = [];
-                this.currentBet = 0;
-                this.folded = false;
-                this.allIn = false;
-                this.lastAction = '';
-            }
+        const MESSAGE_TYPES = {
+            JOIN: 'join',
+            WELCOME: 'welcome',
+            PLAYER_JOINED: 'player_joined',
+            PLAYER_LEFT: 'player_left',
+            GAME_START: 'game_start',
+            ACTION: 'action',
+            STATE_UPDATE: 'state_update',
+            NEW_GAME: 'new_game',
+            NEW_GAME_REQUEST: 'new_game_request'
+        };
 
-            reset() {
-                this.cards = [];
-                this.currentBet = 0;
-                this.folded = false;
-                this.allIn = false;
-                this.lastAction = '';
-            }
-        }
-
-        // AI 个性
         const AI_PERSONALITIES = [
             { name: '保守型', aggression: 0.2, bluffChance: 0.05, foldThreshold: 0.3 },
             { name: '平衡型', aggression: 0.5, bluffChance: 0.2, foldThreshold: 0.2 },
             { name: '激进型', aggression: 0.8, bluffChance: 0.4, foldThreshold: 0.1 }
         ];
+
+        // ==================== 全局状态 ====================
+        let gameMode = null; // 'local' or 'online'
+        let myPlayerName = '';
+        let isHost = false;
+        let localPlayerIndex = 0;
+
+        // PeerJS 相关
+        let peer = null;
+        let hostConnection = null;
+        let playerConnections = [];
+        let myPeerId = null;
+        let roomId = null;
 
         // 游戏配置
         let gameConfig = {
@@ -525,7 +800,7 @@
 
         // 游戏状态
         let gameState = {
-            phase: 'idle',           // idle, preflop, flop, turn, river, showdown
+            phase: 'idle',
             round: 0,
             pot: 0,
             currentBet: 0,
@@ -538,11 +813,437 @@
             communityCards: []
         };
 
-        // ==================== 初始化 ====================
-        function init() {
-            updatePlayerCount();
+        // ==================== 玩家类 ====================
+        class Player {
+            constructor(id, name, isLocal = false, isHuman = false, chips = 1000) {
+                this.id = id;
+                this.name = name;
+                this.isLocal = isLocal;
+                this.isHuman = isHuman;
+                this.chips = chips;
+                this.initialChips = chips;
+                this.cards = [];
+                this.currentBet = 0;
+                this.folded = false;
+                this.allIn = false;
+                this.lastAction = '';
+                this.personality = null;
+            }
+
+            reset() {
+                this.cards = [];
+                this.currentBet = 0;
+                this.folded = false;
+                this.allIn = false;
+                this.lastAction = '';
+            }
         }
 
+        // ==================== 模式选择 ====================
+        function selectMode(mode) {
+            gameMode = mode;
+            document.getElementById('mode-selector').classList.add('hidden');
+
+            if (mode === 'local') {
+                document.getElementById('setup-panel').classList.remove('hidden');
+                updatePlayerCount();
+            } else {
+                document.getElementById('lobby-panel').classList.remove('hidden');
+                initPeer();
+            }
+        }
+
+        function showLobbyTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (tab === 'create') {
+                document.getElementById('create-room-tab').classList.remove('hidden');
+                document.getElementById('join-room-tab').classList.add('hidden');
+            } else {
+                document.getElementById('create-room-tab').classList.add('hidden');
+                document.getElementById('join-room-tab').classList.remove('hidden');
+            }
+        }
+
+        // ==================== PeerJS 初始化 ====================
+        function initPeer() {
+            updateConnectionStatus('connecting', '正在连接PeerJS服务器...');
+
+            peer = new Peer(null, {
+                debug: 1
+            });
+
+            peer.on('open', (id) => {
+                myPeerId = id;
+                console.log('My peer ID:', id);
+                updateConnectionStatus('connected', '已连接到服务器');
+            });
+
+            peer.on('connection', (conn) => {
+                if (isHost) {
+                    handlePlayerConnection(conn);
+                }
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                updateConnectionStatus('error', '连接错误: ' + err.type);
+                showMessage('PeerJS连接失败，请刷新页面重试');
+            });
+        }
+
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.className = 'connection-status ' + status;
+            statusDiv.textContent = message;
+        }
+
+        // ==================== 房间管理 ====================
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function createRoom() {
+            const nameInput = document.getElementById('player-name');
+            myPlayerName = nameInput.value.trim();
+
+            if (!myPlayerName) {
+                showMessage('请输入昵称');
+                return;
+            }
+
+            isHost = true;
+            roomId = generateRoomCode();
+
+            // 创建房主玩家
+            gameState.players = [new Player(0, myPlayerName, true, true)];
+            localPlayerIndex = 0;
+
+            // 显示等待房间
+            showWaitingRoom();
+        }
+
+        function joinRoom() {
+            const nameInput = document.getElementById('join-player-name');
+            const roomInput = document.getElementById('room-code-input');
+            myPlayerName = nameInput.value.trim();
+            const roomCode = roomInput.value.trim().toUpperCase();
+
+            if (!myPlayerName || !roomCode) {
+                showMessage('请输入昵称和房间码');
+                return;
+            }
+
+            if (!peer || !myPeerId) {
+                showMessage('请等待连接服务器');
+                return;
+            }
+
+            isHost = false;
+            roomId = roomCode;
+
+            // 检查URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const hostId = urlParams.get('host');
+
+            if (!hostId) {
+                showMessage('无效的邀请链接');
+                return;
+            }
+
+            showMessage('正在加入房间...');
+
+            // 连接到房主
+            hostConnection = peer.connect(hostId, {
+                metadata: { playerName: myPlayerName, roomId: roomCode }
+            });
+
+            hostConnection.on('open', () => {
+                console.log('Connected to host');
+                // 发送加入请求
+                hostConnection.send({
+                    type: MESSAGE_TYPES.JOIN,
+                    playerName: myPlayerName,
+                    peerId: myPeerId
+                });
+            });
+
+            hostConnection.on('data', (data) => {
+                handleHostMessage(data);
+            });
+
+            hostConnection.on('close', () => {
+                showMessage('与房主的连接已断开');
+            });
+
+            hostConnection.on('error', (err) => {
+                console.error('Connection error:', err);
+                showMessage('连接错误');
+            });
+        }
+
+        function showWaitingRoom() {
+            document.getElementById('lobby-panel').classList.add('hidden');
+            document.getElementById('waiting-room').classList.remove('hidden');
+
+            document.getElementById('display-room-code').textContent = roomId;
+
+            // 生成分享链接
+            const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}&host=${myPeerId}`;
+            document.getElementById('share-link').value = shareUrl;
+
+            if (isHost) {
+                document.getElementById('host-controls').classList.remove('hidden');
+            } else {
+                document.getElementById('guest-message').classList.remove('hidden');
+            }
+
+            updatePlayersList();
+        }
+
+        function updatePlayersList() {
+            const listDiv = document.getElementById('players-list');
+            listDiv.innerHTML = '';
+
+            gameState.players.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'player-item';
+                item.innerHTML = `
+                    <span class="player-name ${player.isLocal ? 'is-host' : ''}">${player.name}</span>
+                    <span class="player-status">${player.isLocal ? '(你)' : '已连接'}</span>
+                `;
+                listDiv.appendChild(item);
+            });
+
+            // 房主检查是否可以开始游戏
+            if (isHost) {
+                const canStart = gameState.players.length >= 2;
+                document.getElementById('start-online-btn').disabled = !canStart;
+            }
+        }
+
+        // ==================== 房主消息处理 ====================
+        function handlePlayerConnection(conn) {
+            playerConnections.push(conn);
+            console.log('Player connected:', conn.peer);
+
+            conn.on('data', (data) => {
+                handlePlayerMessage(data, conn);
+            });
+
+            conn.on('close', () => {
+                // 玩家断开连接
+                const index = playerConnections.indexOf(conn);
+                if (index > -1) {
+                    playerConnections.splice(index, 1);
+                    // 移除玩家
+                    const playerIndex = gameState.players.findIndex(p => p.connectionId === conn.peer);
+                    if (playerIndex > -1) {
+                        const player = gameState.players[playerIndex];
+                        gameState.players.splice(playerIndex, 1);
+                        // 重新分配ID
+                        gameState.players.forEach((p, i) => p.id = i);
+                        // 广播玩家离开
+                        broadcastToPlayers({ type: MESSAGE_TYPES.PLAYER_LEFT, playerIndex });
+                        updatePlayersList();
+                    }
+                }
+            });
+
+            conn.on('error', (err) => {
+                console.error('Player connection error:', err);
+            });
+        }
+
+        function handlePlayerMessage(data, conn) {
+            console.log('Received from player:', data);
+
+            switch (data.type) {
+                case MESSAGE_TYPES.JOIN:
+                    // 新玩家加入
+                    const newPlayer = new Player(
+                        gameState.players.length,
+                        data.playerName,
+                        false,
+                        true
+                    );
+                    newPlayer.connectionId = conn.peer;
+                    newPlayer.conn = conn;
+                    gameState.players.push(newPlayer);
+
+                    // 发送欢迎消息给新玩家
+                    conn.send({
+                        type: MESSAGE_TYPES.WELCOME,
+                        players: gameState.players.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            chips: p.chips
+                        })),
+                        playerIndex: newPlayer.id
+                    });
+
+                    // 广播新玩家加入
+                    broadcastToPlayers({
+                        type: MESSAGE_TYPES.PLAYER_JOINED,
+                        player: { id: newPlayer.id, name: newPlayer.name }
+                    }, conn);
+
+                    updatePlayersList();
+                    break;
+
+                case MESSAGE_TYPES.ACTION:
+                    // 玩家动作
+                    executeRemoteAction(data.action, data.playerIndex);
+                    break;
+
+                case MESSAGE_TYPES.NEW_GAME_REQUEST:
+                    // 玩家请求开始新游戏
+                    if (gameState.phase === 'showdown') {
+                        startNewGame();
+                    }
+                    break;
+            }
+        }
+
+        function broadcastToPlayers(message, excludeConn = null) {
+            playerConnections.forEach(conn => {
+                if (conn !== excludeConn && conn.open) {
+                    conn.send(message);
+                }
+            });
+        }
+
+        // ==================== 玩家消息处理（非房主） ====================
+        function handleHostMessage(data) {
+            console.log('Received from host:', data);
+
+            switch (data.type) {
+                case MESSAGE_TYPES.WELCOME:
+                    gameState.players = data.players.map((p, i) => {
+                        const player = new Player(i, p.name, false, p.id === data.playerIndex);
+                        player.chips = p.chips;
+                        return player;
+                    });
+                    localPlayerIndex = data.playerIndex;
+                    gameState.players[localPlayerIndex].isLocal = true;
+                    showWaitingRoom();
+                    break;
+
+                case MESSAGE_TYPES.PLAYER_JOINED:
+                    const newPlayer = new Player(data.player.id, data.player.name, false, false);
+                    gameState.players.push(newPlayer);
+                    updatePlayersList();
+                    break;
+
+                case MESSAGE_TYPES.PLAYER_LEFT:
+                    if (data.playerIndex < gameState.players.length) {
+                        gameState.players.splice(data.playerIndex, 1);
+                        gameState.players.forEach((p, i) => p.id = i);
+                        if (localPlayerIndex > data.playerIndex) {
+                            localPlayerIndex--;
+                        }
+                        updatePlayersList();
+                    }
+                    break;
+
+                case MESSAGE_TYPES.GAME_START:
+                    startGame();
+                    break;
+
+                case MESSAGE_TYPES.STATE_UPDATE:
+                    // 更新游戏状态
+                    updateGameStateFromHost(data);
+                    break;
+
+                case MESSAGE_TYPES.NEW_GAME:
+                    startNewGame();
+                    break;
+            }
+        }
+
+        function updateGameStateFromHost(data) {
+            const state = data.gameState;
+
+            // 更新公共状态
+            gameState.phase = state.phase;
+            gameState.pot = state.pot;
+            gameState.currentBet = state.currentBet;
+            gameState.currentPlayerIndex = state.currentPlayerIndex;
+            gameState.dealerIndex = state.dealerIndex;
+            gameState.communityCards = state.communityCards;
+
+            // 更新玩家状态
+            state.players.forEach((p, i) => {
+                if (gameState.players[i]) {
+                    gameState.players[i].chips = p.chips;
+                    gameState.players[i].currentBet = p.currentBet;
+                    gameState.players[i].folded = p.folded;
+                    gameState.players[i].allIn = p.allIn;
+                    gameState.players[i].lastAction = p.lastAction;
+
+                    // 只更新自己的牌
+                    if (i === localPlayerIndex && p.cards) {
+                        gameState.players[i].cards = p.cards;
+                    }
+                }
+            });
+
+            // 摊牌时显示所有牌
+            if (state.phase === 'showdown' && state.showdownCards) {
+                state.showdownCards.forEach((cards, i) => {
+                    if (gameState.players[i]) {
+                        gameState.players[i].cards = cards;
+                    }
+                });
+            }
+
+            // 胜负判定
+            if (state.phase === 'showdown' && state.winners) {
+                setTimeout(() => {
+                    const winnerNames = state.winners.map(w => gameState.players[w]?.name || '未知').join(' & ');
+                    showMessage(`${winnerNames} 获胜！${state.handName || ''}`);
+                }, 500);
+            }
+
+            updateDisplay();
+
+            // 轮到本地玩家
+            if (state.currentPlayerIndex === localPlayerIndex && state.phase !== 'showdown') {
+                enableControls();
+                showMessage('轮到你了！');
+            } else {
+                disableControls();
+            }
+        }
+
+        // ==================== 在线游戏 ====================
+        function startOnlineGame() {
+            if (!isHost) return;
+
+            // 通知所有玩家开始游戏
+            broadcastToPlayers({ type: MESSAGE_TYPES.GAME_START });
+            startGame();
+        }
+
+        function requestNewGame() {
+            if (gameMode === 'online') {
+                if (isHost) {
+                    startNewGame();
+                } else {
+                    hostConnection.send({ type: MESSAGE_TYPES.NEW_GAME_REQUEST });
+                }
+            } else {
+                startNewGame();
+            }
+        }
+
+        // ==================== 单机游戏 ====================
         function updatePlayerCount() {
             const count = parseInt(document.getElementById('player-count').value);
             document.getElementById('player-count-display').textContent = count;
@@ -567,9 +1268,10 @@
             }
         }
 
-        // ==================== 游戏开始 ====================
-        function startGame() {
-            // 获取配置
+        function startLocalGame() {
+            gameMode = 'local';
+            isHost = true;
+
             const count = parseInt(document.getElementById('player-count').value);
             gameConfig.totalPlayers = count;
             gameConfig.humanPlayers = [];
@@ -585,59 +1287,31 @@
             for (let i = 0; i < count; i++) {
                 const isHuman = gameConfig.humanPlayers.includes(i);
                 const personality = isHuman ? null : AI_PERSONALITIES[i % AI_PERSONALITIES.length];
-                const player = new Player(i, isHuman ? `玩家${i + 1}` : `${personality.name}${i + 1}`, isHuman);
+                const player = new Player(i, isHuman ? `玩家${i + 1}` : `${personality.name}${i + 1}`, true, isHuman);
                 player.personality = personality;
                 gameState.players.push(player);
             }
 
-            // 显示游戏界面
-            document.getElementById('setup-panel').style.display = 'none';
+            localPlayerIndex = gameConfig.humanPlayers[0] || 0;
+
+            document.getElementById('setup-panel').classList.add('hidden');
+            document.getElementById('game-area').classList.remove('display');
             document.getElementById('game-area').style.display = 'block';
 
-            // 创建玩家座位
             createPlayerSeats();
-
-            // 开始新游戏
-            newGame();
+            startGame();
         }
 
-        function showSetupPanel() {
-            document.getElementById('setup-panel').style.display = 'block';
-            document.getElementById('game-area').style.display = 'none';
+        // ==================== 游戏开始 ====================
+        function startGame() {
+            document.getElementById('waiting-room').classList.add('hidden');
+            document.getElementById('game-area').style.display = 'block';
+
+            createPlayerSeats();
+            startNewGame();
         }
 
-        function createPlayerSeats() {
-            const container = document.getElementById('player-seats');
-            container.innerHTML = '';
-
-            const count = gameState.players.length;
-            const radius = 280; // 环形半径
-
-            for (let i = 0; i < count; i++) {
-                const angle = (i * 360 / count - 90) * Math.PI / 180; // -90度让第一个玩家在顶部
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-
-                const seat = document.createElement('div');
-                seat.className = 'player-seat';
-                seat.id = `player-seat-${i}`;
-                seat.style.left = `calc(50% + ${x}px - 90px)`;
-                seat.style.top = `calc(50% + ${y}px - 60px)`;
-                seat.innerHTML = `
-                    <div class="player-info">
-                        <span class="player-name">${gameState.players[i].name}</span>
-                        <span class="player-chips">${gameState.players[i].chips}</span>
-                    </div>
-                    <div class="player-cards" id="player-cards-${i}"></div>
-                    <div class="player-bet" id="player-bet-${i}"></div>
-                    <div class="player-action" id="player-action-${i}"></div>
-                `;
-                container.appendChild(seat);
-            }
-        }
-
-        // ==================== 新游戏 ====================
-        function newGame() {
+        function startNewGame() {
             // 重置状态
             gameState.round++;
             gameState.phase = 'preflop';
@@ -654,7 +1328,7 @@
             // 重置玩家
             gameState.players.forEach(p => {
                 if (p.chips <= 0) {
-                    p.chips = gameConfig.startingChips; // 重置筹码
+                    p.chips = gameConfig.startingChips;
                 }
                 p.reset();
             });
@@ -667,7 +1341,7 @@
             // 下盲注
             postBlinds();
 
-            // 设置第一个行动玩家（大盲后面的人）
+            // 设置第一个行动玩家
             const sbIndex = (gameState.dealerIndex + 1) % gameState.players.length;
             const bbIndex = (gameState.dealerIndex + 2) % gameState.players.length;
             gameState.currentPlayerIndex = (bbIndex + 1) % gameState.players.length;
@@ -675,6 +1349,11 @@
 
             updateDisplay();
             showMessage('第 ' + gameState.round + ' 回合开始！');
+
+            // 在线模式：广播状态
+            if (gameMode === 'online' && isHost) {
+                broadcastGameState();
+            }
 
             // 开始第一个玩家的回合
             setTimeout(() => processTurn(), 1000);
@@ -712,14 +1391,12 @@
 
         // ==================== 回合处理 ====================
         function processTurn() {
-            // 检查是否只剩一个玩家
             const activePlayers = gameState.players.filter(p => !p.folded);
             if (activePlayers.length === 1) {
                 endRound(activePlayers[0]);
                 return;
             }
 
-            // 检查回合是否结束
             if (isRoundComplete()) {
                 nextPhase();
                 return;
@@ -727,7 +1404,6 @@
 
             const player = gameState.players[gameState.currentPlayerIndex];
 
-            // 跳过全押玩家
             if (player.allIn || player.folded) {
                 nextPlayer();
                 return;
@@ -735,7 +1411,9 @@
 
             updateDisplay();
 
-            if (player.isHuman) {
+            const isMyTurn = player.isLocal || (gameMode === 'local' && player.isHuman);
+
+            if (isMyTurn) {
                 enableControls();
                 showMessage('轮到你了！');
             } else {
@@ -746,24 +1424,19 @@
 
         function aiTurn(player) {
             const callAmount = gameState.currentBet - player.currentBet;
-            const potOdds = callAmount / (gameState.pot + callAmount);
             const handStrength = evaluateHandStrength(player);
-            const personality = player.personality;
-
-            // 计算随机因素
+            const personality = player.personality || AI_PERSONALITIES[1];
             const random = Math.random();
+
             let action;
 
-            // 决策逻辑
             if (callAmount === 0) {
-                // 可以过牌
                 if (handStrength > 0.6 && random < personality.aggression) {
                     action = 'raise';
                 } else {
                     action = 'check';
                 }
             } else {
-                // 需要跟注
                 if (handStrength < personality.foldThreshold && random > personality.bluffChance) {
                     action = 'fold';
                 } else if (handStrength > 0.7 && random < personality.aggression) {
@@ -775,7 +1448,6 @@
                 }
             }
 
-            // 执行动作
             executeAction(player, action);
         }
 
@@ -808,7 +1480,6 @@
                         gameState.lastRaiser = player.id;
                         showMessage(`${player.name} 加注到 ${player.currentBet}`);
                     } else {
-                        // 筹码不足，执行全押
                         placeBet(player.id, player.chips);
                         player.lastAction = '全押';
                         showMessage(`${player.name} 全押`);
@@ -823,17 +1494,62 @@
             }
 
             updateDisplay();
+
+            // 在线模式：发送动作给房主或广播
+            if (gameMode === 'online') {
+                if (isHost) {
+                    broadcastGameState();
+                } else {
+                    hostConnection.send({
+                        type: MESSAGE_TYPES.ACTION,
+                        action: action,
+                        playerIndex: player.id
+                    });
+                }
+            }
+
             setTimeout(() => nextPlayer(), 500);
+        }
+
+        function executeRemoteAction(action, playerIndex) {
+            const player = gameState.players[playerIndex];
+            if (!player) return;
+
+            executeAction(player, action);
         }
 
         function playerAction(action) {
             disableControls();
             const player = gameState.players[gameState.currentPlayerIndex];
-            executeAction(player, action);
+
+            if (gameMode === 'online' && !isHost) {
+                // 发送动作给房主
+                hostConnection.send({
+                    type: MESSAGE_TYPES.ACTION,
+                    action: action,
+                    playerIndex: player.id
+                });
+
+                // 本地预览
+                player.lastAction = getActionName(action);
+                updateDisplay();
+            } else {
+                executeAction(player, action);
+            }
+        }
+
+        function getActionName(action) {
+            const names = {
+                'fold': '弃牌',
+                'check': '过牌',
+                'call': '跟注',
+                'raise': '加注',
+                'allin': '全押'
+            };
+            return names[action] || action;
         }
 
         function nextPlayer() {
-            // 找到下一个未弃牌、未全押的玩家
             let nextIndex = gameState.currentPlayerIndex;
             let loopCount = 0;
 
@@ -850,7 +1566,6 @@
         }
 
         function isRoundComplete() {
-            // 检查所有活跃玩家的下注是否相等，且最后一个加注者已行动
             const activePlayers = gameState.players.filter(p => !p.folded && !p.allIn);
             if (activePlayers.length <= 1) return true;
 
@@ -863,7 +1578,6 @@
 
         // ==================== 阶段推进 ====================
         function nextPhase() {
-            // 重置当前轮下注
             gameState.players.forEach(p => p.currentBet = 0);
             gameState.currentBet = 0;
             gameState.lastRaiser = (gameState.dealerIndex + 1) % gameState.players.length;
@@ -872,8 +1586,11 @@
             switch (gameState.phase) {
                 case 'preflop':
                     gameState.phase = 'flop';
-                    // 发三张公共牌
-                    gameState.communityCards.push(gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop());
+                    gameState.communityCards.push(
+                        gameState.deck.pop(),
+                        gameState.deck.pop(),
+                        gameState.deck.pop()
+                    );
                     showMessage('翻牌圈！');
                     break;
 
@@ -895,6 +1612,11 @@
             }
 
             updateDisplay();
+
+            if (gameMode === 'online' && isHost) {
+                broadcastGameState();
+            }
+
             setTimeout(() => processTurn(), 1000);
         }
 
@@ -908,7 +1630,6 @@
                 return;
             }
 
-            // 评估所有玩家的牌
             let bestHand = null;
             let winners = [];
 
@@ -924,10 +1645,8 @@
                 }
             }
 
-            // 显示所有玩家的牌
             updateDisplay(true);
 
-            // 分配底池
             const winAmount = Math.floor(gameState.pot / winners.length);
             winners.forEach(w => w.chips += winAmount);
 
@@ -935,12 +1654,14 @@
                 ? `${winners[0].name} 获胜！${winners[0].hand.name}`
                 : `平局！${winners.map(w => w.name).join(' & ')} 各赢 ${winAmount}`;
 
-            showMessage(`${resultText}`);
+            showMessage(resultText);
 
-            // 3秒后可以开始新游戏
-            setTimeout(() => {
-                disableControls();
-            }, 3000);
+            // 在线模式：广播结果
+            if (gameMode === 'online' && isHost) {
+                broadcastGameState();
+            }
+
+            disableControls();
         }
 
         function endRound(winner) {
@@ -949,6 +1670,54 @@
             gameState.phase = 'showdown';
             updateDisplay(true);
             disableControls();
+
+            if (gameMode === 'online' && isHost) {
+                broadcastGameState();
+            }
+        }
+
+        // ==================== 状态广播（房主） ====================
+        function broadcastGameState() {
+            if (!isHost || gameMode !== 'online') return;
+
+            const showdownCards = gameState.phase === 'showdown' ?
+                gameState.players.map(p => p.cards) : null;
+
+            const winners = gameState.phase === 'showdown' ?
+                gameState.players
+                    .map((p, i) => ({ player: p, index: i }))
+                    .filter(({ player }) => !player.folded)
+                    .sort((a, b) => compareHands(b.player.hand, a.player.hand))
+                    .slice(0, 1)
+                    .map(w => w.index) : null;
+
+            const stateMessage = {
+                type: MESSAGE_TYPES.STATE_UPDATE,
+                gameState: {
+                    phase: gameState.phase,
+                    pot: gameState.pot,
+                    currentBet: gameState.currentBet,
+                    currentPlayerIndex: gameState.currentPlayerIndex,
+                    dealerIndex: gameState.dealerIndex,
+                    communityCards: gameState.communityCards,
+                    showdownCards: showdownCards,
+                    winners: winners,
+                    handName: winners !== null ?
+                        gameState.players[winners[0]]?.hand?.name : null,
+                    players: gameState.players.map((p, i) => ({
+                        id: p.id,
+                        name: p.name,
+                        chips: p.chips,
+                        currentBet: p.currentBet,
+                        folded: p.folded,
+                        allIn: p.allIn,
+                        lastAction: p.lastAction,
+                        cards: i === localPlayerIndex ? p.cards : []
+                    }))
+                }
+            };
+
+            broadcastToPlayers(stateMessage);
         }
 
         // ==================== 牌型评估 ====================
@@ -967,29 +1736,19 @@
             const uniqueValues = [...new Set(values)].sort((a, b) => b - a);
             const isStraight = checkStraight(uniqueValues);
 
-            // 同花顺
             if (isFlush && isStraight) return { rank: 9, name: '同花顺', values };
-            // 四条
             if (counts[0] === 4) return { rank: 8, name: '四条', values };
-            // 葫芦
             if (counts[0] === 3 && counts[1] >= 2) return { rank: 7, name: '葫芦', values };
-            // 同花
             if (isFlush) return { rank: 6, name: '同花', values };
-            // 顺子
             if (isStraight) return { rank: 5, name: '顺子', values };
-            // 三条
             if (counts[0] === 3) return { rank: 4, name: '三条', values };
-            // 两对
             if (counts[0] === 2 && counts[1] === 2) return { rank: 3, name: '两对', values };
-            // 一对
             if (counts[0] === 2) return { rank: 2, name: '一对', values };
-            // 高牌
             return { rank: 1, name: '高牌', values };
         }
 
         function evaluateHandStrength(player) {
             if (gameState.communityCards.length === 0) {
-                // 翻牌前，根据手牌评估
                 const c1 = player.cards[0];
                 const c2 = player.cards[1];
                 const isPair = c1.value === c2.value;
@@ -1012,7 +1771,6 @@
             for (let i = 0; i <= values.length - 5; i++) {
                 if (values[i] - values[i + 4] === 4) return true;
             }
-            // A2345
             if (values.includes(14) && values.includes(2) && values.includes(3) && values.includes(4) && values.includes(5)) {
                 return true;
             }
@@ -1023,7 +1781,6 @@
             if (hand1.rank !== hand2.rank) {
                 return hand1.rank - hand2.rank;
             }
-            // 相同牌型，比较高牌
             for (let i = 0; i < Math.min(hand1.values.length, hand2.values.length); i++) {
                 if (hand1.values[i] !== hand2.values[i]) {
                     return hand1.values[i] - hand2.values[i];
@@ -1040,7 +1797,6 @@
                     deck.push({ suit, rank, value: RANK_VALUES[rank] });
                 }
             }
-            // 洗牌
             for (let i = deck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -1069,14 +1825,42 @@
         }
 
         // ==================== 显示更新 ====================
+        function createPlayerSeats() {
+            const container = document.getElementById('player-seats');
+            container.innerHTML = '';
+
+            const count = gameState.players.length;
+            const radius = 280;
+
+            for (let i = 0; i < count; i++) {
+                const angle = (i * 360 / count - 90) * Math.PI / 180;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+
+                const seat = document.createElement('div');
+                seat.className = 'player-seat';
+                seat.id = `player-seat-${i}`;
+                seat.style.left = `calc(50% + ${x}px - 90px)`;
+                seat.style.top = `calc(50% + ${y}px - 60px)`;
+                seat.innerHTML = `
+                    <div class="player-info">
+                        <span class="player-name">${gameState.players[i].name}</span>
+                        <span class="player-chips">${gameState.players[i].chips}</span>
+                    </div>
+                    <div class="player-cards" id="player-cards-${i}"></div>
+                    <div class="player-bet" id="player-bet-${i}"></div>
+                    <div class="player-action" id="player-action-${i}"></div>
+                `;
+                container.appendChild(seat);
+            }
+        }
+
         function updateDisplay(showAllCards = false) {
-            // 更新游戏信息
             document.getElementById('round-num').textContent = gameState.round;
             document.getElementById('small-blind').textContent = gameConfig.smallBlind;
             document.getElementById('big-blind').textContent = gameConfig.bigBlind;
             document.getElementById('pot').textContent = gameState.pot;
 
-            // 更新阶段显示
             const phaseNames = {
                 'idle': '等待开始',
                 'preflop': '翻牌前',
@@ -1103,32 +1887,29 @@
             // 更新玩家座位
             gameState.players.forEach((player, index) => {
                 const seat = document.getElementById(`player-seat-${index}`);
+                if (!seat) return;
+
                 const cardsDiv = document.getElementById(`player-cards-${index}`);
                 const betDiv = document.getElementById(`player-bet-${index}`);
                 const actionDiv = document.getElementById(`player-action-${index}`);
 
-                // 更新座位状态
                 seat.classList.toggle('active', index === gameState.currentPlayerIndex && gameState.phase !== 'idle' && gameState.phase !== 'showdown');
                 seat.classList.toggle('folded', player.folded);
                 seat.classList.toggle('dealer', index === gameState.dealerIndex);
 
-                // 更新筹码显示
                 seat.querySelector('.player-chips').textContent = player.chips;
 
-                // 更新手牌
                 cardsDiv.innerHTML = '';
                 if (player.cards.length > 0) {
-                    const showCards = player.isHuman || showAllCards || gameState.phase === 'showdown';
+                    const showCards = player.isLocal || showAllCards || gameState.phase === 'showdown';
                     player.cards.forEach(card => {
                         cardsDiv.appendChild(createCardElement(card, !showCards));
                     });
                 }
 
-                // 更新下注显示
                 betDiv.textContent = player.currentBet > 0 ? `下注: ${player.currentBet}` : '';
                 if (player.allIn) betDiv.textContent = '全押！';
 
-                // 更新动作显示
                 actionDiv.textContent = player.lastAction;
             });
 
@@ -1139,18 +1920,17 @@
                 document.getElementById('call-amount').textContent = callAmount > 0 ? callAmount : '';
             }
 
-            // 更新真人玩家的手牌强度
             updateHandStrength();
         }
 
         function updateHandStrength() {
-            const humanPlayer = gameState.players.find(p => p.isHuman);
-            if (!humanPlayer || humanPlayer.cards.length === 0) {
+            const myPlayer = gameState.players[localPlayerIndex];
+            if (!myPlayer || myPlayer.cards.length === 0) {
                 document.getElementById('hand-strength').textContent = '';
                 return;
             }
 
-            const hand = evaluateHand([...humanPlayer.cards, ...gameState.communityCards]);
+            const hand = evaluateHand([...myPlayer.cards, ...gameState.communityCards]);
             document.getElementById('hand-strength').textContent = `当前牌型: ${hand.name}`;
         }
 
@@ -1176,11 +1956,32 @@
             document.getElementById('btn-call').disabled = true;
             document.getElementById('btn-raise').disabled = true;
             document.getElementById('btn-allin').disabled = true;
-            document.getElementById('btn-new-game').disabled = false;
+            document.getElementById('btn-new-game').disabled = gameState.phase !== 'showdown';
         }
 
-        // 初始化
-        init();
+        function exitGame() {
+            if (confirm('确定要退出游戏吗？')) {
+                location.reload();
+            }
+        }
+
+        // ==================== URL参数解析 ====================
+        function parseUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const room = urlParams.get('room');
+            const host = urlParams.get('host');
+
+            if (room && host) {
+                // 自动进入加入房间流程
+                selectMode('online');
+                document.getElementById('join-player-name').value = '';
+                document.getElementById('room-code-input').value = room;
+                showLobbyTab('join');
+            }
+        }
+
+        // ==================== 初始化 ====================
+        parseUrlParams();
     </script>
 </body>
 </html>
