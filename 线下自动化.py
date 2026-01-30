@@ -17,6 +17,7 @@ import time
 import os
 import random
 import logging
+import socket
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
 from selenium import webdriver
@@ -322,6 +323,29 @@ def get_yes_no_choice(prompt: str) -> bool:
 # ==============================================================================
 # --- 4. 数据库配置 ---
 # ==============================================================================
+def get_local_physical_ip() -> Optional[str]:
+    """获取本地物理网卡IP地址（用于绕过VPN直连数据库）"""
+    try:
+        # 创建一个UDP socket连接到公网地址（不会实际发送数据）
+        # 这会触发系统选择最佳路由，通常是物理网卡
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # 连接到AWS的公网DNS（不实际发送数据）
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            # 排除常见的VPN虚拟网卡IP段
+            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
+                return local_ip
+            # 如果获取到的是内网IP，尝试通过主机名解析
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
+                return local_ip
+    except Exception:
+        pass
+    # 如果上述方法失败，返回None让系统自动选择
+    return None
+
+
 class DBConfig:
     """数据库配置（支持多环境切换）"""
     _DATABASE_CONFIG = DATABASE_CONFIG_DICT
@@ -361,10 +385,34 @@ class DatabaseExecutor:
                     raise
 
     def _connect(self) -> None:
-        """执行数据库连接"""
-        self.conn = pymysql.connect(**self.config, autocommit=True)
-        self.cursor = self.conn.cursor()
-        logging.info("✅ 数据库连接成功")
+        """执行数据库连接（绑定本地物理网卡IP绕过VPN）"""
+        # 获取本地物理网卡IP用于绕过VPN
+        local_ip = get_local_physical_ip()
+        connect_params = self.config.copy()
+
+        if local_ip:
+            connect_params['bind_address'] = local_ip
+            logging.info(f"🔗 绑定本地IP: {local_ip} 绕过VPN直连数据库")
+
+        try:
+            # 清除代理环境变量
+            old_proxies = {}
+            for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
+                if os.environ.get(proxy_key):
+                    old_proxies[proxy_key] = os.environ[proxy_key]
+                    del os.environ[proxy_key]
+
+            self.conn = pymysql.connect(**connect_params, autocommit=True)
+            self.cursor = self.conn.cursor()
+
+            if local_ip:
+                logging.info(f"✅ 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
+            else:
+                logging.info("✅ 数据库连接成功（系统自动路由）")
+        finally:
+            # 恢复代理环境变量
+            for k, v in old_proxies.items():
+                os.environ[k] = v
 
     def _ensure_connected(self) -> None:
         """确保数据库连接有效，如果断开则重连"""

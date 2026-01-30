@@ -6,6 +6,8 @@ DPU状态模拟工具
 核心特性：自动重连数据库、输入验证、日志颜色区分、统一请求处理
 """
 import logging
+import os
+import socket
 import time
 import uuid
 import random
@@ -250,6 +252,23 @@ class DatabaseConfig:
         return cls._DATABASE_CONFIG[env].copy()
 
 
+def get_local_physical_ip() -> Optional[str]:
+    """获取本地物理网卡IP地址（用于绕过VPN直连数据库）"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
+                return local_ip
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
+                return local_ip
+    except Exception:
+        pass
+    return None
+
+
 # ============================ 数据库执行器（精简连接逻辑，提升稳定性）============================
 class DatabaseExecutor:
     """数据库操作执行器（封装连接、查询、执行逻辑，支持自动重连和上下文管理）"""
@@ -261,18 +280,39 @@ class DatabaseExecutor:
         self.env = env
 
     def connect(self) -> None:
-        """建立数据库连接"""
+        """建立数据库连接（绑定本地物理网卡IP绕过VPN）"""
+        # 获取本地物理网卡IP
+        local_ip = get_local_physical_ip()
+        connect_params = self.config.copy()
+
+        if local_ip:
+            connect_params['bind_address'] = local_ip
+
         try:
+            # 清除代理环境变量
+            old_proxies = {}
+            for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
+                if os.environ.get(proxy_key):
+                    old_proxies[proxy_key] = os.environ[proxy_key]
+                    del os.environ[proxy_key]
+
             self.conn = pymysql.connect(
-                **self.config,
+                **connect_params,
                 autocommit=True,
                 client_flag=CLIENT.INTERACTIVE
             )
             self.cursor = self.conn.cursor()
-            log.info(f"[{self.env}] 数据库连接成功")
+            if local_ip:
+                log.info(f"[{self.env}] 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
+            else:
+                log.info(f"[{self.env}] 数据库连接成功（系统自动路由）")
         except Exception as e:
             log.error(f"[{self.env}] 数据库连接失败: {e}")
             raise
+        finally:
+            # 恢复代理环境变量
+            for k, v in old_proxies.items():
+                os.environ[k] = v
 
     def reconnect(self) -> None:
         """数据库重连（连接失效时自动调用）"""

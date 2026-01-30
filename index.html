@@ -587,7 +587,7 @@
     <script>
         // ==================== 配置 ====================
         // 公网访问地址 (Cloudflare Tunnel)
-        const API_BASE = 'https://toolkit-favorites-physician-columnists.trycloudflare.com';
+        const API_BASE = 'https://think-conversion-dan-numerical.trycloudflare.com';
         let apiLogOpen = false;
 
         // 游戏状态
@@ -671,7 +671,7 @@
 
         // ==================== WebSocket ====================
         function connectWebSocket(roomId, playerId) {
-            const ws = new WebSocket(`wss://toolkit-favorites-physician-columnists.trycloudflare.com/ws/${roomId}/${playerId}`);
+            const ws = new WebSocket(`wss://think-conversion-dan-numerical.trycloudflare.com/ws/${roomId}/${playerId}`);
 
             ws.onopen = () => {
                 addApiLog('WEBSOCKET', { direction: '🔌 连接建立', message: { roomId, playerId } });
