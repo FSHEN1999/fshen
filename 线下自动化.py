@@ -240,6 +240,7 @@ LOCATORS = {
     "BANK_SELECT_OPTIONS": (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]"),
     "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[5]/div/div/div/input"),
     # 银行选择备选定位器
+    "BANK_SELECT_SVG_ICON": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[2]/i/svg"),
     "BANK_SELECT_DIV": (By.XPATH, "//div[contains(@class, 'el-select')]"),
     "BANK_SELECT_TRIGGER": (By.XPATH, "//div[contains(@class, 'el-select')]//span[contains(@class, 'el-select__suffix')]"),
     "BANK_SELECT_DISABLED_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @readonly]"),
@@ -1565,6 +1566,7 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
         if not bank_select_clicked:
             logging.info("[UI] 进入策略2：WebDriverWait备选方案...")
             bank_locators_to_try = [
+                ("BANK_SELECT_SVG_ICON", "银行选择下拉框SVG图标（精准定位）"),
                 ("BANK_SELECT_CONTAINER", "银行选择容器（精准定位）"),
                 ("BANK_SELECT_DROPDOWN", "银行选择input输入框"),
                 ("BANK_SELECT_TRIGGER", "银行选择触发器"),
