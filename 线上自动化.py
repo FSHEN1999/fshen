@@ -1595,80 +1595,13 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
     if auto_fill:
         logging.info("[流程] 选择自动填写银行账户信息...")
 
-        # 选择银行 - 优先使用快速查找策略
-        bank_select_clicked = False
-        import time as time_module
-        start_time = time_module.time()
-
-        # 策略1：先尝试快速JavaScript查找（最快，无等待）
-        logging.info("[UI] 开始策略1：JavaScript快速查找...")
-        try:
-            quick_click_js = """
-            (function() {
-                var selectors = [
-                    'input.el-select__input[role="combobox"]',
-                    'input[role="combobox"]',
-                    '.el-select .el-input__inner',
-                    'input.el-select__input',
-                    '.el-select'
-                ];
-                for (var i = 0; i < selectors.length; i++) {
-                    var elements = document.querySelectorAll(selectors[i]);
-                    for (var j = 0; j < elements.length; j++) {
-                        if (elements[j].offsetParent !== null) {
-                            elements[j].click();
-                            return {success: true, selector: selectors[i], index: j};
-                        }
-                    }
-                }
-                return {success: false};
-            })();
-            """
-            result = driver.execute_script(quick_click_js)
-            if result and result.get('success'):
-                elapsed = time_module.time() - start_time
-                logging.info(f"[UI] JavaScript快速点击成功，选择器: {result.get('selector')}，耗时: {elapsed:.2f}秒")
-                bank_select_clicked = True
-            else:
-                logging.info(f"[UI] JavaScript查找未找到可用元素")
-        except Exception as e:
-            logging.info(f"[UI] JavaScript快速点击失败: {e}")
-
-        # 策略2：如果JavaScript失败，使用WebDriverWait（备选）
-        if not bank_select_clicked:
-            logging.info("[UI] 进入策略2：WebDriverWait备选方案...")
-            bank_locators_to_try = [
-                ("BANK_SELECT_SVG_ICON", "银行选择下拉框SVG图标（精准定位）"),
-                ("BANK_SELECT_CONTAINER", "银行选择容器（精准定位）"),
-                ("BANK_SELECT_DROPDOWN", "银行选择input输入框"),
-                ("BANK_SELECT_TRIGGER", "银行选择触发器"),
-                ("BANK_SELECT_DIV", "银行选择div"),
-            ]
-
-            for idx, (locator_key, _) in enumerate(bank_locators_to_try, 1):
-                locator_start = time_module.time()
-                try:
-                    locator = LOCATORS.get(locator_key)
-                    if locator:
-                        logging.info(f"[UI] 尝试定位器 {idx}/{len(bank_locators_to_try)}: {locator_key}")
-                        # 减少超时时间到2秒
-                        element = WebDriverWait(driver, 2).until(EC.element_to_be_clickable(locator))
-                        locator_elapsed = time_module.time() - locator_start
-                        logging.info(f"[UI] 定位器 {locator_key} 找到元素，耗时: {locator_elapsed:.2f}秒")
-                        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-                        time.sleep(0.3)
-                        element.click()
-                        total_elapsed = time_module.time() - start_time
-                        logging.info(f"[UI] 已使用定位器 {locator_key} 点击银行选择框，总耗时: {total_elapsed:.2f}秒")
-                        bank_select_clicked = True
-                        break
-                except Exception as e:
-                    locator_elapsed = time_module.time() - locator_start
-                    logging.info(f"[UI] 定位器 {locator_key} 失败（耗时{locator_elapsed:.2f}秒）: {e}")
-                    continue
-
-        if not bank_select_clicked:
-            raise Exception("无法找到或点击银行选择下拉框")
+        # 点击银行选择框
+        logging.info("[UI] 点击银行选择框...")
+        element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(LOCATORS["BANK_SELECT_CONTAINER"]))
+        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
+        time.sleep(0.3)
+        element.click()
+        logging.info("[UI] 已点击银行选择框")
 
         # 点击后等待下拉框展开
         logging.info("[UI] 等待银行选项列表展开...")
