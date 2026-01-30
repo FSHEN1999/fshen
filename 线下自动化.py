@@ -1705,8 +1705,26 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                 logging.info(f"[UI] 已通过第三种方式输入银行账号: {bank_account}")
                 account_input_found = True
 
+        # 验证银行账号是否已成功输入
         if not account_input_found:
-            raise Exception("无法找到银行账号输入框，请检查页面结构")
+            logging.info("[UI] 验证银行账号是否已输入...")
+            verify_js = f"""
+            (function() {{
+                var inputs = document.querySelectorAll('input');
+                for (var i = 0; i < inputs.length; i++) {{
+                    if (inputs[i].value === '{bank_account}') {{
+                        return {{success: true, found: true}};
+                    }}
+                }}
+                return {{success: true, found: false}};
+            }})();
+            """
+            result = driver.execute_script(verify_js)
+            if result and result.get('found'):
+                logging.info(f"[UI] 验证成功：银行账号 {bank_account} 已在输入框中")
+                account_input_found = True
+            else:
+                raise Exception("无法找到银行账号输入框，请检查页面结构")
 
     else:
         logging.info("[流程] 跳过自动填写，请手动填写银行账户信息")
