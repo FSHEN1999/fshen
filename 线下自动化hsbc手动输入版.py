@@ -2276,16 +2276,14 @@ def run_offline_automation():
         auth_url = f"{sp_auth_url}?{urlencode(params)}"
         logging.info(f"[AUTH] SP授权URL: {auth_url}")
 
+        # 在新窗口中打开SP授权URL
         try:
-            logging.info("[AUTH] 正在发送SP授权GET请求...")
-            response = requests.get(auth_url, timeout=30)
-
-            if response.status_code == 200:
-                logging.info(f"✅ SP授权请求成功 - 响应: {response.text[:100]}...")
-            else:
-                logging.warning(f"⚠️ SP授权请求返回状态码: {response.status_code} | 响应: {response.text[:200]}...")
+            logging.info("[AUTH] 正在新窗口中打开SP授权URL...")
+            driver.execute_script(f"window.open('{auth_url}', '_blank');")
+            time.sleep(CONFIG.ACTION_DELAY)
+            logging.info(f"✅ SP授权页面已在新窗口中打开")
         except Exception as e:
-            logging.warning(f"⚠️ SP授权请求异常: {e}")
+            logging.warning(f"⚠️ SP授权页面打开异常: {e}")
 
         # --- 步骤 6.5: 发送updateOffer请求 (SP完成后、3PL前) ---
         logging.info("\n" + "=" * 50)
