@@ -39,7 +39,7 @@ from urllib.parse import urlencode
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "preprod"
 
 # 基础URL映射
 BASE_URL_DICT = {
@@ -141,7 +141,7 @@ OFFLINE_SIGNUP_URL_DICT = {
     "sit": "https://expressfinance-dpu-sit.dowsure.com/en/sign-up-step1",
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
     "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/sign-up",
-    "preprod": "https://expressfinance-preprod.business.hsbc.com/en/sign-up-step1",
+    "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/sign-up",
 }
 OFFLINE_SIGNUP_URL = OFFLINE_SIGNUP_URL_DICT.get(ENV, OFFLINE_SIGNUP_URL_DICT["sit"])
 
@@ -156,11 +156,11 @@ BROWSER_CONFIG = {
         "process_name": "msedge.exe"
     },
     "QQ": {
-        "binary_path": r"C:\Program Files (x86)\Tencent\QQBrowser\QQBrowser.exe",
+        "binary_path": r"C:\Program Files\Tencent\QQBrowser\QQBrowser.exe",
         "process_name": "qqbrowser.exe"
     },
     "360": {
-        "binary_path": r"C:\Program Files (x86)\360\360se6\360se.exe",
+        "binary_path": r"C:\Users\PC\AppData\Roaming\360se6\Application\360se.exe",
         "process_name": "360se.exe"
     },
     "FIREFOX": {
@@ -205,7 +205,9 @@ LOCATORS = {
     "SECURITY_QUESTION_DROPDOWN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div[1]/div[1]/div[1]/div[1]/input"),
     "SECURITY_ANSWER_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[4]/div/div[1]/div/input"),
     "EMAIL_ADDRESS_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[3]/div[2]/div/div[1]/div/input"),
-    "AGREE_DECLARATION_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/label/span[1]/span"),
+    # 声明页面的两个复选框
+    "AGREE_CONSENT_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div[1]/div/label/span[1]/span"),
+    "AUTHORIZATION_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div[2]/div/label/span[1]/span"),
     "FINAL_REGISTER_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[5]/div[2]/button"),
 
     # 通用下一步按钮
@@ -229,7 +231,7 @@ LOCATORS = {
     "ID_NUMBER_INPUT": (By.XPATH, "//input[@placeholder='请输入证件号码']"),
     "ID_FRONT_UPLOAD_AREA": (By.XPATH, "//div[contains(@class, 'el-upload-dragger') and .//img[contains(@src, 'PRC%20ID-Front')]]"),
     "ID_BACK_UPLOAD_AREA": (By.XPATH, "//div[contains(@class, 'el-upload-dragger') and .//img[contains(@src, 'PRC%20ID-Back')]]"),
-    "DATE_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div/div[1]/div[2]/div/div[3]/div[1]/div/div/div/input"),
+    "BIRTH_DATE_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div/div[1]/div[2]/div/div[3]/div[1]/div/div[1]/div/input"),  # 董事信息-出生日期
     "DIRECTOR_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[5]/div[2]/button[2]"),
     "REFERENCE_PHONE_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='15']"),
     "REFERENCE_EMAIL_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @autocomplete='off' and not(@maxlength) and not(@placeholder)]"),
@@ -894,6 +896,63 @@ def send_post_request(url: str, phone: str = None) -> bool:
         return False
 
 
+def send_update_offer_request(phone: str) -> bool:
+    """发送updateOffer请求 (SP完成后、3PL前)"""
+    update_offer_url = f"{BASE_URL}/dpu-auth/amazon-sp/updateOffer"
+
+    try:
+        db = get_global_db()
+        selling_partner_id = f"spshouquanfs{phone}"
+
+        # 查询idempotencyKey和offerId
+        idempotency_sql = f"""
+            SELECT idempotency_key FROM dpu_seller_center.dpu_manual_offer
+            WHERE platform_seller_id = '{selling_partner_id}'
+            ORDER BY created_at DESC LIMIT 1
+        """
+        idempotency_key = db.execute_sql(idempotency_sql)
+
+        offer_id_sql = f"""
+            SELECT platform_offer_id FROM dpu_seller_center.dpu_manual_offer
+            WHERE platform_seller_id = '{selling_partner_id}'
+            ORDER BY created_at DESC LIMIT 1
+        """
+        offer_id = db.execute_sql(offer_id_sql)
+
+        if not all([idempotency_key, offer_id]):
+            logging.error("❌ 数据库查询失败，缺少idempotencyKey或offerId")
+            return False
+
+        logging.info(f"✅ 查询到idempotencyKey: {idempotency_key}")
+        logging.info(f"✅ 查询到offerId: {offer_id}")
+
+        request_body = {
+            "idempotencyKey": idempotency_key,
+            "sendStatus": "SUCCESS",
+            "offerId": offer_id,
+            "reason": ""
+        }
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        logging.info(f"[UPDATE_OFFER] 发送POST请求到: {update_offer_url}")
+        response = requests.post(update_offer_url, json=request_body, headers=headers, timeout=30)
+
+        if response.status_code == 200:
+            logging.info(f"✅ updateOffer请求成功 - 响应: {response.text[:100]}...")
+            return True
+        else:
+            logging.error(f"❌ updateOffer请求失败 | 状态码: {response.status_code}")
+            logging.error(f"📋 完整响应内容:\n{response.text}")
+            return False
+
+    except Exception as e:
+        logging.error(f"❌ updateOffer请求异常: {e}")
+        return False
+
+
 def poll_credit_offer_status(phone: str, authorization_token: str = None, max_attempts: int = 120, interval: int = 5):
     """轮询信用报价状态，等待SUBMITTED状态"""
     status_url = f"{BASE_URL}/dpu-merchant/credit-offer/status"
@@ -1161,9 +1220,9 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
     if not locator:
         raise ValueError(f"定位器 '{locator_key}' 未在 LOCATORS 中定义")
 
-    # 备选定位器（特别是针对日期输入框）
+    # 备选定位器（特别是针对出生日期输入框）
     fallback_locators = []
-    if locator_key == "DATE_INPUT":
+    if locator_key == "BIRTH_DATE_INPUT":
         fallback_locators = [
             (By.XPATH, "//input[contains(@class, 'el-input__inner') and @placeholder='YYYY/MM/DD']"),
             (By.XPATH, "//input[contains(@class, 'el-input__inner') and @type='text']"),
@@ -1373,11 +1432,15 @@ def handle_password_setup(driver: webdriver.Remote, phone: str) -> Optional[str]
     safe_send_keys(driver, "EMAIL_ADDRESS_INPUT", email_address, "电子邮件地址")
     time.sleep(CONFIG.ACTION_DELAY)
 
-    # 6. 勾选同意声明
-    safe_click(driver, "AGREE_DECLARATION_CHECKBOX", "同意声明复选框")
+    # 6. 勾选第一个复选框：同意
+    safe_click(driver, "AGREE_CONSENT_CHECKBOX", "同意复选框")
     time.sleep(CONFIG.ACTION_DELAY)
 
-    # 7. 点击注册按钮
+    # 7. 勾选第二个复选框：授权
+    # safe_click(driver, "AUTHORIZATION_CHECKBOX", "授权复选框")
+    # time.sleep(CONFIG.ACTION_DELAY)
+
+    # 8. 点击注册按钮
     safe_click(driver, "FINAL_REGISTER_BTN", "注册按钮")
     time.sleep(CONFIG.ACTION_DELAY * 3)
 
@@ -1499,8 +1562,8 @@ def handle_director_info(driver: webdriver.Remote, phone: str, auto_fill: bool):
         upload_image(driver, "身份证背面")
         time.sleep(CONFIG.ACTION_DELAY * 3)
 
-        # 3. 填写日期（格式：日/月/年，如 30/12/2025）
-        safe_send_keys(driver, "DATE_INPUT", "30/12/2025", "日期")
+        # 3. 填写出生日期（格式：日/月/年，如 30/12/2025）
+        safe_send_keys(driver, "BIRTH_DATE_INPUT", "30/12/2025", "出生日期")
 
         # 4. 填写参考手机号
         safe_send_keys(driver, "REFERENCE_PHONE_INPUT", phone, "参考手机号")
@@ -1666,8 +1729,9 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
         if not bank_selected:
             raise Exception("无法选择银行选项，所有方式均失败")
 
-        # 等待银行选择完成后再输入账号
-        time.sleep(1)
+        # 等待银行选择完成后再输入账号，增加等待时间确保页面完全更新
+        logging.info("[UI] 等待银行选择完成后页面更新...")
+        time.sleep(2)  # 从1秒增加到2秒
 
         # 生成并输入银行账号
         import random
@@ -1680,98 +1744,219 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
         # 方法1：使用主定位器
         try:
             account_input = WebDriverWait(driver, 5).until(
-                EC.visibility_of_element_located(LOCATORS["BANK_ACCOUNT_INPUT"])
+                EC.presence_of_element_located(LOCATORS["BANK_ACCOUNT_INPUT"])
             )
-            # 确保元素可交互
-            driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", account_input)
-            time.sleep(0.3)
-            account_input.clear()
-            account_input.send_keys(bank_account)
-            logging.info(f"[UI] 已输入银行账号: {bank_account}")
-            account_input_found = True
+            # 检查元素是否可见和可交互
+            is_interactable = driver.execute_script("""
+                var elem = arguments[0];
+                if (!elem) return false;
+                var style = window.getComputedStyle(elem);
+                var rect = elem.getBoundingClientRect();
+                return style.display !== 'none' &&
+                       style.visibility !== 'hidden' &&
+                       style.opacity !== '0' &&
+                       !elem.readOnly &&
+                       rect.width > 0 &&
+                       rect.height > 0;
+            """, account_input)
+
+            if is_interactable:
+                # 滚动到元素位置
+                driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", account_input)
+                time.sleep(0.5)
+                # 使用JavaScript直接输入（更可靠）
+                driver.execute_script("""
+                    arguments[0].focus();
+                    arguments[0].value = arguments[1];
+                    arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
+                    arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
+                """, account_input, bank_account)
+                logging.info(f"[UI] 已通过主定位器输入银行账号: {bank_account}")
+                account_input_found = True
+            else:
+                logging.warning("[UI] 主定位器元素不可交互，尝试备选方式")
         except Exception as e:
             logging.warning(f"[UI] 主定位器失败: {e}，尝试备选方式")
 
-        # 方法2：通过JavaScript输入
+        # 方法2：通过JavaScript智能查找并输入（增加诊断和更宽松的条件）
         if not account_input_found:
-            logging.info("[UI] 尝试通过JavaScript查找并输入银行账号...")
+            logging.info("[UI] 尝试通过JavaScript智能查找并输入银行账号...")
+            diagnostic_js = """
+            (function() {
+                // 收集所有输入框信息用于诊断
+                var inputs = document.querySelectorAll('input');
+                var info = [];
+                for (var i = 0; i < inputs.length; i++) {
+                    var input = inputs[i];
+                    var computedStyle = window.getComputedStyle(input);
+                    var isVisible = input.offsetParent !== null &&
+                                   computedStyle.display !== 'none' &&
+                                   computedStyle.visibility !== 'hidden' &&
+                                   computedStyle.opacity !== '0';
+                    info.push({
+                        index: i,
+                        type: input.type,
+                        visible: isVisible,
+                        readOnly: input.readOnly,
+                        hasValue: !!input.value,
+                        valueLength: input.value ? input.value.length : 0,
+                        maxlength: input.getAttribute('maxlength'),
+                        placeholder: input.getAttribute('placeholder') || '',
+                        className: input.className || ''
+                    });
+                }
+                // 统计可见且可编辑的输入框
+                var editable = info.filter(x => x.visible && !x.readOnly);
+                return {total: inputs.length, visible: info.filter(x => x.visible).length, editable: editable.length, details: editable};
+            })();
+            """
+            diag_result = driver.execute_script(diagnostic_js)
+            logging.info(f"[UI] 输入框诊断: 总数={diag_result.get('total')}, 可见={diag_result.get('visible')}, 可编辑={diag_result.get('editable')}")
+            if diag_result.get('details'):
+                for detail in diag_result.get('details')[:5]:  # 只显示前5个
+                    logging.info(f"[UI]   - 类型:{detail.get('type')}, maxlength:{detail.get('maxlength')}, placeholder:'{detail.get('placeholder')}', 有值:{detail.get('hasValue')}")
+
+            # 尝试更智能的查找策略
             input_js = f"""
             (function() {{
-                // 查找所有可见的输入框
                 var inputs = document.querySelectorAll('input');
-                for (var i = inputs.length - 1; i >= 0; i--) {{
+                var bestCandidate = null;
+                var bestScore = -1;
+
+                for (var i = 0; i < inputs.length; i++) {{
                     var input = inputs[i];
-                    // 检查是否可见且为空
-                    if (input.offsetParent !== null &&
-                        input.type !== 'hidden' &&
-                        input.type !== 'submit' &&
-                        !input.readOnly &&
-                        !input.value) {{
-                        // 尝试设置值
-                        input.focus();
-                        input.value = '{bank_account}';
-                        // 触发事件
-                        var events = ['input', 'change', 'blur'];
-                        for (var j = 0; j < events.length; j++) {{
-                            var event = new Event(events[j], {{bubbles: true}});
-                            input.dispatchEvent(event);
+                    var computedStyle = window.getComputedStyle(input);
+                    var isVisible = input.offsetParent !== null &&
+                                   computedStyle.display !== 'none' &&
+                                   computedStyle.visibility !== 'hidden';
+                    var isEditable = isVisible && !input.readOnly && input.type !== 'hidden' && input.type !== 'submit';
+
+                    if (isEditable) {{
+                        var score = 0;
+                        var maxlength = input.getAttribute('maxlength');
+
+                        // 银行账号通常有12-20位的maxlength
+                        if (maxlength && parseInt(maxlength) >= 12 && parseInt(maxlength) <= 20) {{
+                            score += 50;
                         }}
-                        return {{success: true, tagName: input.tagName, type: input.type}};
+                        // 没有placeholder的优先（银行账号通常没有placeholder）
+                        if (!input.getAttribute('placeholder')) {{
+                            score += 20;
+                        }}
+                        // 是空的优先
+                        if (!input.value) {{
+                            score += 30;
+                        }}
+                        // 是text类型的优先
+                        if (!input.type || input.type === 'text') {{
+                            score += 10;
+                        }}
+
+                        if (score > bestScore) {{
+                            bestScore = score;
+                            bestCandidate = input;
+                        }}
                     }}
+                }}
+
+                if (bestCandidate) {{
+                    bestCandidate.focus();
+                    bestCandidate.value = '{bank_account}';
+                    ['input', 'change', 'blur', 'keyup'].forEach(function(evt) {{
+                        bestCandidate.dispatchEvent(new Event(evt, {{bubbles: true}}));
+                    }});
+                    return {{success: true, score: bestScore}};
                 }}
                 return {{success: false}};
             }})();
             """
             result = driver.execute_script(input_js)
             if result and result.get('success'):
-                logging.info(f"[UI] 已通过JavaScript输入银行账号: {bank_account} (元素类型: {result.get('type')})")
+                logging.info(f"[UI] 已通过JavaScript输入银行账号: {bank_account} (评分: {result.get('score')})")
                 account_input_found = True
             else:
                 logging.warning("[UI] JavaScript输入失败，尝试第三种方式")
 
-        # 方法3：最后尝试使用更宽松的定位器
+        # 方法3：尝试不同的XPath位置（因为页面结构可能变化）
         if not account_input_found:
-            logging.info("[UI] 尝试查找最后一个空输入框...")
-            last_input_js = f"""
-            (function() {{
-                var inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([readonly])'));
-                // 找到最后一个可见的空输入框
-                for (var i = inputs.length - 1; i >= 0; i--) {{
-                    if (inputs[i].offsetParent !== null && !inputs[i].value) {{
-                        inputs[i].focus();
-                        inputs[i].value = '{bank_account}';
-                        inputs[i].dispatchEvent(new Event('input', {{bubbles: true}}));
-                        inputs[i].dispatchEvent(new Event('change', {{bubbles: true}}));
-                        return {{success: true}};
-                    }}
-                }}
-                return {{success: false}};
-            }})();
-            """
-            result = driver.execute_script(last_input_js)
-            if result and result.get('success'):
-                logging.info(f"[UI] 已通过第三种方式输入银行账号: {bank_account}")
-                account_input_found = True
+            logging.info("[UI] 尝试不同的XPath位置（div[3]到div[6]）...")
+            for div_num in range(3, 7):
+                try:
+                    xpath = f"/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[{div_num}]/div/div/div/input"
+                    account_input = driver.find_element(By.XPATH, xpath)
+                    # 使用JavaScript输入，避免元素状态问题
+                    driver.execute_script("""
+                        arguments[0].focus();
+                        arguments[0].value = arguments[1];
+                        arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
+                        arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
+                    """, account_input, bank_account)
+                    logging.info(f"[UI] 已通过div[{div_num}]定位器输入银行账号: {bank_account}")
+                    account_input_found = True
+                    break
+                except Exception as e:
+                    continue
 
-        # 验证银行账号是否已成功输入
-        if not account_input_found:
-            logging.info("[UI] 验证银行账号是否已输入...")
-            verify_js = f"""
-            (function() {{
-                var inputs = document.querySelectorAll('input');
-                for (var i = 0; i < inputs.length; i++) {{
-                    if (inputs[i].value === '{bank_account}') {{
-                        return {{success: true, found: true}};
+            if not account_input_found:
+                logging.warning("[UI] 所有XPath位置均失败，尝试最终备用方法...")
+                # 最终备用：找到所有可见可编辑的输入框，尝试每个
+                final_attempt_js = f"""
+                (function() {{
+                    var inputs = document.querySelectorAll('input');
+                    for (var i = inputs.length - 1; i >= 0; i--) {{
+                        var input = inputs[i];
+                        var style = window.getComputedStyle(input);
+                        if (style.display !== 'none' && style.visibility !== 'hidden' &&
+                            !input.readOnly && input.type !== 'hidden' && input.type !== 'submit') {{
+                            // 尝试清除并设置值
+                            input.focus();
+                            input.value = '';
+                            input.value = '{bank_account}';
+                            input.dispatchEvent(new Event('input', {{bubbles: true}}));
+                            input.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            return {{success: true, index: i, type: input.type}};
+                        }}
                     }}
+                    return {{success: false}};
+                }})();
+                """
+                result = driver.execute_script(final_attempt_js)
+                if result and result.get('success'):
+                    logging.info(f"[UI] 已通过最终备用方法输入银行账号: {bank_account} (索引: {result.get('index')})")
+                    account_input_found = True
+
+        # 验证银行账号是否已成功输入（始终执行验证）
+        logging.info("[UI] 验证银行账号是否已输入...")
+        verify_js = f"""
+        (function() {{
+            var inputs = document.querySelectorAll('input');
+            for (var i = 0; i < inputs.length; i++) {{
+                if (inputs[i].value === '{bank_account}') {{
+                    return {{success: true, found: true, index: i}};
                 }}
-                return {{success: true, found: false}};
-            }})();
-            """
-            result = driver.execute_script(verify_js)
-            if result and result.get('found'):
-                logging.info(f"[UI] 验证成功：银行账号 {bank_account} 已在输入框中")
-                account_input_found = True
-            else:
+            }}
+            // 如果没找到，列出所有输入框的值用于调试
+            var allValues = [];
+            for (var i = 0; i < inputs.length; i++) {{
+                if (inputs[i].value && inputs[i].offsetParent !== null) {{
+                    allValues.push({{index: i, value: inputs[i].value, type: inputs[i].type}});
+                }}
+            }}
+            return {{success: true, found: false, visibleValues: allValues}};
+        }})();
+        """
+        result = driver.execute_script(verify_js)
+        if result and result.get('found'):
+            logging.info(f"[UI] ✓ 验证成功：银行账号 {bank_account} 已在输入框中（索引: {result.get('index')}）")
+            account_input_found = True
+        else:
+            visible_values = result.get('visibleValues', []) if result else []
+            logging.warning(f"[UI] ✗ 验证失败：银行账号 {bank_account} 未找到")
+            if visible_values:
+                logging.warning("[UI] 当前可见输入框的值:")
+                for v in visible_values[:5]:
+                    logging.warning(f"[UI]   - 索引{v.get('index')}: '{v.get('value')}' (类型: {v.get('type')})")
+            if not account_input_found:
                 raise Exception("无法找到银行账号输入框，请检查页面结构")
 
     else:
@@ -2038,6 +2223,17 @@ def run_offline_automation():
         except Exception as e:
             logging.warning(f"⚠️ 查询platform_offer_id或访问redirect URL失败: {e}")
             logging.info("ℹ️  继续后续流程")
+
+        # --- 步骤 6.6: 发送updateOffer请求 (SP完成后、3PL前) ---
+        logging.info("\n" + "=" * 50)
+        logging.info("步骤 6.6: 发送updateOffer请求")
+        logging.info("=" * 50)
+
+        time.sleep(3)
+        if send_update_offer_request(phone):
+            logging.info("✅ updateOffer请求成功！")
+        else:
+            logging.warning("⚠️ updateOffer请求失败，继续后续流程")
 
         # --- 步骤 7: 填写公司信息 ---
         auto_fill_company = get_yes_no_choice("[流程] 是否自动填写公司信息?")

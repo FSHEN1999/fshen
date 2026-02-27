@@ -35,12 +35,6 @@ import pymysql  # 新增：数据库连接
 from pymysql.err import OperationalError  # 数据库错误类型
 from urllib.parse import urlencode
 
-# 暂停管理器：支持通过空格键暂停/继续脚本
-from pause_manager import get_pause_manager
-
-# 全局暂停管理器实例
-_pause_manager = get_pause_manager()
-
 # ==============================================================================
 # --- 1. 配置与常量 (集中管理，易于维护) ---
 # ==============================================================================
@@ -48,7 +42,7 @@ _pause_manager = get_pause_manager()
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "preprod"
 
 # 基础URL映射（参考mock_sit.py）
 BASE_URL_DICT = {
@@ -115,9 +109,9 @@ DEFAULT_TOKEN_DICT = {
 # 金额配置（每个环境的各种额度）
 AMOUNT_CONFIG = {
     "sit": {
-        "underwritten_amount": "50000",      # 核保额度（字符串）
-        "approved_amount": 50000.00,          # 审批额度（浮点数）
-        "esign_amount": 50000.00              # 电子签额度（浮点数）
+        "underwritten_amount": "500000",      # 核保额度（字符串）
+        "approved_amount": 500000.00,          # 审批额度（浮点数）
+        "esign_amount": 500000.00              # 电子签额度（浮点数）
     },
     "uat": {
         "underwritten_amount": "500000",
@@ -130,7 +124,7 @@ AMOUNT_CONFIG = {
         "esign_amount": 500000.00
     },
     "preprod": {
-        "underwritten_amount": "500000",
+        "underwritten_amount": "800000",
         "approved_amount": 500000.00,
         "esign_amount": 500000.00
     },
@@ -157,7 +151,7 @@ BROWSER_CONFIG = {
     },
     "QQ": {
         "binary_path": r"C:\Program Files\Tencent\QQBrowser\QQBrowser.exe",
-        "process_name": "qqbrowser.exe"
+        "process_name": "QQBrowser.exe"
     },
     "360": {
         "binary_path": r"C:\Users\PC\AppData\Roaming\360se6\Application\360se.exe",
@@ -259,7 +253,7 @@ LOCATORS = {
     "BANK_SELECT_CONTAINER": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[1]"),
     "BANK_SELECT_DROPDOWN": (By.XPATH, "//input[contains(@class, 'el-select__input') and @role='combobox']"),
     "BANK_SELECT_OPTIONS": (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]"),
-    "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[4]/div/div/div/input"),
+    "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[5]/div/div/div/input"),
     # 银行选择备选定位器
     "BANK_SELECT_SVG_ICON": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[2]/i/svg"),
     "BANK_SELECT_DIV": (By.XPATH, "//div[contains(@class, 'el-select')]"),
@@ -394,8 +388,8 @@ def poll_credit_offer_status(phone: str, authorization_token: str = None, max_at
         except requests.exceptions.RequestException as e:
             logging.error(f"[轮询 #{attempt}] 请求失败: {e}")
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停（允许用户在轮询过程中暂停）
+        # 暂停检查已禁用
 
         # 等待指定间隔后继续下一次轮询
         if attempt < max_attempts:
@@ -472,8 +466,8 @@ def poll_drawdown_status(phone: str, authorization_token: str = None, max_attemp
         except requests.exceptions.RequestException as e:
             logging.error(f"[drawdown轮询 #{attempt}] 请求失败: {e}")
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停（允许用户在轮询过程中暂停）
+        # 暂停检查已禁用
 
         # 等待指定间隔后继续下一次轮询
         if attempt < max_attempts:
@@ -1834,64 +1828,26 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                 logging.info(f"[UI] 已通过第三种方式输入银行账号: {bank_account}")
                 account_input_found = True
 
-        # 验证银行账号是否已成功输入（使用更宽松的验证逻辑）
+        # 验证银行账号是否已成功输入
         if not account_input_found:
             logging.info("[UI] 验证银行账号是否已输入...")
-            # 去除可能的空格或分隔符进行匹配
-            bank_account_clean = bank_account.replace(' ', '').replace('-', '')
-            verify_js = f'''
+            verify_js = f"""
             (function() {{
                 var inputs = document.querySelectorAll('input');
-                var allValues = [];
                 for (var i = 0; i < inputs.length; i++) {{
-                    var value = inputs[i].value;
-                    if (value) {{
-                        allValues.push(value);
-                        // 去除空格和分隔符后比较
-                        var cleanValue = value.replace(/\\s/g, '').replace(/-/g, '');
-                        if (cleanValue === '{bank_account_clean}') {{
-                            return {{success: true, found: true, value: value, method: 'exact'}};
-                        }}
-                        // 也检查是否包含银行账号（处理格式化显示的情况）
-                        if (cleanValue.includes('{bank_account_clean}') || '{bank_account_clean}'.includes(cleanValue)) {{
-                            return {{success: true, found: true, partial: true, value: value, method: 'partial'}};
-                        }}
+                    if (inputs[i].value === '{bank_account}') {{
+                        return {{success: true, found: true}};
                     }}
                 }}
-                // 还没找到，检查其他可能的元素（如el-input的内部元素）
-                var spans = document.querySelectorAll('.el-input__inner');
-                for (var j = 0; j < spans.length; j++) {{
-                    if (spans[j].value) {{
-                        var cleanValue = spans[j].value.replace(/\\s/g, '').replace(/-/g, '');
-                        if (cleanValue === '{bank_account_clean}' || cleanValue.includes('{bank_account_clean}')) {{
-                            return {{success: true, found: true, value: spans[j].value, method: 'el-input'}};
-                        }}
-                    }}
-                }}
-                return {{success: true, found: false, allValues: allValues}};
+                return {{success: true, found: false}};
             }})();
-            '''
+            """
             result = driver.execute_script(verify_js)
             if result and result.get('found'):
-                match_type = "完全匹配" if not result.get('partial') else "部分匹配"
-                display_value = result.get('value', 'N/A')
-                method = result.get('method', 'unknown')
-                logging.info(f"[UI] 验证成功：银行账号 {match_type} ({method}) - 显示值: {display_value}")
+                logging.info(f"[UI] 验证成功：银行账号 {bank_account} 已在输入框中")
                 account_input_found = True
             else:
-                # 显示所有找到的输入框值用于诊断
-                all_values = result.get('allValues', []) if result else []
-                logging.warning(f"[UI] ⚠️ 自动验证未找到完全匹配的银行账号")
-                logging.warning(f"[UI] 💡 预期银行账号: {bank_account} (清理后: {bank_account_clean})")
-                if all_values:
-                    logging.warning(f"[UI] 📋 页面上找到的输入框值: {all_values}")
-                logging.warning(f"[UI] 📋 请检查页面上的银行账号输入框，如果已填写正确，按Enter继续")
-                user_input = input("确认银行账号已正确填写？(直接Enter继续，输入n退出): ").strip()
-                if user_input.lower() != 'n':
-                    account_input_found = True
-                    logging.info("[UI] 用户确认银行账号已正确填写")
-                else:
-                    raise Exception("用户取消操作，银行账号未填写")
+                raise Exception("无法找到银行账号输入框，请检查页面结构")
 
     else:
         input("[流程] 请手动选择银行并填写账户信息，完成后按Enter键继续...")
@@ -2121,8 +2077,8 @@ def run_automation(url: str, phone: str, tier_name: str):
         # 处理初始注册并获取token
         auth_token = handle_initial_registration(driver, phone)
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停
+        # 暂停检查已禁用
 
         logging.info("\n" + "=" * 50)
         logging.info("步骤 4/8: 提交最终申请")
@@ -2199,14 +2155,14 @@ def run_automation(url: str, phone: str, tier_name: str):
         auto_fill_company = get_yes_no_choice("[流程] 是否自动填写公司信息?")
         handle_company_info(driver, auto_fill_company)
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停
+        # 暂停检查已禁用
 
         auto_fill_director = get_yes_no_choice("[流程] 是否自动填写董事股东信息?")
         handle_director_info(driver, phone, auto_fill_director)
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停
+        # 暂停检查已禁用
 
         need_bank_info = False
         if tier_name == "TIER2":
@@ -2218,8 +2174,8 @@ def run_automation(url: str, phone: str, tier_name: str):
             auto_fill_bank = get_yes_no_choice("[流程] 是否自动填写银行账户信息?")
             handle_bank_account_info(driver, auto_fill_bank)
 
-            # 检查暂停（按空格键暂停/继续）
-            _pause_manager.check_pause()
+            # 检查暂停
+            # 暂停检查已禁用
 
         logging.info("\n" + "=" * 50)
         logging.info("步骤 8/8: 发起关联店铺API请求")
@@ -2243,8 +2199,8 @@ def run_automation(url: str, phone: str, tier_name: str):
         # 轮询信用报价状态，等待 SUBMITTED 状态
         submitted_success = poll_credit_offer_status(phone, authorization_token=auth_token, interval=5, max_attempts=120)
 
-        # 检查暂停（按空格键暂停/继续）
-        _pause_manager.check_pause()
+        # 检查暂停
+        # 暂停检查已禁用
 
         # 如果获取到SUBMITTED状态，根据need_bank_info走不同流程
         if submitted_success:

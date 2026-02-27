@@ -1,17 +1,19 @@
 """
-HSBC API 数据生成与自动注册工具
+HSBC API 数据生成与自动注册工具 - TIER3固定版本
 
 概述:
     一个用于自动化生成测试数据并完成HSBC相关注册流程的Selenium脚本。
-    支持不同TIER级别的申请流程，并提供灵活的自动/手动填写选项。
+    **固定选择TIER3级别（金额: 2000000）**，无需手动选择TIER。
     新增支持：Chrome、Edge、QQ浏览器、360安全浏览器、Firefox（均为无痕模式）
 
 主要功能:
-    1. 生成测试数据（调用API获取offerId，生成URL和手机号）。
+    1. 生成测试数据（固定TIER3，金额2000000）。
     2. 自动化完成注册流程（支持5种浏览器的无痕模式）。
-    3. 智能处理不同TIER级别的流程差异（如TIER1包含银行账户信息步骤）。
-    4. TIER2流程中增加融资方案选择分支。
-    5. 详细的日志记录和错误处理机制。
+    3. 智能处理TIER3级别的完整流程（核保→审批→PSP→电子签→放款→还款）。
+    4. 详细的日志记录和错误处理机制。
+
+TIER3流程:
+    核保(underwritten) → 审批(approved) → PSP验证 → 电子签 → 放款 → 还款
 """
 
 import time
@@ -115,28 +117,33 @@ DEFAULT_TOKEN_DICT = {
 # 金额配置（每个环境的各种额度）
 AMOUNT_CONFIG = {
     "sit": {
-        "underwritten_amount": "50000",      # 核保额度（字符串）
-        "approved_amount": 50000.00,          # 审批额度（浮点数）
-        "esign_amount": 50000.00              # 电子签额度（浮点数）
+        "underwritten_amount": "800000",          # 核保额度（字符串）
+        "approved_amount": 500000.00,              # 第一次审批额度（浮点数）
+        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
+        "esign_amount": 800000.00                  # 电子签额度（浮点数）
     },
     "uat": {
         "underwritten_amount": "500000",
         "approved_amount": 500000.00,
+        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
         "esign_amount": 500000.00
     },
     "dev": {
         "underwritten_amount": "500000",
         "approved_amount": 500000.00,
+        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
         "esign_amount": 500000.00
     },
     "preprod": {
         "underwritten_amount": "500000",
         "approved_amount": 500000.00,
+        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
         "esign_amount": 500000.00
     },
     "local": {
         "underwritten_amount": "500000",
         "approved_amount": 500000.00,
+        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
         "esign_amount": 500000.00
     }
 }
@@ -157,7 +164,7 @@ BROWSER_CONFIG = {
     },
     "QQ": {
         "binary_path": r"C:\Program Files\Tencent\QQBrowser\QQBrowser.exe",
-        "process_name": "qqbrowser.exe"
+        "process_name": "QQBrowser.exe"
     },
     "360": {
         "binary_path": r"C:\Users\PC\AppData\Roaming\360se6\Application\360se.exe",
@@ -269,6 +276,19 @@ LOCATORS = {
     # 融资方案选择页 (TIER2)
     "ACTIVATE_NOW_BTN": (By.XPATH, "//button[span[text()='去激活']]"),
     "APPLY_HIGHER_AMOUNT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div/div[2]/div[2]/div/div[2]/button"),
+
+    # TIER3额度选择页 (审批成功后)
+    "TIER3_ACTIVATE_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[2]/div[1]/div[2]/div[2]/button"),  # 去激活
+    "TIER3_SUBMIT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[2]/div[2]/div[2]/div[2]/button"),  # 去提交
+
+    # TIER3额外信息填写页 (去提交后 - 银行流水)
+    "BANK_STATEMENT_UPLOAD_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div[2]/div[1]/div/div"),  # 上传按钮
+    "EXTRA_INFO_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/div[4]/div[2]/button[2]"),  # 下一页按钮
+
+    # TIER3股东董事额外信息页 (第二页)
+    "CREDIT_REPORT_UPLOAD_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div"),  # 个人信用报告上传
+    "SINGLE_STATUS_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div/div/div[2]/div/div[3]/div/div/label[2]/span[1]/span"),  # 未婚状态勾选框
+    "DIRECTOR_INFO_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/div[4]/div[2]/button[2]"),  # 下一页按钮
 
     # 审批成功后的额度确定页
     "ACTIVATE_CREDIT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/div[3]/div[2]/div[7]/div[2]/button"),
@@ -1214,120 +1234,6 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
         raise
 
 
-def upload_image(driver: webdriver.Remote, description: str):
-    """上传图片到指定区域（优化版，使用JavaScript直接上传避免stale element错误）"""
-    try:
-        # 1. 文件名映射（支持中英文描述）
-        file_mapping = {
-            "身份证正面": "身份证正面.png",
-            "身份证背面": "身份证反面.png",
-            "ID-Front": "身份证正面.png",
-            "ID-Back": "身份证反面.png",
-        }
-
-        # 2. 根据description获取目标文件
-        target_file = file_mapping.get(description)
-        if not target_file:
-            # 尝试模糊匹配
-            if "正面" in description or "front" in description.lower():
-                target_file = "身份证正面.png"
-            elif "反面" in description or "back" in description.lower():
-                target_file = "身份证反面.png"
-            else:
-                target_file = "身份证正面.png"  # 默认使用正面
-
-        image_path = os.path.join(CONFIG.SCREENSHOT_FOLDER, target_file)
-
-        # 3. 验证文件存在
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"图片文件不存在: {image_path}")
-
-        # 4. 转换为绝对路径（JavaScript需要）
-        abs_image_path = os.path.abspath(image_path)
-
-        # 5. 使用JavaScript直接上传（避免stale element问题）
-        logging.info(f"[UI] 正在上传图片 '{target_file}' 用于: {description}")
-
-        # JavaScript上传函数：找到file input并设置文件路径
-        upload_js = f"""
-        (function() {{
-            // 查找所有file input
-            var inputs = document.querySelectorAll('input[type="file"]');
-            var targetInput = null;
-
-            // 优先查找可见的file input
-            for (var i = 0; i < inputs.length; i++) {{
-                if (inputs[i].offsetParent !== null && inputs[i].offsetParent !== document.body) {{
-                    targetInput = inputs[i];
-                    break;
-                }}
-            }}
-
-            // 如果没找到可见的，使用第一个
-            if (!targetInput && inputs.length > 0) {{
-                targetInput = inputs[0];
-            }}
-
-            if (!targetInput) {{
-                return {{success: false, message: '未找到file input'}};
-            }}
-
-            // 设置文件路径（使用FileList构造器）
-            try {{
-                // 创建一个File对象来模拟文件选择
-                var file = null;
-                targetInput.value = '{abs_image_path.replace(os.sep, '/')}';
-
-                // 触发change事件
-                var event = new Event('change', {{bubbles: true}});
-                targetInput.dispatchEvent(event);
-
-                return {{
-                    success: true,
-                    message: '上传成功',
-                    hasValue: targetInput.value !== ''
-                }};
-            }} catch (e) {{
-                return {{success: false, message: e.toString()}};
-            }}
-        }})();
-        """
-
-        # 执行上传
-        upload_result = driver.execute_script(upload_js)
-
-        if not upload_result or not upload_result.get('success'):
-            # JavaScript方式失败，尝试使用Selenium方式
-            logging.warning(f"[UI] JavaScript上传失败，尝试使用Selenium方式")
-
-            # 使用Selenium的find_element（每次都重新获取元素）
-            from selenium.webdriver.common.by import By
-            file_input = None
-
-            try:
-                file_input = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
-                    EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
-                )
-            except:
-                # 尝试通过CSS选择器
-                file_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
-
-            if file_input:
-                file_input.send_keys(abs_image_path)
-                logging.info(f"[UI] ✅ 已通过Selenium上传图片 '{target_file}' 用于: {description}")
-            else:
-                raise Exception("页面上未找到可用的文件上传输入框")
-        else:
-            logging.info(f"[UI] ✅ 已通过JavaScript上传图片 '{target_file}' 用于: {description}")
-
-        # 6. 等待上传处理完成
-        time.sleep(2)
-
-    except Exception as e:
-        logging.error(f"[UI] 上传图片 '{description}' 时发生错误: {e}")
-        raise
-
-
 def select_specific_security_question(driver: webdriver.Remote):
     """
     点击安全问题下拉框并选择指定的第4个选项
@@ -1387,17 +1293,20 @@ def get_yes_no_choice(prompt: str) -> bool:
 
 def generate_test_data() -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
-    第一步：生成测试数据。
+    第一步：生成测试数据（固定TIER3）。
 
     Returns:
         Tuple[url, phone, tier_name, offer_id]
     """
     logging.info("=" * 50)
-    logging.info("步骤 1/8: 生成测试数据")
+    logging.info("步骤 1/8: 生成测试数据 (固定TIER3)")
     logging.info("=" * 50)
-    tier_options_display = {k: f"{v[0]} (金额: {v[1]})" for k, v in CONFIG.TIER_OPTIONS.items()}
-    tier_choice_key = get_user_choice(tier_options_display, "请选择申请的TIER级别:")
-    tier_name, amount = CONFIG.TIER_OPTIONS[tier_choice_key]
+
+    # 固定选择TIER3
+    tier_name = "TIER3"
+    amount = 2000000
+    logging.info(f"已固定选择: {tier_name} (金额: {amount})")
+
     try:
         logging.info(f"正在为TIER '{tier_name}' (金额: {amount}) 生成数据...")
         response = requests.post(
@@ -1633,9 +1542,13 @@ def handle_director_info(driver: webdriver.Remote, phone: str, auto_fill: bool):
     logging.info("=" * 50)
     if auto_fill:
         logging.info("[流程] 选择自动填写董事股东信息...")
-        upload_image(driver, "身份证正面")
+        # 上传身份证正面
+        id_front_path = os.path.join(CONFIG.SCREENSHOT_FOLDER, "身份证正面.png")
+        upload_image(driver, id_front_path, "身份证正面")
         time.sleep(CONFIG.ACTION_DELAY * 3)
-        upload_image(driver, "身份证背面")
+        # 上传身份证反面
+        id_back_path = os.path.join(CONFIG.SCREENSHOT_FOLDER, "身份证反面.png")
+        upload_image(driver, id_back_path, "身份证反面")
         time.sleep(CONFIG.ACTION_DELAY * 3)
         safe_send_keys(driver, "BIRTH_DATE_INPUT", "30/12/2025", "出生日期")
         safe_send_keys(driver, "REFERENCE_PHONE_INPUT", phone, "参考手机号")
@@ -1930,8 +1843,399 @@ def handle_financing_choice(driver: webdriver.Remote) -> bool:
         return False
 
 
+def handle_tier3_credit_choice(driver: webdriver.Remote) -> str:
+    """
+    处理TIER3审批成功后的额度选择页面
+
+    Returns:
+        'activate' - 选择"去激活"，走完整流程（激活额度→PSP→电子签）
+        'submit' - 选择"去提交"，进入额外信息填写页面
+    """
+    import time as time_module
+    start_time = time_module.time()
+
+    logging.info("\n" + "=" * 50)
+    logging.info("步骤: TIER3额度选择")
+    logging.info("=" * 50)
+
+    # 等待额度选择页面加载
+    logging.info("[UI] 等待额度选择页面加载...")
+    try:
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located(LOCATORS["TIER3_ACTIVATE_BTN"]))
+        elapsed = time_module.time() - start_time
+        logging.info(f"[UI] 额度选择页面已加载，耗时: {elapsed:.2f}秒")
+    except Exception as e:
+        logging.warning(f"[UI] 等待额度选择页面超时，尝试继续: {e}")
+
+    options = {'1': '去激活 (完整流程: 激活额度→PSP→电子签)', '2': '去提交 (额外信息填写页面)'}
+    choice = get_user_choice(options, "请选择TIER3额度方案:")
+
+    if choice == '1':
+        safe_click(driver, "TIER3_ACTIVATE_BTN", "去激活按钮")
+        total_elapsed = time_module.time() - start_time
+        logging.info(f"[UI] 已选择：去激活，总耗时: {total_elapsed:.2f}秒")
+        return 'activate'
+    else:
+        safe_click(driver, "TIER3_SUBMIT_BTN", "去提交按钮")
+        total_elapsed = time_module.time() - start_time
+        logging.info(f"[UI] 已选择：去提交，总耗时: {total_elapsed:.2f}秒")
+        return 'submit'
+
+
+def upload_image(driver: webdriver.Remote, image_path: str, description: str):
+    """
+    上传图片（使用成功的upload_image逻辑）
+
+    Args:
+        driver: WebDriver实例
+        image_path: 图片文件的绝对路径
+        description: 描述信息（用于日志）
+    """
+    import os as os_module
+    import time as time_module
+
+    # 转换为绝对路径
+    abs_image_path = os_module.path.abspath(image_path)
+
+    # 确保文件存在
+    if not os_module.path.exists(image_path):
+        raise FileNotFoundError(f"图片文件不存在: {image_path}")
+
+    target_file = os_module.path.basename(image_path)
+    logging.info(f"[UI] 正在上传图片 '{target_file}' 用于: {description}")
+
+    # JavaScript上传函数
+    upload_js = f"""
+    (function() {{
+        // 查找所有file input
+        var inputs = document.querySelectorAll('input[type="file"]');
+        var targetInput = null;
+
+        // 优先查找可见的file input
+        for (var i = 0; i < inputs.length; i++) {{
+            if (inputs[i].offsetParent !== null && inputs[i].offsetParent !== document.body) {{
+                targetInput = inputs[i];
+                break;
+            }}
+        }}
+
+        // 如果没找到可见的，使用第一个
+        if (!targetInput && inputs.length > 0) {{
+            targetInput = inputs[0];
+        }}
+
+        if (!targetInput) {{
+            return {{success: false, message: '未找到file input'}};
+        }}
+
+        // 设置文件路径
+        try {{
+            targetInput.value = '{abs_image_path.replace(os_module.sep, '/')}';
+
+            // 触发change事件
+            var event = new Event('change', {{bubbles: true}});
+            targetInput.dispatchEvent(event);
+
+            return {{
+                success: true,
+                message: '上传成功',
+                hasValue: targetInput.value !== ''
+            }};
+        }} catch (e) {{
+            return {{success: false, message: e.toString()}};
+        }}
+    }})();
+    """
+
+    # 执行JavaScript上传
+    upload_result = driver.execute_script(upload_js)
+
+    if not upload_result or not upload_result.get('success'):
+        # JavaScript方式失败，尝试使用Selenium方式
+        logging.warning(f"[UI] JavaScript上传失败，尝试使用Selenium方式")
+
+        from selenium.webdriver.common.by import By
+        file_input = None
+
+        try:
+            file_input = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
+            )
+        except:
+            # 尝试通过CSS选择器
+            file_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
+
+        if file_input:
+            file_input.send_keys(abs_image_path)
+            logging.info(f"[UI] ✅ 已通过Selenium上传图片 '{target_file}' 用于: {description}")
+        else:
+            raise Exception("页面上未找到可用的文件上传输入框")
+    else:
+        logging.info(f"[UI] ✅ 已通过JavaScript上传图片 '{target_file}' 用于: {description}")
+
+    # 等待上传处理完成
+    time_module.sleep(2)
+
+
+def handle_extra_info_page(driver: webdriver.Remote, phone: str):
+    """
+    处理TIER3额外信息填写页面（去提交后）
+
+    功能：上传银行流水图片并点击下一页
+
+    Args:
+        driver: WebDriver实例
+        phone: 手机号，用于后续API请求
+    """
+    import time as time_module
+    import glob
+    import os as os_module
+
+    start_time = time_module.time()
+
+    logging.info("\n" + "=" * 50)
+    logging.info("步骤: 额外信息填写 - 银行流水上传")
+    logging.info("=" * 50)
+
+    # 等待额外信息页面加载
+    logging.info("[UI] 等待额外信息页面加载...")
+    try:
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located(LOCATORS["BANK_STATEMENT_UPLOAD_BTN"]))
+        elapsed = time_module.time() - start_time
+        logging.info(f"[UI] 额外信息页面已加载，耗时: {elapsed:.2f}秒")
+    except Exception as e:
+        logging.warning(f"[UI] 等待额外信息页面超时，尝试继续: {e}")
+
+    # 选择填写方式
+    options = {'1': '自动填写（上传银行流水）', '2': '手动填写'}
+    choice = get_user_choice(options, "请选择填写方式:")
+
+    if choice == '1':
+        logging.info("[流程] 选择自动填写...")
+
+        # 银行流水图片文件夹路径
+        screenshot_folder = r"C:\Users\PC\Desktop\截图"
+
+        # 优先查找包含"银行流水"的文件，否则查找任意图片
+        image_extensions = ['*.png', '*.jpg', '*.jpeg', '*.bmp']
+        image_files = []
+        for ext in image_extensions:
+            image_files.extend(glob.glob(os_module.path.join(screenshot_folder, ext)))
+
+        # 优先选择文件名包含"银行流水"的文件
+        bank_statement_file = None
+        for file in image_files:
+            if '银行流水' in os_module.path.basename(file):
+                bank_statement_file = file
+                break
+
+        # 如果没找到包含"银行流水"的文件，使用第一个找到的文件
+        if bank_statement_file:
+            image_path = bank_statement_file
+            logging.info(f"[UI] 找到银行流水图片: {os_module.path.basename(image_path)}")
+        elif image_files:
+            image_path = image_files[0]
+            logging.info(f"[UI] 未找到包含'银行流水'的文件，使用: {os_module.path.basename(image_path)}")
+        else:
+            logging.error(f"❌ 在文件夹 {screenshot_folder} 中未找到图片！")
+            logging.info("[流程] 请手动选择图片上传")
+            input("上传完成后按Enter继续...")
+            return  # 结束函数执行
+
+        try:
+            # 使用upload_image函数上传
+            upload_image(driver, image_path, "银行流水")
+
+        except Exception as e:
+            logging.error(f"❌ 自动填写失败: {e}")
+            logging.info("[流程] 请手动完成上传和点击下一页")
+            input("上传完成后按Enter继续...")
+
+        # 点击下一页按钮
+        logging.info("[UI] 点击下一页按钮...")
+        safe_click(driver, "EXTRA_INFO_NEXT_BTN", "下一页按钮")
+
+        total_elapsed = time_module.time() - start_time
+        logging.info(f"✅ 银行流水上传完成，总耗时: {total_elapsed:.2f}秒")
+
+        # 进入股东董事额外信息页面
+        time_module.sleep(2)
+        handle_director_extra_info_page(driver, phone)
+
+    else:
+        logging.info("[流程] 选择手动填写...")
+        input("填写完成后按Enter继续...")
+
+
+def handle_director_extra_info_page(driver: webdriver.Remote, phone: str):
+    """
+    处理TIER3股东董事额外信息页面（第二页）
+
+    功能：上传个人信用报告、勾选未婚状态、点击下一页、第二次审批、激活额度、PSP、电子签
+
+    Args:
+        driver: WebDriver实例
+        phone: 手机号，用于后续API请求
+    """
+    import time as time_module
+    import glob
+    import os as os_module
+
+    start_time = time_module.time()
+
+    logging.info("\n" + "=" * 50)
+    logging.info("步骤: 股东董事额外信息 - 个人信用报告上传")
+    logging.info("=" * 50)
+
+    # 等待页面加载
+    logging.info("[UI] 等待股东董事额外信息页面加载...")
+    time_module.sleep(2)
+
+    # 选择填写方式
+    options = {'1': '自动输入（上传信用报告+勾选未婚）', '2': '手动输入'}
+    choice = get_user_choice(options, "请选择填写方式:")
+
+    if choice == '1':
+        logging.info("[流程] 选择自动输入...")
+
+        # 个人信用报告图片文件夹路径
+        screenshot_folder = r"C:\Users\PC\Desktop\截图"
+
+        # 查找个人信用报告图片
+        image_extensions = ['*.png', '*.jpg', '*.jpeg', '*.bmp']
+        image_files = []
+        for ext in image_extensions:
+            image_files.extend(glob.glob(os_module.path.join(screenshot_folder, ext)))
+
+        # 优先选择文件名包含"个人信用报告"的文件
+        credit_report_file = None
+        for file in image_files:
+            if '个人信用报告' in os_module.path.basename(file):
+                credit_report_file = file
+                break
+
+        # 如果没找到包含"个人信用报告"的文件，使用第一个找到的文件
+        if credit_report_file:
+            image_path = credit_report_file
+            logging.info(f"[UI] 找到个人信用报告图片: {os_module.path.basename(image_path)}")
+        elif image_files:
+            image_path = image_files[0]
+            logging.info(f"[UI] 未找到包含'个人信用报告'的文件，使用: {os_module.path.basename(image_path)}")
+        else:
+            logging.error(f"❌ 在文件夹 {screenshot_folder} 中未找到图片！")
+            logging.info("[流程] 请手动选择图片上传")
+            input("上传完成后按Enter继续...")
+            return  # 结束函数执行
+
+        try:
+            # 使用upload_image函数上传个人信用报告
+            upload_image(driver, image_path, "个人信用报告")
+
+            # 2. 勾选未婚状态
+            logging.info("[UI] 勾选未婚状态...")
+            try:
+                checkbox = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(LOCATORS["SINGLE_STATUS_CHECKBOX"])
+                )
+                # 检查是否已勾选
+                if not checkbox.is_selected():
+                    checkbox.click()
+                    logging.info("✅ 已勾选未婚状态")
+                else:
+                    logging.info("ℹ️  未婚状态已勾选")
+            except Exception as e:
+                logging.warning(f"⚠️ 勾选未婚状态失败: {e}，尝试JavaScript方式...")
+                # 尝试JavaScript方式
+                checkbox_js = """
+                (function() {
+                    var checkbox = document.querySelector("label[class*='el-radio'] span[class*='el-radio__input']");
+                    if (checkbox) {
+                        checkbox.click();
+                        return {success: true};
+                    }
+                    return {success: false};
+                })();
+                """
+                result = driver.execute_script(checkbox_js)
+                if result and result.get('success'):
+                    logging.info("✅ 已通过JavaScript勾选未婚状态")
+
+            time_module.sleep(1)
+
+            # 3. 点击下一页按钮
+            logging.info("[UI] 点击下一页按钮...")
+            safe_click(driver, "DIRECTOR_INFO_NEXT_BTN", "下一页按钮")
+
+            total_elapsed = time_module.time() - start_time
+            logging.info(f"✅ 股东董事额外信息填写完成，总耗时: {total_elapsed:.2f}秒")
+
+            # 4. 发送第二次审批请求
+            logging.info("\n" + "=" * 50)
+            logging.info("步骤: 第二次审批请求")
+            logging.info("=" * 50)
+
+            second_amount = CURRENT_AMOUNT_CONFIG["approved_amount_2nd"]
+            logging.info(f"[API] 发送第二次审批请求（金额: {second_amount}）...")
+
+            time_module.sleep(3)
+            if send_approved_request(phone, amount=second_amount):
+                logging.info(f"✅ 第二次审批请求成功（金额: {second_amount}）！")
+
+                # 5. 点击激活额度按钮
+                time_module.sleep(5)
+                logging.info("\n[UI] 点击激活额度按钮...")
+                safe_click(driver, "ACTIVATE_CREDIT_BTN", "激活额度按钮")
+                logging.info("✅ 已点击激活额度按钮")
+
+                # 6. 点击接受按钮
+                time_module.sleep(5)
+                safe_click(driver, "ACCEPT_BTN", "接受按钮")
+                logging.info("✅ 已点击接受按钮")
+
+                # 7. PSP开始请求
+                time_module.sleep(5)
+                logging.info("\n[1/3] 发送PSP验证开始请求...")
+                if send_psp_start_request(phone):
+                    logging.info("✅ PSP开始请求成功！")
+                else:
+                    logging.error("❌ PSP开始请求失败！")
+
+                # 8. PSP完成请求
+                time_module.sleep(5)
+                logging.info("\n[2/3] 发送PSP验证完成请求...")
+                if send_psp_completed_request(phone):
+                    logging.info("✅ PSP完成请求成功！")
+                else:
+                    logging.error("❌ PSP完成请求失败！")
+
+                # 9. 电子签请求
+                time_module.sleep(5)
+                logging.info("\n[3/3] 发送电子签完成请求...")
+                if send_esign_request(phone):
+                    logging.info("✅ 电子签请求成功！")
+
+                    logging.info("\n" + "=" * 50)
+                    logging.info("🎉 TIER3去提交流程已完成！")
+                    logging.info("=" * 50)
+
+                else:
+                    logging.error("❌ 电子签请求失败！")
+
+            else:
+                logging.error("❌ 第二次审批请求失败！")
+
+        except Exception as e:
+            logging.error(f"❌ 自动填写失败: {e}")
+            logging.info("[流程] 请手动完成上传、勾选和点击下一页")
+            input("完成后按Enter继续...")
+
+    else:
+        logging.info("[流程] 选择手动输入...")
+        input("填写完成后按Enter继续...")
+
+
 # ==============================================================================
-# --- 6. 全局数据库连接（单例模式） ---
+# --- 6. 全局数据库连接（单例模式）---
 # ==============================================================================
 _global_db: Optional[DatabaseExecutor] = None
 
@@ -2289,9 +2593,9 @@ def run_automation(url: str, phone: str, tier_name: str):
                 else:
                     logging.error("❌ 审批请求失败！")
             else:
-                # need_bank_info=False表示选择了"去解锁"，走原流程（核保→审批→点击按钮→PSP→电子签）
+                # TIER3走完整流程（核保→审批→额度选择→后续流程）
                 logging.info("\n" + "=" * 50)
-                logging.info("步骤 9/9: 发起核保→审批→点击按钮→PSP→电子签")
+                logging.info("步骤 9/9: TIER3流程 - 核保→审批→额度选择")
                 logging.info("=" * 50)
 
                 # 1. 核保请求
@@ -2306,43 +2610,64 @@ def run_automation(url: str, phone: str, tier_name: str):
                 if send_approved_request(phone):
                     logging.info("✅ 审批请求成功！")
 
-                    # 3. 点击激活额度按钮
-                    time.sleep(5)
-                    safe_click(driver, "ACTIVATE_CREDIT_BTN", "激活额度按钮")
-                    logging.info("✅ 已点击激活额度按钮")
+                    # 3. 额度选择（TIER3特有）
+                    time.sleep(3)
+                    tier3_choice = handle_tier3_credit_choice(driver)
 
-                    # 4. 点击接受按钮
-                    time.sleep(5)
-                    safe_click(driver, "ACCEPT_BTN", "接受按钮")
-                    logging.info("✅ 已点击接受按钮")
+                    if tier3_choice == 'activate':
+                        # 选择"去激活"：走完整流程（激活额度→PSP→电子签）
+                        logging.info("\n" + "=" * 50)
+                        logging.info("后续流程: 激活额度→PSP→电子签")
+                        logging.info("=" * 50)
 
-                    # 5. PSP开始请求
-                    time.sleep(5)
-                    logging.info("\n[5/6] 发送PSP验证开始请求...")
-                    if send_psp_start_request(phone):
-                        logging.info("✅ PSP开始请求成功！")
+                        # 4. 点击激活额度按钮
+                        time.sleep(5)
+                        safe_click(driver, "ACTIVATE_CREDIT_BTN", "激活额度按钮")
+                        logging.info("✅ 已点击激活额度按钮")
+
+                        # 5. 点击接受按钮
+                        time.sleep(5)
+                        safe_click(driver, "ACCEPT_BTN", "接受按钮")
+                        logging.info("✅ 已点击接受按钮")
+
+                        # 6. PSP开始请求
+                        time.sleep(5)
+                        logging.info("\n[1/3] 发送PSP验证开始请求...")
+                        if send_psp_start_request(phone):
+                            logging.info("✅ PSP开始请求成功！")
+                        else:
+                            logging.error("❌ PSP开始请求失败！")
+
+                        # 7. PSP完成请求
+                        time.sleep(5)
+                        logging.info("\n[2/3] 发送PSP验证完成请求...")
+                        if send_psp_completed_request(phone):
+                            logging.info("✅ PSP完成请求成功！")
+                        else:
+                            logging.error("❌ PSP完成请求失败！")
+
+                        # 8. 电子签请求
+                        time.sleep(5)
+                        logging.info("\n[3/3] 发送电子签完成请求...")
+                        if send_esign_request(phone):
+                            logging.info("✅ 电子签请求成功！")
+                        else:
+                            logging.error("❌ 电子签请求失败！")
+
+                        logging.info("\n" + "=" * 50)
+                        logging.info("🎉 TIER3去激活流程已完成！")
+                        logging.info("=" * 50)
+
                     else:
-                        logging.error("❌ PSP开始请求失败！")
+                        # 选择"去提交"：进入额外信息填写页面
+                        logging.info("\n" + "=" * 50)
+                        logging.info("已选择：去提交")
+                        logging.info("=" * 50)
 
-                    # 6. PSP完成请求
-                    time.sleep(5)
-                    logging.info("\n[6/6] 发送PSP验证完成请求...")
-                    if send_psp_completed_request(phone):
-                        logging.info("✅ PSP完成请求成功！")
-                    else:
-                        logging.error("❌ PSP完成请求失败！")
+                        # 处理额外信息填写页面（上传银行流水、股东董事信息、第二次审批等）
+                        time.sleep(3)  # 等待页面加载
+                        handle_extra_info_page(driver, phone)
 
-                    # 7. 电子签请求
-                    time.sleep(5)
-                    logging.info("\n[7/7] 发送电子签完成请求...")
-                    if send_esign_request(phone):
-                        logging.info("✅ 电子签请求成功！")
-                    else:
-                        logging.error("❌ 电子签请求失败！")
-
-                    logging.info("\n" + "=" * 50)
-                    logging.info("🎉 核保、审批、PSP和电子签请求已完成！")
-                    logging.info("=" * 50)
                 else:
                     logging.error("❌ 审批请求失败！")
 

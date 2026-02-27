@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-DPU状态模拟工具
+DPU状态模拟工具 - 外用版
 功能：支持账号注册、SP授权、核保/审批/PSP/电子签/放款/还款等状态模拟，支持多环境切换和多店铺场景
 环境支持：sit/local/dev/uat/preprod
 核心特性：自动重连数据库、输入验证、日志颜色区分、统一请求处理
+外用版特性：注册记录固定输出到桌面
 """
 import logging
-import os
-import socket
 import time
 import uuid
 import random
+import os
 from urllib.parse import urlencode
 from enum import Enum
 from typing import Optional, Dict, Any, Callable, Union
@@ -25,22 +25,25 @@ from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod）
-ENV = "preprod"
+ENV = "sit"
+
+# 获取用户桌面路径
+DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
 # 流程配置映射（清晰展示不同额度对应的流程步骤）
 STEPS = {
     "200k": """
-            1.approved offer 
+            1.approved offer
             2.更新esign状态
             3.更新放款状态
-            4.underwritten 
+            4.underwritten
             5.approved offer
             6.psp_start
             7.psp completed
             8.更新esign状态
             9.更新放款状态""",
     "500k-2M": """
-            1.underwritten 
+            1.underwritten
             2.approved offer
             3.psp_start
             4.psp completed
@@ -252,23 +255,6 @@ class DatabaseConfig:
         return cls._DATABASE_CONFIG[env].copy()
 
 
-def get_local_physical_ip() -> Optional[str]:
-    """获取本地物理网卡IP地址（用于绕过VPN直连数据库）"""
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
-                return local_ip
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
-                return local_ip
-    except Exception:
-        pass
-    return None
-
-
 # ============================ 数据库执行器（精简连接逻辑，提升稳定性）============================
 class DatabaseExecutor:
     """数据库操作执行器（封装连接、查询、执行逻辑，支持自动重连和上下文管理）"""
@@ -280,39 +266,18 @@ class DatabaseExecutor:
         self.env = env
 
     def connect(self) -> None:
-        """建立数据库连接（绑定本地物理网卡IP绕过VPN）"""
-        # 获取本地物理网卡IP
-        local_ip = get_local_physical_ip()
-        connect_params = self.config.copy()
-
-        if local_ip:
-            connect_params['bind_address'] = local_ip
-
+        """建立数据库连接"""
         try:
-            # 清除代理环境变量
-            old_proxies = {}
-            for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
-                if os.environ.get(proxy_key):
-                    old_proxies[proxy_key] = os.environ[proxy_key]
-                    del os.environ[proxy_key]
-
             self.conn = pymysql.connect(
-                **connect_params,
+                **self.config,
                 autocommit=True,
                 client_flag=CLIENT.INTERACTIVE
             )
             self.cursor = self.conn.cursor()
-            if local_ip:
-                log.info(f"[{self.env}] 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
-            else:
-                log.info(f"[{self.env}] 数据库连接成功（系统自动路由）")
+            log.info(f"[{self.env}] 数据库连接成功")
         except Exception as e:
             log.error(f"[{self.env}] 数据库连接失败: {e}")
             raise
-        finally:
-            # 恢复代理环境变量
-            for k, v in old_proxies.items():
-                os.environ[k] = v
 
     def reconnect(self) -> None:
         """数据库重连（连接失效时自动调用）"""
@@ -333,9 +298,7 @@ class DatabaseExecutor:
     ) -> Any:
         """带重试机制的执行包装器（统一处理连接失效）"""
         try:
-            # f-string中不能使用反斜杠，需要提前处理
-            sql_display = sql.strip().replace('\n', ' ')
-            log.debug(f"执行SQL: {sql_display}")
+            log.debug(f"执行SQL: {sql.strip().replace(chr(10), ' ')}")
             return func(sql)
         except OperationalError as e:
             # 处理常见连接失效错误码
@@ -343,12 +306,10 @@ class DatabaseExecutor:
                 log.warning(f"数据库连接失效，剩余{retry}次重连尝试...")
                 self.reconnect()
                 return self._execute_with_retry(func, sql, retry - 1)
-            sql_display = sql.strip().replace('\n', ' ')
-            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
+            log.error(f"SQL执行出错: {e}, SQL: {sql.strip().replace(chr(10), ' ')}")
             raise
         except Exception as e:
-            sql_display = sql.strip().replace('\n', ' ')
-            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
+            log.error(f"SQL执行出错: {e}, SQL: {sql.strip().replace(chr(10), ' ')}")
             raise
 
     def execute_sql(self, sql: str, retry: int = 3) -> Optional[Any]:
@@ -420,6 +381,9 @@ class DPUMockService:
             else f"https://dpu-gateway-{self.db_executor.env}.dowsure.com/dpu-merchant/amazon/redirect"
         )
 
+        # 外用版：txt_path固定指向桌面
+        txt_path = os.path.join(DESKTOP_PATH, f"register_{self.db_executor.env}.txt")
+
         # 构建API配置（复用基础URL，减少冗余）
         return ApiConfig(
             base_url=base_url,
@@ -432,15 +396,15 @@ class DPUMockService:
             link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
-            txt_path=f"./register_{self.db_executor.env}.txt"
+            txt_path=txt_path
         )
 
     # ============================ 数据查询方法（精简SQL，提升可读性）============================
     def get_merchant_id(self) -> Optional[str]:
         """根据手机号查询最新的merchant_id"""
         sql = f"""
-            SELECT merchant_id FROM dpu_users 
-            WHERE phone_number = '{self.phone_number}' 
+            SELECT merchant_id FROM dpu_users
+            WHERE phone_number = '{self.phone_number}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -448,7 +412,7 @@ class DPUMockService:
     def get_platform_offer_id(self, seller_id: str) -> Optional[str]:
         """根据seller_id查询platform_offer_id"""
         sql = f"""
-            SELECT platform_offer_id FROM dpu_manual_offer 
+            SELECT platform_offer_id FROM dpu_manual_offer
             WHERE platform_seller_id = '{seller_id}'
             ORDER BY created_at DESC LIMIT 1
         """
@@ -461,9 +425,9 @@ class DPUMockService:
             return None
 
         sql = f"""
-            SELECT merchant_id, loan_id, lender_loan_id 
-            FROM dpu_drawdown 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT merchant_id, loan_id, lender_loan_id
+            FROM dpu_drawdown
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         drawdown_info = self.db_executor.execute_query(sql)
@@ -478,8 +442,8 @@ class DPUMockService:
     def merchant_account_id(self) -> Optional[str]:
         """获取merchant_account_id"""
         sql = f"""
-            SELECT merchant_account_id FROM dpu_merchant_account_limit 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT merchant_account_id FROM dpu_merchant_account_limit
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -488,8 +452,8 @@ class DPUMockService:
     def application_unique_id(self) -> Optional[str]:
         """获取application_unique_id"""
         sql = f"""
-            SELECT application_unique_id FROM dpu_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT application_unique_id FROM dpu_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -503,8 +467,8 @@ class DPUMockService:
     def dpu_loan_id(self) -> Optional[str]:
         """获取dpu_loan_id"""
         sql = f"""
-            SELECT loan_id FROM dpu_drawdown 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT loan_id FROM dpu_drawdown
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -518,8 +482,8 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_limit_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT limit_application_unique_id FROM dpu_limit_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -528,10 +492,9 @@ class DPUMockService:
     def dpu_auth_token_seller_id(self) -> Optional[str]:
         """获取SP授权的seller_id"""
         sql = f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{self.merchant_id}' 
-            AND authorization_party = 'SP' 
-            AND authorization_id IS NOT NULL
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -689,6 +652,10 @@ class DPUMockService:
             "local": "http://192.168.11.3:8080"
         }
         base_url = base_url_dict[ENV]
+
+        # 外用版：txt_path固定指向桌面
+        txt_path = os.path.join(DESKTOP_PATH, f"register_{ENV}.txt")
+
         api_config = ApiConfig(
             base_url=base_url,
             create_offerid_url=f"{base_url}/dpu-merchant/mock/generate-shop-performance",
@@ -704,7 +671,7 @@ class DPUMockService:
             link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
-            txt_path=f"./register_{ENV}.txt"
+            txt_path=txt_path
         )
 
         # 创建offer_id（失败重试）
@@ -760,7 +727,8 @@ class DPUMockService:
             )
             resp_register.raise_for_status()
             token = resp_register.json().get("data", {}).get("token", "未获取到token")
-            print(f"✅ 注册成功！手机号: {phone_number} | Token: {token}")
+            print(f"注册成功！手机号: {phone_number} | Token: {token}")
+            print(f"注册记录已保存至桌面: {txt_path}")
             with open(api_config.txt_path, 'a', encoding='utf-8') as f:
                 f.write(f"\n{journey}\n{phone_number}\n{redirect_url}\n")
             return phone_number
@@ -779,30 +747,29 @@ class DPUMockService:
             log.error(error_detail)
             return cls.register_new_account()
 
-    # 功能1已注释：模拟SPAPI授权回调
-    # def mock_spapi_auth(self) -> None:
-    #     """模拟SPAPI授权回调"""
-    #     shop_num = input_with_validation(
-    #         prompt="请输入店铺编号(1,2,3...): \n",
-    #         validator=lambda x: x.isdigit() and int(x) >= 1,
-    #         error_msg="请输入正整数！"
-    #     )
-    #     self.seller_id = f"{shop_num}BTC6RWJD{self.phone_number}"
-    #     payload = {
-    #         "phone": self.phone_number,
-    #         "status": "ACTIVE",
-    #         "dpu_token": "dpu_token",
-    #         "sellerId": self.seller_id,
-    #         "authorization_code": "authorization_code",
-    #         "refresh_token_expires_time": "2025-09-19T10:09:07.921Z",
-    #         "access_token": "access_token sunt",
-    #         "refresh_token": "refresh_token minim et anim sunt"
-    #     }
-    #     response = self._send_request(self.api_config.spapi_auth_url, json=payload)
-    #     if response and response.get("code") == 200:
-    #         log.info(f"SPAPI授权成功，seller_id: {self.seller_id}")
-    #     else:
-    #         log.error(f"SPAPI授权失败: {response}")
+    def mock_spapi_auth(self) -> None:
+        """模拟SPAPI授权回调"""
+        shop_num = input_with_validation(
+            prompt="请输入店铺编号(1,2,3...): \n",
+            validator=lambda x: x.isdigit() and int(x) >= 1,
+            error_msg="请输入正整数！"
+        )
+        self.seller_id = f"{shop_num}BTC6RWJD{self.phone_number}"
+        payload = {
+            "phone": self.phone_number,
+            "status": "ACTIVE",
+            "dpu_token": "dpu_token",
+            "sellerId": self.seller_id,
+            "authorization_code": "authorization_code",
+            "refresh_token_expires_time": "2025-09-19T10:09:07.921Z",
+            "access_token": "access_token sunt",
+            "refresh_token": "refresh_token minim et anim sunt"
+        }
+        response = self._send_request(self.api_config.spapi_auth_url, json=payload)
+        if response and response.get("code") == 200:
+            log.info(f"SPAPI授权成功，seller_id: {self.seller_id}")
+        else:
+            log.error(f"SPAPI授权失败: {response}")
 
     def mock_link_sp_3pl_shop(self) -> None:
         """模拟关联SP和3PL店铺"""
@@ -910,7 +877,7 @@ class DPUMockService:
                 "details": {
                     "merchantId": self.merchant_id,
                     "dpuApplicationId": self.application_unique_id,
-                    "originalRequestId": "req_1111113579",
+                    "originalRequestId": " ",
                     "status": approved_status,
                     "failureReason": failure_reason,
                     "lenderApprovedOfferId": self.lender_approved_offer_id,
@@ -1029,17 +996,16 @@ class DPUMockService:
         }
         self._send_webhook_request(request_body)
 
-    # 功能5已注释：创建PSP授权记录
-    # def mock_create_psp_record(self) -> None:
-    #     """创建PSP授权记录"""
-    #     if not self.seller_id:
-    #         log.error("请先执行SPAPI授权获取seller_id")
-    #         return
-    #
-    #     params = {"authorizationId": self.seller_id, "pspId": f"PSP{self.seller_id}"}
-    #     result = self._send_request(self.api_config.create_psp_auth_url, params=params)
-    #     log.info("创建PSP授权记录成功" if result else "创建PSP授权记录失败")
-    #     time.sleep(1)
+    def mock_create_psp_record(self) -> None:
+        """创建PSP授权记录"""
+        if not self.seller_id:
+            log.error("请先执行SPAPI授权获取seller_id")
+            return
+
+        params = {"authorizationId": self.seller_id, "pspId": f"PSP{self.seller_id}"}
+        result = self._send_request(self.api_config.create_psp_auth_url, params=params)
+        log.info("创建PSP授权记录成功" if result else "创建PSP授权记录失败")
+        time.sleep(1)
 
     def _mock_psp_status(self, is_start: bool = True) -> None:
         """模拟PSP状态更新（复用逻辑，支持开始/完成状态）"""
@@ -1262,9 +1228,9 @@ def check_is_registered(phone_number: str, db_executor: DatabaseExecutor) -> boo
 
         # 校验3PL授权
         offer_id = db_executor.execute_sql(f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{merchant_id}' 
-            AND authorization_party = '3PL' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{merchant_id}'
+            AND authorization_party = '3PL'
             ORDER BY created_at DESC LIMIT 1
         """)
         if offer_id:
@@ -1281,6 +1247,7 @@ def check_is_registered(phone_number: str, db_executor: DatabaseExecutor) -> boo
 def main():
     """程序入口（控制整体流程）"""
     log.info(f"当前环境：{ENV}")
+    log.info(f"注册记录保存路径：{os.path.join(DESKTOP_PATH, f'register_{ENV}.txt')}")
     log.info("=" * 50)
 
     # 初始化数据库连接（上下文管理自动关闭）
@@ -1304,27 +1271,30 @@ def main():
         # 初始化服务
         mock_service = DPUMockService(phone_number, db_executor)
 
-        # 主菜单配置（结构化管理，便于维护）- 移除了1(spapi授权)、5(创建psp记录)、14(清空缓存)选项
+        # 主菜单配置（结构化管理，便于维护）- 移除了14号清空缓存选项
         menu = """
 请输入要执行的操作：
-1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)
-4 - psp开始(psp_start)   5 - psp完成(psp_completed)  6 - 电子签(esign)
-7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
-10 - SP店铺绑定（多店铺第一步）  11 - 3PL重定向（多店铺第二步）
+1 - spapi授权回调        2 - link-sp-3pl关联      3 - 核保(underwritten)
+4 - 审批(approved)       5 - 创建psp记录(不用做)  6 - psp开始(psp_start)
+7 - psp完成(psp_completed)  8 - 电子签(esign)     9 - 放款(drawdown)
+10 - 还款开始(repayment_start)  11 - 还款(repayment)     12 - SP店铺绑定（多店铺第一步）
+13 - 3PL重定向（多店铺第二步）
 q - 退出
 """
         operation_map = {
-            "1": mock_service.mock_link_sp_3pl_shop,
-            "2": mock_service.mock_underwritten_status,
-            "3": mock_service.mock_approved_offer_status,
-            "4": mock_service.mock_psp_start_status,
-            "5": mock_service.mock_psp_completed_status,
-            "6": mock_service.mock_esign_status,
-            "7": mock_service.mock_drawdown_status,
-            "8": mock_service.mock_repayment_start_status,
-            "9": mock_service.mock_repayment_status,
-            "10": mock_service.mock_multi_shop_binding,
-            "11": mock_service.mock_multi_shop_3pl_redirect
+            "1": mock_service.mock_spapi_auth,
+            "2": mock_service.mock_link_sp_3pl_shop,
+            "3": mock_service.mock_underwritten_status,
+            "4": mock_service.mock_approved_offer_status,
+            "5": mock_service.mock_create_psp_record,
+            "6": mock_service.mock_psp_start_status,
+            "7": mock_service.mock_psp_completed_status,
+            "8": mock_service.mock_esign_status,
+            "9": mock_service.mock_drawdown_status,
+            "10": mock_service.mock_repayment_start_status,
+            "11": mock_service.mock_repayment_status,
+            "12": mock_service.mock_multi_shop_binding,
+            "13": mock_service.mock_multi_shop_3pl_redirect
         }
 
         # 菜单循环

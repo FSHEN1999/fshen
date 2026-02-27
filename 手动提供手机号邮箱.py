@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-DPU状态模拟工具
+DPU状态模拟工具（手动输入手机号和邮箱版本）
 功能：支持账号注册、SP授权、核保/审批/PSP/电子签/放款/还款等状态模拟，支持多环境切换和多店铺场景
 环境支持：sit/local/dev/uat/preprod
 核心特性：自动重连数据库、输入验证、日志颜色区分、统一请求处理
+与原版本区别：注册时手动输入手机号和邮箱，不使用faker自动生成
 """
 import logging
 import os
@@ -19,28 +20,27 @@ from datetime import datetime, timedelta
 
 import pymysql
 import requests
-from faker import Faker
 from pymysql.constants import CLIENT
 from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod）
-ENV = "preprod"
+ENV = "uat"
 
 # 流程配置映射（清晰展示不同额度对应的流程步骤）
 STEPS = {
     "200k": """
-            1.approved offer 
+            1.approved offer
             2.更新esign状态
             3.更新放款状态
-            4.underwritten 
+            4.underwritten
             5.approved offer
             6.psp_start
             7.psp completed
             8.更新esign状态
             9.更新放款状态""",
     "500k-2M": """
-            1.underwritten 
+            1.underwritten
             2.approved offer
             3.psp_start
             4.psp completed
@@ -77,9 +77,6 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# 初始化工具实例（单例复用）
-faker = Faker("zh_CN")
-
 
 # ============================ 工具函数（精简冗余，提升复用性）============================
 def generate_uuid37() -> str:
@@ -90,6 +87,13 @@ def generate_uuid37() -> str:
 def validate_phone_number(phone_number: str) -> bool:
     """验证手机号格式（支持8位或11位数字）"""
     return phone_number.isdigit() and len(phone_number) in (11, 8)
+
+
+def validate_email(email: str) -> bool:
+    """验证邮箱格式"""
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 
 def get_current_time(fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
@@ -439,8 +443,8 @@ class DPUMockService:
     def get_merchant_id(self) -> Optional[str]:
         """根据手机号查询最新的merchant_id"""
         sql = f"""
-            SELECT merchant_id FROM dpu_users 
-            WHERE phone_number = '{self.phone_number}' 
+            SELECT merchant_id FROM dpu_users
+            WHERE phone_number = '{self.phone_number}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -448,7 +452,7 @@ class DPUMockService:
     def get_platform_offer_id(self, seller_id: str) -> Optional[str]:
         """根据seller_id查询platform_offer_id"""
         sql = f"""
-            SELECT platform_offer_id FROM dpu_manual_offer 
+            SELECT platform_offer_id FROM dpu_manual_offer
             WHERE platform_seller_id = '{seller_id}'
             ORDER BY created_at DESC LIMIT 1
         """
@@ -461,9 +465,9 @@ class DPUMockService:
             return None
 
         sql = f"""
-            SELECT merchant_id, loan_id, lender_loan_id 
-            FROM dpu_drawdown 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT merchant_id, loan_id, lender_loan_id
+            FROM dpu_drawdown
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         drawdown_info = self.db_executor.execute_query(sql)
@@ -478,8 +482,8 @@ class DPUMockService:
     def merchant_account_id(self) -> Optional[str]:
         """获取merchant_account_id"""
         sql = f"""
-            SELECT merchant_account_id FROM dpu_merchant_account_limit 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT merchant_account_id FROM dpu_merchant_account_limit
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -488,8 +492,8 @@ class DPUMockService:
     def application_unique_id(self) -> Optional[str]:
         """获取application_unique_id"""
         sql = f"""
-            SELECT application_unique_id FROM dpu_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT application_unique_id FROM dpu_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -503,8 +507,8 @@ class DPUMockService:
     def dpu_loan_id(self) -> Optional[str]:
         """获取dpu_loan_id"""
         sql = f"""
-            SELECT loan_id FROM dpu_drawdown 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT loan_id FROM dpu_drawdown
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -518,8 +522,8 @@ class DPUMockService:
     def dpu_limit_application_id(self) -> Optional[str]:
         """获取limit_application_unique_id"""
         sql = f"""
-            SELECT limit_application_unique_id FROM dpu_limit_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT limit_application_unique_id FROM dpu_limit_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -528,9 +532,9 @@ class DPUMockService:
     def dpu_auth_token_seller_id(self) -> Optional[str]:
         """获取SP授权的seller_id"""
         sql = f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{self.merchant_id}' 
-            AND authorization_party = 'SP' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
             AND authorization_id IS NOT NULL
             ORDER BY created_at DESC LIMIT 1
         """
@@ -566,20 +570,17 @@ class DPUMockService:
             log.info(f"Webhook请求成功，响应: {response.text[:100]}...")
             return True
         except requests.exceptions.RequestException as e:
-            # ========== 优化点1：增强Webhook请求失败日志 ==========
             error_detail = f"Webhook请求失败: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 error_detail += f"\n  - 响应头: {dict(e.response.headers)}"
                 try:
-                    # 尝试解析JSON响应
                     resp_json = e.response.json()
                     error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
                     error_detail += f"\n  - Status: {resp_json.get('status', 'N/A')}"
                     error_detail += f"\n  - Detail: {resp_json.get('detail', 'N/A')}"
                     error_detail += f"\n  - 完整响应: {resp_json}"
                 except:
-                    # 非JSON响应直接输出文本
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
             return False
@@ -596,14 +597,12 @@ class DPUMockService:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            # ========== 优化点2：增强通用请求失败日志 ==========
             error_detail = f"请求{url}失败: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 请求方法: {method.upper()}"
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 error_detail += f"\n  - 响应头: {dict(e.response.headers)}"
                 try:
-                    # 尝试解析JSON响应
                     resp_json = e.response.json()
                     error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
                     error_detail += f"\n  - Status: {resp_json.get('status', 'N/A')}"
@@ -612,7 +611,6 @@ class DPUMockService:
                     error_detail += f"\n  - Detail: {resp_json.get('detail', 'N/A')}"
                     error_detail += f"\n  - 完整响应JSON: {resp_json}"
                 except:
-                    # 非JSON响应直接输出文本
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
             return None
@@ -646,9 +644,7 @@ class DPUMockService:
         if offer_id:
             redirect_url = f"{api_config.redirect_url}?offerId={offer_id}"
             try:
-                # GET请求激活
                 requests.get(redirect_url, timeout=30)
-                # POST请求二次确认
                 post_payload = {"offerId": offer_id, "relayPage": 1}
                 requests.post(
                     redirect_url,
@@ -658,7 +654,6 @@ class DPUMockService:
                 )
                 log.info(f"offer_id {offer_id} 已激活")
             except requests.exceptions.RequestException as e:
-                # ========== 优化点3：增强offer_id激活失败日志 ==========
                 error_detail = f"offer_id激活失败: {str(e)}"
                 if hasattr(e, 'response') and e.response is not None:
                     error_detail += f"\n  - 状态码: {e.response.status_code}"
@@ -671,14 +666,24 @@ class DPUMockService:
 
     @classmethod
     def register_new_account(cls) -> str:
-        """注册新账号（自动生成手机号、邮箱，返回注册成功的手机号）"""
+        """注册新账号（手动输入手机号和邮箱，返回注册成功的手机号）"""
         journey = cls.get_journey_by_input()
         log.info(f"开始注册新账号，流程: {journey}")
 
-        # 生成账号信息
-        phone_number = ''.join(filter(str.isdigit, faker.phone_number()))
-        email = f"{phone_number}y@163doushabao.com"
-        log.info(f"生成账号信息 | 手机号：{phone_number} | 邮箱：{email}")
+        # 手动输入账号信息（修改点：不再使用faker自动生成）
+        phone_number = input_with_validation(
+            prompt="请输入手机号（8位或11位数字）：\n",
+            validator=validate_phone_number,
+            error_msg="请输入有效的手机号（8位或11位数字）！"
+        )
+
+        email = input_with_validation(
+            prompt="请输入邮箱地址：\n",
+            validator=validate_email,
+            error_msg="请输入有效的邮箱地址！"
+        )
+
+        log.info(f"手动输入账号信息 | 手机号：{phone_number} | 邮箱：{email}")
 
         # 初始化API配置
         base_url_dict = {
@@ -724,7 +729,6 @@ class DPUMockService:
         try:
             requests.post(validate_url, json=payload, headers=headers, timeout=30)
         except requests.exceptions.RequestException as e:
-            # ========== 优化点4：增强验证码验证失败日志 ==========
             error_detail = f"验证码验证失败: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
@@ -760,13 +764,12 @@ class DPUMockService:
             )
             resp_register.raise_for_status()
             token = resp_register.json().get("data", {}).get("token", "未获取到token")
-            print(f"✅ 注册成功！手机号: {phone_number} | Token: {token}")
+            print(f"✅ 注册成功！手机号: {phone_number} | 邮箱: {email} | Token: {token}")
             with open(api_config.txt_path, 'a', encoding='utf-8') as f:
-                f.write(f"\n{journey}\n{phone_number}\n{redirect_url}\n")
+                f.write(f"\n{journey}\n{phone_number}\n{email}\n{redirect_url}\n")
             return phone_number
         except requests.exceptions.RequestException as e:
-            # ========== 优化点5：增强注册失败日志 ==========
-            error_detail = f"注册失败: {str(e)} | 手机号：{phone_number}"
+            error_detail = f"注册失败: {str(e)} | 手机号：{phone_number} | 邮箱：{email}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 try:
@@ -778,31 +781,6 @@ class DPUMockService:
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
             return cls.register_new_account()
-
-    # 功能1已注释：模拟SPAPI授权回调
-    # def mock_spapi_auth(self) -> None:
-    #     """模拟SPAPI授权回调"""
-    #     shop_num = input_with_validation(
-    #         prompt="请输入店铺编号(1,2,3...): \n",
-    #         validator=lambda x: x.isdigit() and int(x) >= 1,
-    #         error_msg="请输入正整数！"
-    #     )
-    #     self.seller_id = f"{shop_num}BTC6RWJD{self.phone_number}"
-    #     payload = {
-    #         "phone": self.phone_number,
-    #         "status": "ACTIVE",
-    #         "dpu_token": "dpu_token",
-    #         "sellerId": self.seller_id,
-    #         "authorization_code": "authorization_code",
-    #         "refresh_token_expires_time": "2025-09-19T10:09:07.921Z",
-    #         "access_token": "access_token sunt",
-    #         "refresh_token": "refresh_token minim et anim sunt"
-    #     }
-    #     response = self._send_request(self.api_config.spapi_auth_url, json=payload)
-    #     if response and response.get("code") == 200:
-    #         log.info(f"SPAPI授权成功，seller_id: {self.seller_id}")
-    #     else:
-    #         log.error(f"SPAPI授权失败: {response}")
 
     def mock_link_sp_3pl_shop(self) -> None:
         """模拟关联SP和3PL店铺"""
@@ -1029,18 +1007,6 @@ class DPUMockService:
         }
         self._send_webhook_request(request_body)
 
-    # 功能5已注释：创建PSP授权记录
-    # def mock_create_psp_record(self) -> None:
-    #     """创建PSP授权记录"""
-    #     if not self.seller_id:
-    #         log.error("请先执行SPAPI授权获取seller_id")
-    #         return
-    #
-    #     params = {"authorizationId": self.seller_id, "pspId": f"PSP{self.seller_id}"}
-    #     result = self._send_request(self.api_config.create_psp_auth_url, params=params)
-    #     log.info("创建PSP授权记录成功" if result else "创建PSP授权记录失败")
-    #     time.sleep(1)
-
     def _mock_psp_status(self, is_start: bool = True) -> None:
         """模拟PSP状态更新（复用逻辑，支持开始/完成状态）"""
         if is_start:
@@ -1192,7 +1158,6 @@ class DPUMockService:
         status_map = {
             "1": RepaymentStatus.SUCCESS.value,
             "2": RepaymentStatus.FAILURE.value,
-            #"3": RepaymentStatus.START.value
         }
         status_input = input_with_validation(
             prompt="请输入还款状态：\n1-Success(成功)  2-Failure(失败) \n",
@@ -1244,7 +1209,7 @@ class DPUMockService:
         log.info(f"还款请求发送 | 状态={repayment_status} | 还款ID={lender_repayment_id} | 总金额={total_amount} USD")
         self._send_webhook_request(data)
 
-        # 核心修改：执行完还款操作后自动清空缓存
+        # 执行完还款操作后自动清空缓存
         self.clear_lender_repayment_id()
 
 
@@ -1262,9 +1227,9 @@ def check_is_registered(phone_number: str, db_executor: DatabaseExecutor) -> boo
 
         # 校验3PL授权
         offer_id = db_executor.execute_sql(f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{merchant_id}' 
-            AND authorization_party = '3PL' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{merchant_id}'
+            AND authorization_party = '3PL'
             ORDER BY created_at DESC LIMIT 1
         """)
         if offer_id:
@@ -1304,7 +1269,7 @@ def main():
         # 初始化服务
         mock_service = DPUMockService(phone_number, db_executor)
 
-        # 主菜单配置（结构化管理，便于维护）- 移除了1(spapi授权)、5(创建psp记录)、14(清空缓存)选项
+        # 主菜单配置（结构化管理，便于维护）
         menu = """
 请输入要执行的操作：
 1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)

@@ -14,27 +14,67 @@ import json
 import pymysql
 import secrets
 from pymysql.constants import CLIENT
+from datetime import datetime, timedelta
 
 # ================= 配置区域 =================
-DB_CONFIG = {
-    "host": "aurora-dpu-sit.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
-    "user": "dpu_sit",
-    "password": "20250818dpu_sit",
-    "database": "dpu_seller_center",
-    "port": 3306,
-    "charset": "utf8mb4",
-    "connect_timeout": 1500,
-    "read_timeout": 15,
+# 环境选择：sit, uat, preprod, dev
+ENV = "sit"
+
+# 多环境数据库配置
+DATABASE_CONFIG = {
+    "sit": {
+        "host": "aurora-dpu-sit.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_sit",
+        "password": "20250818dpu_sit",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4",
+        "connect_timeout": 1500,
+        "read_timeout": 15,
+    },
+    "uat": {
+        "host": "aurora-dpu-uat.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_uat",
+        "password": "20250818dpu_uat",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4",
+        "connect_timeout": 1500,
+        "read_timeout": 15,
+    },
+    "preprod": {
+        "host": "43.199.241.190",
+        "user": "dpu_preprod",
+        "password": "OWBSNfx8cC5c#Or0",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4",
+        "connect_timeout": 1500,
+        "read_timeout": 15,
+    },
+    "dev": {
+        "host": "localhost",
+        "user": "root",
+        "password": "password",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4",
+        "connect_timeout": 1500,
+        "read_timeout": 15,
+    },
 }
 
 # 初始化日志
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
+log.info(f"当前环境: {ENV}")
+log.info(f"数据库主机: {DATABASE_CONFIG[ENV]['host']}")
 
 # ================= 数据库操作类 =================
 class ExecuteSql:
-    def __init__(self):
-        self.conn = pymysql.connect(**DB_CONFIG, autocommit=True, client_flag=CLIENT.INTERACTIVE)
+    def __init__(self, env=ENV):
+        self.env = env
+        self.conn = pymysql.connect(**DATABASE_CONFIG[env], autocommit=True, client_flag=CLIENT.INTERACTIVE)
         self.cursor = self.conn.cursor()
 
     def __enter__(self):
@@ -323,214 +363,85 @@ def run_application(file_path):
                 log.info(f"Step 2: merchant_account_id 为 {merchant_account_id}")
 
                 # 跳过 3PL 回滚备份（无权限）
-                res_3pl_token = executor.execute_sql(
-                    f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_party='3PL' AND merchant_id='{merchant_id}'"
-                )
-                if res_3pl_token['data']:
-                    original_3pl_merchant_account_id = res_3pl_token['data'][0][0]
-                    log.info(f"3PL 原始 merchant_account_id: {original_3pl_merchant_account_id}")
+                # ==================== 跳过 Step 4-5：3PL 更新（数据迁移客户不需要） ====================
+                # res_3pl_token = executor.execute_sql(
+                #     f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_party='3PL' AND merchant_id='{merchant_id}'"
+                # )
+                # if res_3pl_token['data']:
+                #     original_3pl_merchant_account_id = res_3pl_token['data'][0][0]
+                #     log.info(f"3PL 原始 merchant_account_id: {original_3pl_merchant_account_id}")
+                # check_and_execute(executor, f"UPDATE dpu_auth_token SET merchant_account_id='{merchant_account_id}' WHERE authorization_party='3PL' and merchant_id='{merchant_id}'",
+                #                   "Step 4：更新dpu_auth_token中3PL的merchant_account_id")
+                # check_and_execute(executor, f"update dpu_shops set merchant_account_id='{merchant_account_id}' WHERE emarketplace_data_type='3PL'and merchant_id='{merchant_id}'",
+                #                   "Step 5：更新dpu_shops中3PL的merchant_account_id")
 
-                # 更新 PSP 相关
-                check_and_execute(executor, f"UPDATE dpu_auth_token SET merchant_account_id='{merchant_account_id}' WHERE authorization_party='3PL' and merchant_id='{merchant_id}'",
-                                  "Step 4：更新dpu_auth_token中3PL的merchant_account_id")
-                check_and_execute(executor, f"update dpu_shops set merchant_account_id='{merchant_account_id}' WHERE emarketplace_data_type='3PL'and merchant_id='{merchant_id}'",
-                                  "Step 5：更新dpu_shops中3PL的merchant_account_id")
+                # ==================== 跳过 Step 6：插入 PSP 记录（数据迁移客户不需要） ====================
+                # sql_psp = f"""INSERT INTO `dpu_auth_token` (`authorization_id`, `authorization_party`, `consented_at`, `create_by`, `created_at`, `id`, `last_update_on`, `merchant_account_id`, `merchant_id`, `name`, `status`, `update_by`, `updated_at`)
+                #              VALUES ('{psp_id}', 'PSP', '2026-01-16 15:48:10', 'SYSTEM', '2026-01-16 15:48:10', '{ids['insert_psp_id']}', X'0a0a83ee', '{merchant_account_id}', '{merchant_id}', '{psp_name}', 'ACTIVE', 'SYSTEM', '2026-01-16 15:48:10')"""
+                # check_and_execute(executor, sql_psp, "Step 6: 向dpu_auth_token插入PSP记录")
 
-                sql_psp = build_insert_sql('dpu_auth_token', {
-                    'authorization_id': psp_id,
-                    'authorization_party': 'PSP',
-                    'consented_at': '2026-01-16 15:48:10',
-                    'create_by': 'SYSTEM',
-                    'created_at': '2026-01-16 15:48:10',
-                    'id': ids['insert_psp_id'],
-                    'last_update_on': "X'0a0a83ee'",
-                    'merchant_account_id': merchant_account_id,
-                    'merchant_id': merchant_id,
-                    'name': psp_name,
-                    'status': 'ACTIVE',
-                    'update_by': 'SYSTEM',
-                    'updated_at': '2026-01-16 15:48:10',
-                })
-                check_and_execute(executor, sql_psp, "Step 6: 向dpu_auth_token插入PSP记录")
+                # ==================== 跳过 Step 7：Merchant Account Limit（数据迁移客户不需要） ====================
+                # sql_mal = f"""UPDATE `dpu_merchant_account_limit`
+                #                     SET
+                #                     `created_at` = '2026-01-16 11:17:45',
+                #                     `currency` = 'USD',
+                #                     `finance_product` = 'LINE_OF_CREDIT',
+                #                     `indicative_limit` = '0.00',
+                #                     `indicative_limit_update_at` = '2026-01-16 11:17:45',
+                #                     `lender_code` = 'FUNDPARK',
+                #                     `merchant_account_id` = '{merchant_account_id}',
+                #                     `platform_sync_status` = 'PENDING',
+                #                     `psp_status` = 'SUCCESS',
+                #                     `updated_at` = '2026-01-16 07:48:26'
+                #                      WHERE `merchant_id` = '{merchant_id}';"""
+                # check_and_execute(executor, sql_mal, "Step 7: 插入Merchant Account Limit")
 
-                # 更新 Merchant Account Limit
-                sql_mal = f"""UPDATE `dpu_merchant_account_limit`
-                                    SET
-                                    `created_at` = '2026-01-16 11:17:45',
-                                    `currency` = 'USD',
-                                    `finance_product` = 'LINE_OF_CREDIT',
-                                    `indicative_limit` = '0.00',
-                                    `indicative_limit_update_at` = '2026-01-16 11:17:45',
-                                    `lender_code` = 'FUNDPARK',
-                                    `merchant_account_id` = '{merchant_account_id}',
-                                    `platform_sync_status` = 'PENDING',
-                                    `psp_status` = 'SUCCESS',
-                                    `updated_at` = '2026-01-16 07:48:26'
-                                     WHERE `merchant_id` = '{merchant_id}';"""
-                check_and_execute(executor, sql_mal, "Step 7: 插入Merchant Account Limit")
-
-                # 先查询 Application，获取 application_id 和 application_unique_id（后续步骤需要使用）
-                res_app = check_and_execute(executor, f"SELECT * FROM dpu_application WHERE merchant_id='{merchant_id}'", "Step 8: 查询Application")
+                # ==================== 查询 Application（Step 8 保留查询逻辑，后续步骤需要这些变量） ====================
+                res_app = executor.execute_sql(f"SELECT * FROM dpu_application WHERE merchant_id='{merchant_id}'")
                 application_id = ''
                 application_unique_id = ''
                 if res_app['data']:
                     application_id = res_app['data'][0][0]
                     application_unique_id = res_app['data'][0][1]
-
-                # 插入/更新 Entity（需要在更新 Application 之前执行，确保 entity_id 正确）
-                res_entity = check_and_execute(executor, f"SELECT * FROM dpu_entity WHERE merchant_id='{merchant_id}'", "Step 9: 查询Entity")
-                if not res_entity['data']:
-                    # 不存在则插入
-                    sql_entity = build_insert_sql('dpu_entity', {
-                        'additional_info': None,
-                        'business_registration_number': business_registration_number,
-                        'chi_name': None,
-                        'city': '',
-                        'company_registration_date': '2015-08-12',
-                        'company_type': 'Private company limited by shares',
-                        'country_list_of_top_3_buyers': 'United States Of America,Canada,Mexico',
-                        'country_list_of_top_3_suppliers': 'China',
-                        'country_of_source_of_funds': 'Hong Kong',
-                        'created_at': '2026-01-21 18:49:21',
-                        'created_by': '1039000002',
-                        'draft_status': 'SUBMITTED',
-                        'en_name_consistent': 0,
-                        'encryption_status': 'ENCRYPTED',
-                        'eng_name': company_eng_name,
-                        'extend_json': '{{}}',
-                        'funder_type': 'FUNDPARK',
-                        'id': ids['entity_id'],
-                        'industry': 'Toys & Leisure Products',
-                        'initial_source_of_wealth': 'savings',
-                        'is_total_equity_over75': 1,
-                        'last_submitted_reg_no': business_registration_number,
-                        'last_update_on': '3a987643',
-                        'main_product': 'Toys',
-                        'merchant_id': merchant_id,
-                        'ongoing_source_of_wealth': 'operationProfit',
-                        'postcode': '',
-                        'registered_country_code': 'CN',
-                        'registered_office_address1': 'Unit 808, 8/F, Innovation Plaza, 12 Science Park Road, Hong Kong Science Park, Sha Tin',
-                        'registered_office_address2': None,
-                        'sanction_status': 'NOT_HIT',
-                        'source_of_funds': 'bizOperations',
-                        'submission_count': 1,
-                        'updated_at': '2026-01-22 02:00:38',
-                        'updated_by': '1039000002',
-                    })
-                    check_and_execute(executor, sql_entity, "Step 9.1: 插入Entity")
+                    log.info(f"Step 8: 查询到 application_id={application_id}, application_unique_id={application_unique_id}")
                 else:
-                    # 存在则更新
+                    log.warning(f"Step 8: 未找到 Application 记录")
+
+                # ==================== 查询 Entity（Step 9 保留查询逻辑，获取 entity_id） ====================
+                res_entity = executor.execute_sql(f"SELECT * FROM dpu_entity WHERE merchant_id='{merchant_id}'")
+                if res_entity['data']:
                     existing_entity_id = res_entity['data'][0][18]  # 获取已存在的 entity id
-                    existing_submission_count = res_entity['data'][0][30]  # 获取当前 submission_count
-                    ids['entity_id'] = existing_entity_id  # 使用已存在的 entity id
-                    # 处理 submission_count 为 None 的情况
-                    new_submission_count = (existing_submission_count or 0) + 1
-                    sql_entity_update = f"""UPDATE `dpu_entity`
-                                    SET `business_registration_number` = '{business_registration_number}',
-                                        `eng_name` = '{company_eng_name}',
-                                        `main_product` = 'Toys',
-                                        `last_update_on` = '3a987643',
-                                        `updated_at` = '2026-01-22 02:00:38',
-                                        `updated_by` = '1039000002',
-                                        `submission_count` = {new_submission_count}
-                                    WHERE `merchant_id` = '{merchant_id}'"""
-                    check_and_execute(executor, sql_entity_update, "Step 9.2: 更新Entity")
+                    ids['entity_id'] = existing_entity_id
+                    log.info(f"Step 9: 查询到 entity_id={existing_entity_id}")
+                else:
+                    log.warning(f"Step 9: 未找到 Entity 记录，使用预生成的 entity_id={ids['entity_id']}")
 
-                # 更新 Application（在 Entity 处理之后执行，确保使用正确的 entity_id）
+                # ==================== 跳过 Step 11-15：股东信息和身份证文档（数据迁移客户不需要） ====================
+                # # 插入股东信息（动态处理）
+                # for idx, shareholder in enumerate(shareholders[:3]):
+                #     if not shareholder.get('full_name_en') and not shareholder.get('full_name_cn'):
+                #         continue
+                #     cn_name = shareholder.get('full_name_cn', '')
+                #     en_name = shareholder.get('full_name_en', '')
+                #     birth_date = shareholder.get('birthday', '')
+                #     ownership = shareholder.get('ownership_percent', '30.00')
+                #     sql_dpu_nature_person = f"""insert into `dpu_nature_person` ...
+                #     check_and_execute(executor, sql_dpu_nature_person, f"Step {11+idx}: 插入Shareholder第{idx+1}条记录")
+                # # 插入 Person Documents
+                # sql_dpu_nature_person_documents_front = ...
+                # check_and_execute(executor, sql_dpu_nature_person_documents_front, "Step 14: 插入dpu_nature_person_documents (正面)")
+                # sql_dpu_nature_person_documents_back = ...
+                # check_and_execute(executor, sql_dpu_nature_person_documents_back, "Step 15: 插入dpu_nature_person_documents (背面)")
+
+                # 更新 Application（只在查询不到 Entity 时更新 entity_id，否则保持不变）
                 if res_app['data']:
-                    check_and_execute(executor, f"UPDATE dpu_application SET entity_id = '{ids['entity_id']}', application_status = 'APPROVED' WHERE merchant_id='{merchant_id}'", "Step 10：更新Application状态")
-
-                # 插入股东信息（动态处理）
-                for idx, shareholder in enumerate(shareholders[:3]):
-                    if not shareholder.get('full_name_en') and not shareholder.get('full_name_cn'):
-                        continue
-                    cn_name = shareholder.get('full_name_cn', '')
-                    en_name = shareholder.get('full_name_en', '')
-                    birth_date = shareholder.get('birthday', '')
-                    ownership = shareholder.get('ownership_percent', '30.00')
-                    sql_dpu_nature_person = build_insert_sql('dpu_nature_person', {
-                        'add_status': 'API',
-                        'birthday': birth_date,
-                        'business_key': None,
-                        'chi_name': cn_name,
-                        'city': '',
-                        'country_code': '',
-                        'created_at': '2026-01-22 02:23:06',
-                        'created_by': '1039000002',
-                        'draft_status': 'SUBMITTED',
-                        'email': 'asdas22dasd@163.com',
-                        'encryption_status': 'PLAINTEXT',
-                        'eng_name': en_name,
-                        'entity_id': ids['entity_id'],
-                        'extend_json': None,
-                        'first_chi_name': None,
-                        'funder_type': 'FUNDPARK',
-                        'id': shareholder_ids[idx],
-                        'id_number': None,
-                        'id_type': 'PRC_RESIDENT_ID_CARD',
-                        'last_chi_name': None,
-                        'last_update_on': "X'3a987643'",
-                        'marital_status': 'UNKNOWN',
-                        'merchant_id': merchant_id,
-                        'nationality': 'China',
-                        'nature_person_associate_id': None,
-                        'nature_person_type': 'DIRECTOR_SHAREHOLDER_UBO',
-                        'number_of_shares': 10,
-                        'percentage_of_shares': ownership,
-                        'phone_country_code': '+86',
-                        'phone_number': '19073511031',
-                        'postcode': '',
-                        'residential_address1': '',
-                        'residential_address2': '',
-                        'sanction_status': 'INITIAL',
-                        'updated_at': '2026-01-22 02:23:06',
-                        'updated_by': '1039000002',
-                    })
-                    check_and_execute(executor, sql_dpu_nature_person, f"Step {11+idx}: 插入Shareholder第{idx+1}条记录")
-
-                # 插入 Person Documents
-                sql_dpu_nature_person_documents_front = build_insert_sql('dpu_nature_person_documents', {
-                    'application_id': 'f5208fb77d8d4712a436b716331cb6b9',
-                    'application_unique_id': application_unique_id,
-                    'content_file_type': 'IMG',
-                    'create_by': None,
-                    'created_at': '2026-01-22 02:23:06',
-                    'doc_name': 'PRC ID-Front@3x-2Sh4SffG.png',
-                    'doc_type': 'DIRECTOR_ID_FRONT',
-                    'entity_id': ids['entity_id'],
-                    'file_content': None,
-                    'file_url': 'uploads/default/default/default/file_20260122102246_121ab309d18b.png',
-                    'id': ids['doc_front'],
-                    'last_update_on': None,
-                    'merchant_id': merchant_id,
-                    'nature_person_id': '1f4479db-b9ef-4cce-aa45-9871753a2a1c',
-                    'status': 'NEW',
-                    'update_by': None,
-                    'updated_at': '2026-01-22 02:23:06',
-                })
-                check_and_execute(executor, sql_dpu_nature_person_documents_front, "Step 14: 插入dpu_nature_person_documents (正面)")
-
-                sql_dpu_nature_person_documents_back = build_insert_sql('dpu_nature_person_documents', {
-                    'application_id': 'f5208fb77d8d4712a436b716331cb6b9',
-                    'application_unique_id': application_unique_id,
-                    'content_file_type': 'IMG',
-                    'create_by': None,
-                    'created_at': '2026-01-22 02:23:06',
-                    'doc_name': 'PRC ID-Back@3x-DPHeKKi2.png',
-                    'doc_type': 'DIRECTOR_ID_BACK',
-                    'entity_id': ids['entity_id'],
-                    'file_content': None,
-                    'file_url': 'uploads/default/default/default/file_20260122102247_a65a2d41c9c3.png',
-                    'id': ids['doc_back'],
-                    'last_update_on': None,
-                    'merchant_id': merchant_id,
-                    'nature_person_id': '1f4479db-b9ef-4cce-aa45-9871753a2a1c',
-                    'status': 'NEW',
-                    'update_by': None,
-                    'updated_at': '2026-01-22 02:23:06',
-                })
-                check_and_execute(executor, sql_dpu_nature_person_documents_back, "Step 15: 插入dpu_nature_person_documents (背面)")
+                    if res_entity['data']:
+                        # 查询到现有 Entity 记录，只更新 application_status，不更新 entity_id
+                        check_and_execute(executor, f"UPDATE dpu_application SET application_status = 'APPROVED' WHERE merchant_id='{merchant_id}'", "Step 16：更新Application状态（保持entity_id不变）")
+                        log.info(f"Step 16: 保持现有 entity_id={ids['entity_id']} 不变")
+                    else:
+                        # 未查询到 Entity 记录，使用预生成的 entity_id
+                        check_and_execute(executor, f"UPDATE dpu_application SET entity_id = '{ids['entity_id']}', application_status = 'APPROVED' WHERE merchant_id='{merchant_id}'", "Step 16：更新Application状态（使用新entity_id）")
 
                 # 更新 dpu_merchants_limit
                 sql_dpu_merchants_limit = f"""UPDATE `dpu_merchants_limit`
@@ -562,32 +473,48 @@ def run_application(file_path):
                                                             `utilization_limit` = NULL,
                                                             `utilization_limit_update_at` = NULL
                                                              WHERE `merchant_id` = '{merchant_id}';"""
-                check_and_execute(executor, sql_dpu_merchants_limit, "Step 16：更新dpu_merchants_limit")
+                check_and_execute(executor, sql_dpu_merchants_limit, "Step 17：更新dpu_merchants_limit")
 
-                # 插入 dpu_bank_account
-                sql_dpu_bank_account = build_insert_sql('dpu_bank_account', {
-                    'bank_account_name': Bank_account_Name,
-                    'bank_account_number': Bank_account_Number,
-                    'bank_code': Branch_Code,
-                    'bank_name': Bank_account,
-                    'bank_status': None,
-                    'branch_code': None,
-                    'created_at': '2026-01-22 10:40:05',
-                    'created_by': '1039000002',
-                    'effective_from': '2026-01-22 10:40:05',
-                    'effective_to': '2026-01-22 10:40:05',
-                    'id': ids['random_id'],
-                    'last_drawdown_at': None,
-                    'last_update_on': "X'35382e3135322e3131382e3637'",
-                    'merchant_id': merchant_id,
-                    'phone_number': '19073511039',
-                    'status': 'PRIMARY',
-                    'swift_code': Swift_Code,
-                    'updated_at': '2026-01-22 10:40:05',
-                    'updated_by': None,
-                    'bank_address': Bank_account_Number_address,
-                })
-                check_and_execute(executor, sql_dpu_bank_account, "Step 17：插入dpu_bank_account")
+                # Step 18：查询 dpu_bank_account，决定 UPDATE 或 INSERT
+                res_bank_account = executor.execute_sql(f"SELECT * FROM dpu_bank_account WHERE merchant_id='{merchant_id}'")
+                if res_bank_account['data']:
+                    # 存在记录，执行 UPDATE
+                    sql_dpu_bank_account = f"""UPDATE `dpu_bank_account`
+                        SET `bank_account_name` = '{escape_sql(Bank_account_Name)}',
+                            `bank_account_number` = '{escape_sql(Bank_account_Number)}',
+                            `bank_code` = '{escape_sql(Branch_Code)}',
+                            `bank_name` = '{escape_sql(Bank_account)}',
+                            `branch_code` = '{escape_sql(Branch_Code)}',
+                            `status` = 'PRIMARY',
+                            `swift_code` = '{escape_sql(Swift_Code)}',
+                            `updated_at` = '2026-01-22 10:40:05',
+                            `bank_address` = '{escape_sql(Bank_account_Number_address)}',
+                            `last_update_on` = X'35382e3135322e3131382e3637'
+                        WHERE `merchant_id` = '{merchant_id}'"""
+                    check_and_execute(executor, sql_dpu_bank_account, "Step 18：更新dpu_bank_account")
+                else:
+                    # 不存在记录，执行 INSERT
+                    sql_dpu_bank_account = build_insert_sql('dpu_bank_account', {
+                        'bank_account_name': Bank_account_Name,
+                        'bank_account_number': Bank_account_Number,
+                        'bank_code': Branch_Code,
+                        'bank_name': Bank_account,
+                        'branch_code': Branch_Code,
+                        'created_at': '2026-01-22 10:40:05',
+                        'created_by': '1039000002',
+                        'effective_from': '2026-01-22 10:40:05',
+                        'effective_to': '2026-01-22 10:40:05',
+                        'id': ids['random_id'],
+                        'last_update_on': "X'35382e3135322e3131382e3637'",
+                        'merchant_id': merchant_id,
+                        'phone_number': '19073511039',
+                        'status': 'PRIMARY',
+                        'swift_code': Swift_Code,
+                        'updated_at': '2026-01-22 10:40:05',
+                        'updated_by': None,
+                        'bank_address': Bank_account_Number_address,
+                    })
+                    check_and_execute(executor, sql_dpu_bank_account, "Step 18：插入dpu_bank_account")
 
                 # 插入 notify_event_dependency
                 sql_dpu_notify_event_dependency_1 = build_insert_sql('dpu_notify_event_dependency', {
@@ -603,7 +530,7 @@ def run_application(file_path):
                     'id': ids['random_id'],
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_dependency_1, "Step 18：插入dpu_notify_event_dependency (1)")
+                check_and_execute(executor, sql_dpu_notify_event_dependency_1, "Step 19：插入dpu_notify_event_dependency (1)")
 
                 sql_dpu_notify_event_dependency_2 = build_insert_sql('dpu_notify_event_dependency', {
                     'biz_id': application_unique_id,
@@ -618,7 +545,7 @@ def run_application(file_path):
                     'id': ids['random_id1'],
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_dependency_2, "Step 19：插入dpu_notify_event_dependency (2)")
+                check_and_execute(executor, sql_dpu_notify_event_dependency_2, "Step 20：插入dpu_notify_event_dependency (2)")
 
                 sql_dpu_notify_event_dependency_3 = build_insert_sql('dpu_notify_event_dependency', {
                     'biz_id': application_unique_id,
@@ -633,7 +560,7 @@ def run_application(file_path):
                     'id': ids['random_id2'],
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_dependency_3, "Step 20：插入dpu_notify_event_dependency (3)")
+                check_and_execute(executor, sql_dpu_notify_event_dependency_3, "Step 21：插入dpu_notify_event_dependency (3)")
 
                 sql_dpu_notify_event_dependency_4 = build_insert_sql('dpu_notify_event_dependency', {
                     'biz_id': application_unique_id,
@@ -648,7 +575,7 @@ def run_application(file_path):
                     'id': ids['random_id3'],
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_dependency_4, "Step 21：插入dpu_notify_event_dependency (4)")
+                check_and_execute(executor, sql_dpu_notify_event_dependency_4, "Step 22：插入dpu_notify_event_dependency (4)")
 
                 # 插入 notify_event
                 sql_dpu_notify_event_1 = build_insert_sql('dpu_notify_event', {
@@ -662,7 +589,7 @@ def run_application(file_path):
                     'retry_count': 0,
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_1, "Step 22：插入dpu_notify_event (1)")
+                check_and_execute(executor, sql_dpu_notify_event_1, "Step 23：插入dpu_notify_event (1)")
 
                 sql_dpu_notify_event_2 = build_insert_sql('dpu_notify_event', {
                     'biz_id': application_unique_id,
@@ -675,101 +602,146 @@ def run_application(file_path):
                     'retry_count': 0,
                     'update_time': '2026-01-22 02:40:05',
                 }, ignore=True)
-                check_and_execute(executor, sql_dpu_notify_event_2, "Step 23：插入dpu_notify_event (2)")
+                check_and_execute(executor, sql_dpu_notify_event_2, "Step 24：插入dpu_notify_event (2)")
 
-                # 插入 credit_offer
-                sql_dpu_credit_offer = build_insert_sql('dpu_credit_offer', {
-                    'application_id': application_id,
-                    'application_unique_id': application_unique_id,
-                    'approved_limit_amount': approvedLimit,
-                    'approved_limit_currency': 'USD',
-                    'approveofferfailure_reason': None,
-                    'base_rate': baseRate,
-                    'base_rate_type': 'SOFR',
-                    'created_at': '2026-01-16 11:33:29',
-                    'created_by': 'SYSTEM',
-                    'e_sign_status': 'SUCCESS',
-                    'esign_failure_reason': None,
-                    'fee_or_charge_amount': '0.00',
-                    'fee_or_charge_currency': 'USD',
-                    'fee_or_charge_date': '2023-10-16',
-                    'fee_or_charge_type': 'PROCESSING_FEE',
-                    'finance_product': 'LINE_OF_CREDIT',
-                    'fixed_rate': None,
-                    'id': ids['credit_offer_id'],
-                    'lender_approved_offer_id': lender_approved_offer_id,
-                    'lender_code': 'FUNDPARK',
-                    'lender_company_id': lender_company_id,
-                    'lender_credit_id': lender_credit_id,
-                    'limit_application_id': ids['limit_application_id'],
-                    'margin_rate': marginRate,
-                    'max_tenor': 24,
-                    'merchant_id': merchant_id,
-                    'min_tenor': 3,
-                    'offer_end_date': '2024-10-15',
-                    'offer_start_date': '2023-10-16',
-                    'offer_term': 12,
-                    'offer_term_unit': 'Months',
-                    'rate_type': 'Float',
-                    'signed_limit_amount': signedLimit,
-                    'signed_limit_currency': 'USD',
-                    'status': 'ACCEPTED',
-                    'updated_at': '2026-01-16 15:48:39',
-                    'updated_by': 'SYSTEM',
-                    'warter_mark_amount': '0.00',
-                    'warter_mark_currency': 'USD',
-                })
-                check_and_execute(executor, sql_dpu_credit_offer, "Step 24：插入dpu_credit_offer")
+                # Step 25：查询 dpu_credit_offer，决定 UPDATE 或 INSERT
+                res_credit_offer = executor.execute_sql(f"SELECT * FROM dpu_credit_offer WHERE merchant_id='{merchant_id}'")
+                if res_credit_offer['data']:
+                    # 存在记录，执行 UPDATE
+                    sql_dpu_credit_offer = f"""UPDATE `dpu_credit_offer`
+                        SET `application_id` = '{application_id}',
+                            `application_unique_id` = '{application_unique_id}',
+                            `approved_limit_amount` = '{approvedLimit}',
+                            `base_rate` = '{baseRate}',
+                            `e_sign_status` = 'SUCCESS',
+                            `lender_approved_offer_id` = '{lender_approved_offer_id}',
+                            `lender_code` = 'FUNDPARK',
+                            `lender_company_id` = '{lender_company_id}',
+                            `lender_credit_id` = '{lender_credit_id}',
+                            `limit_application_id` = '{ids['limit_application_id']}',
+                            `margin_rate` = '{marginRate}',
+                            `signed_limit_amount` = '{signedLimit}',
+                            `status` = 'ACCEPTED',
+                            `updated_at` = '2026-01-16 15:48:39'
+                        WHERE `merchant_id` = '{merchant_id}'"""
+                    check_and_execute(executor, sql_dpu_credit_offer, "Step 25：更新dpu_credit_offer")
+                else:
+                    # 不存在记录，执行 INSERT
+                    sql_dpu_credit_offer = build_insert_sql('dpu_credit_offer', {
+                        'application_id': application_id,
+                        'application_unique_id': application_unique_id,
+                        'approved_limit_amount': approvedLimit,
+                        'approved_limit_currency': 'USD',
+                        'base_rate': baseRate,
+                        'base_rate_type': 'SOFR',
+                        'created_at': '2026-01-16 11:33:29',
+                        'created_by': 'SYSTEM',
+                        'e_sign_status': 'SUCCESS',
+                        'finance_product': 'LINE_OF_CREDIT',
+                        'id': ids['credit_offer_id'],
+                        'lender_approved_offer_id': lender_approved_offer_id,
+                        'lender_code': 'FUNDPARK',
+                        'lender_company_id': lender_company_id,
+                        'lender_credit_id': lender_credit_id,
+                        'limit_application_id': ids['limit_application_id'],
+                        'margin_rate': marginRate,
+                        'max_tenor': 24,
+                        'merchant_id': merchant_id,
+                        'min_tenor': 3,
+                        'offer_end_date': '2024-10-15',
+                        'offer_start_date': '2023-10-16',
+                        'offer_term': 12,
+                        'offer_term_unit': 'Months',
+                        'rate_type': 'Float',
+                        'signed_limit_amount': signedLimit,
+                        'signed_limit_currency': 'USD',
+                        'status': 'ACCEPTED',
+                        'updated_at': '2026-01-16 15:48:39',
+                        'updated_by': 'SYSTEM',
+                    })
+                    check_and_execute(executor, sql_dpu_credit_offer, "Step 25：插入dpu_credit_offer")
 
-                # 插入 limit_application
-                sql_dpu_limit_application = build_insert_sql('dpu_limit_application', {
-                    'activated_limit': None,
-                    'available_limit': None,
-                    'create_by': 'SYSTEM',
-                    'created_at': '2026-01-16 11:32:31',
-                    'currency': 'USD',
-                    'id': ids['limit_application_id'],
-                    'last_update_on': "X'0a0a83ee'",
-                    'lender_code': 'FUNDPARK',
-                    'limit_application_unique_id': ids['limit_application_unique_id'],
-                    'merchant_id': merchant_id,
-                    'previous_activated_limit': None,
-                    'previous_approved_limit': None,
-                    'previous_available_limit': None,
-                    'previous_signed_limit': None,
-                    'previous_underwritten_limit': None,
-                    'product': 'LINE_OF_CREDIT',
-                    'status': 'ACCEPTED',
-                    'underwritten_limit': underwrittenAmount,
-                    'update_by': '5058000001',
-                    'updated_at': '2026-01-16 14:19:17',
-                })
-                check_and_execute(executor, sql_dpu_limit_application, "Step 25：插入dpu_limit_application")
+                # Step 26：查询 dpu_limit_application，决定 UPDATE 或 INSERT
+                res_limit_application = executor.execute_sql(f"SELECT * FROM dpu_limit_application WHERE merchant_id='{merchant_id}'")
+                if res_limit_application['data']:
+                    # 存在记录，执行 UPDATE
+                    sql_dpu_limit_application = f"""UPDATE `dpu_limit_application`
+                        SET `currency` = 'USD',
+                            `lender_code` = 'FUNDPARK',
+                            `limit_application_unique_id` = '{ids['limit_application_unique_id']}',
+                            `product` = 'LINE_OF_CREDIT',
+                            `status` = 'SUBMITTED',
+                            `underwritten_limit` = NULL,
+                            `update_by` = '5058000001',
+                            `updated_at` = '2026-01-16 14:19:17'
+                        WHERE `merchant_id` = '{merchant_id}'"""
+                    check_and_execute(executor, sql_dpu_limit_application, "Step 26：更新dpu_limit_application")
+                else:
+                    # 不存在记录，执行 INSERT
+                    sql_dpu_limit_application = build_insert_sql('dpu_limit_application', {
+                        'activated_limit': None,
+                        'available_limit': None,
+                        'create_by': 'SYSTEM',
+                        'created_at': '2026-01-16 11:32:31',
+                        'currency': 'USD',
+                        'id': ids['limit_application_id'],
+                        'last_update_on': "X'0a0a83ee'",
+                        'lender_code': 'FUNDPARK',
+                        'limit_application_unique_id': ids['limit_application_unique_id'],
+                        'merchant_id': merchant_id,
+                        'product': 'LINE_OF_CREDIT',
+                        'status': 'SUBMITTED',
+                        'underwritten_limit': None,
+                        'update_by': '5058000001',
+                        'updated_at': '2026-01-16 14:19:17',
+                    })
+                    check_and_execute(executor, sql_dpu_limit_application, "Step 26：插入dpu_limit_application")
 
-                # 插入 limit_application_account
-                sql_dpu_limit_application_account = build_insert_sql('dpu_limit_application_account', {
-                    'activated_limit': approvedLimit,
-                    'approved_limit': approvedLimit,
-                    'authorization_id': amazon_seller_id,
-                    'create_by': 'SYSTEM',
-                    'created_at': '2026-01-16 19:32:31',
-                    'currency': 'USD',
-                    'frozen_limit': None,
-                    'id': ids['random_id_LAA'],
-                    'indicative_limit': '0.00',
-                    'last_update_on': "X'0a0a83ee'",
-                    'limit_application_id': ids['limit_application_id'],
-                    'limit_application_unique_id': ids['limit_application_unique_id'],
-                    'merchant_account_id': merchant_account_id,
-                    'merchant_id': merchant_id,
-                    'psp_status': 'INITIAL',
-                    'signed_limit': signedLimit,
-                    'underwritten_limit': underwrittenAmount,
-                    'update_by': 'SYSTEM',
-                    'updated_at': '2026-01-16 22:18:51',
-                    'utilization_limit': None,
-                })
-                check_and_execute(executor, sql_dpu_limit_application_account, "Step 26：插入sql_dpu_limit_application_account")
+                # Step 27：查询 dpu_limit_application_account，决定 UPDATE 或 INSERT
+                res_limit_application_account = executor.execute_sql(f"SELECT * FROM dpu_limit_application_account WHERE merchant_id='{merchant_id}'")
+                if res_limit_application_account['data']:
+                    # 存在记录，执行 UPDATE
+                    sql_dpu_limit_application_account = f"""UPDATE `dpu_limit_application_account`
+                        SET `activated_limit` = '{approvedLimit}',
+                            `approved_limit` = '{approvedLimit}',
+                            `authorization_id` = '{amazon_seller_id}',
+                            `currency` = 'USD',
+                            `indicative_limit` = '0.00',
+                            `limit_application_id` = '{ids['limit_application_id']}',
+                            `limit_application_unique_id` = '{ids['limit_application_unique_id']}',
+                            `merchant_account_id` = '{merchant_account_id}',
+                            `psp_status` = 'INITIAL',
+                            `signed_limit` = '{signedLimit}',
+                            `underwritten_limit` = NULL,
+                            `update_by` = 'SYSTEM',
+                            `updated_at` = '2026-01-16 22:18:51'
+                        WHERE `merchant_id` = '{merchant_id}'"""
+                    check_and_execute(executor, sql_dpu_limit_application_account, "Step 27：更新dpu_limit_application_account")
+                else:
+                    # 不存在记录，执行 INSERT
+                    sql_dpu_limit_application_account = build_insert_sql('dpu_limit_application_account', {
+                        'activated_limit': approvedLimit,
+                        'approved_limit': approvedLimit,
+                        'authorization_id': amazon_seller_id,
+                        'create_by': 'SYSTEM',
+                        'created_at': '2026-01-16 19:32:31',
+                        'currency': 'USD',
+                        'frozen_limit': None,
+                        'id': ids['random_id_LAA'],
+                        'indicative_limit': '0.00',
+                        'last_update_on': "X'0a0a83ee'",
+                        'limit_application_id': ids['limit_application_id'],
+                        'limit_application_unique_id': ids['limit_application_unique_id'],
+                        'merchant_account_id': merchant_account_id,
+                        'merchant_id': merchant_id,
+                        'psp_status': 'INITIAL',
+                        'signed_limit': signedLimit,
+                        'underwritten_limit': None,
+                        'update_by': 'SYSTEM',
+                        'updated_at': '2026-01-16 22:18:51',
+                        'utilization_limit': None,
+                    })
+                    check_and_execute(executor, sql_dpu_limit_application_account, "Step 27：插入dpu_limit_application_account")
 
                 # 插入 drawdown（动态处理）
                 available_limit_current = available_limit
@@ -784,7 +756,17 @@ def run_application(file_path):
                     outstanding_amount = float(drawdown_amount) - total_repayment
 
                     drawdown_id = dd.get('drawdown_id', f"2017{''.join(secrets.choice(string.digits) for _ in range(18))}")
-                    drawdown_start_datetime = dd.get('drawdown_start_datetime', '2026-01-26 00:00:00')
+                    # 处理 drawdown_start_datetime：如果只有日期没有时间，自动添加 00:00:00
+                    raw_start_datetime = dd.get('drawdown_start_datetime', '2026-01-26 00:00:00')
+                    if ' ' not in str(raw_start_datetime):
+                        drawdown_start_datetime = f"{raw_start_datetime} 00:00:00"
+                    else:
+                        drawdown_start_datetime = raw_start_datetime
+                    # 计算 new_repayment_date = drawdown_start_datetime + 90天
+                    start_date_obj = datetime.strptime(drawdown_start_datetime, '%Y-%m-%d %H:%M:%S')
+                    new_repayment_date = (start_date_obj + timedelta(days=90)).strftime('%Y-%m-%d')
+                    # 计算总利率：baseRate + marginRate
+                    total_interest_rate_val = float(baseRate) + float(marginRate)
                     loan_id = loan_ids[idx] if idx < len(loan_ids) else f"EFL{''.join(secrets.choice(string.digits) for _ in range(17))}"
                     drawdown_sql_id = drawdown_ids[idx] if idx < len(drawdown_ids) else generate_random_str()
 
@@ -794,16 +776,16 @@ def run_application(file_path):
                         'account_platform': Bank_account,
                         'actual_drawdown_date': '2026-01-26 00:00:00',
                         'bank_address': Bank_account_Number_address,
-                        'base_interest_rate': '6.000000',
+                        'base_interest_rate': baseRate,
                         'base_rate_type': 'SOFR',
                         'branch_code': Branch_Code,
                         'charge_bases': 'Float',
                         'created_at': '2026-02-03 19:54:48',
                         'currency': 'USD',
                         'drawdown_amount': drawdown_amount,
-                        'drawdown_complete_datetime': '2026-01-26 00:00:00',
+                        'drawdown_complete_datetime': drawdown_start_datetime,
                         'drawdown_failed_reason': None,
-                        'drawdown_start_datetime': drawdown_start_datetime,
+                        'drawdown_start_datetime': None,
                         'drawdown_submit_datetime': '2026-02-03 19:54:48',
                         'fee_or_charge_amount': marginRate,
                         'fee_or_charge_currency': 'USD',
@@ -818,10 +800,10 @@ def run_application(file_path):
                         'lender_id': None,
                         'lender_loan_id': drawdown_id,
                         'loan_id': loan_id,
-                        'margin_interest_rate': '0.000000',
+                        'margin_interest_rate': marginRate,
                         'marketplace_country': None,
                         'merchant_id': merchant_id,
-                        'new_repayment_date': '2026-04-26',
+                        'new_repayment_date': new_repayment_date,
                         'outstanding_amount': outstanding_amount,
                         'overdue_days': None,
                         'phone_number': None,
@@ -831,12 +813,12 @@ def run_application(file_path):
                         'status': 'APPROVED',
                         'swift_code': Swift_Code,
                         'tenor': None,
-                        'term': 120,
+                        'term': 90,
                         'term_unit': 'Days',
-                        'total_interest_rate': '6.000000',
+                        'total_interest_rate': total_interest_rate_val,
                         'updated_at': '2026-02-03 19:54:54',
                     })
-                    check_and_execute(executor, sql_dpu_drawdown, f"Step {27+idx}: 插入第{idx+1}笔drawdown记录")
+                    check_and_execute(executor, sql_dpu_drawdown, f"Step {28+idx}: 插入第{idx+1}笔drawdown记录")
 
                     # 计算可用额度变化
                     available_limit_current = available_limit_current - float(drawdown_amount) + total_repayment
@@ -844,7 +826,7 @@ def run_application(file_path):
                 # 更新最终可用额度
                 if drawdowns:
                     sql_update_limit = f"""update `dpu_merchants_limit` set `available_limit` = '{available_limit_current}', `utilization_limit` = '{sum(float(d.get('drawdown_amount', 0)) for d in drawdowns)}', `utilization_limit_update_at` = now(), `updated_at` = now() where `merchant_id` = '{merchant_id}'"""
-                    check_and_execute(executor, sql_update_limit, "Step 35: 更新最终可用额度")
+                    check_and_execute(executor, sql_update_limit, "Step 36: 更新最终可用额度")
 
     except Exception as e:
         log.error(f"处理数据时出错: {e}")
@@ -859,3 +841,10 @@ if __name__ == '__main__':
     else:
         file_path = sys.argv[1]
     run_application(file_path)
+
+#如果需要满足tier1后还继续进行提额的客户
+#select * from dpu_seller_center.dpu_application where merchant_id = '76aef41377bf433db32e9d35abbe542b' ORDER BY created_at desc; -- 差一条tier2记录
+#select * from dpu_seller_center.dpu_credit_offer where merchant_id = '76aef41377bf433db32e9d35abbe542b' ORDER BY created_at desc; -- 差一条esign init记录
+
+# 3a5db6cbeca14c62aa0ca00753e13cd8 插入
+# 76aef41377bf433db32e9d35abbe542b mock
