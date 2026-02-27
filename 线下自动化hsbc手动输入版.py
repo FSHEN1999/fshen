@@ -2287,13 +2287,55 @@ def run_offline_automation():
         except Exception as e:
             logging.warning(f"⚠️ SP授权请求异常: {e}")
 
-        # --- 步骤 6.5: 查询platform_offer_id并访问redirect URL ---
+        # --- 步骤 6.5: 发送updateOffer请求 (SP完成后、3PL前) ---
         logging.info("\n" + "=" * 50)
-        logging.info("步骤 6.5: 查询platform_offer_id并访问redirect URL")
+        logging.info("步骤 6.5: 发送updateOffer请求")
         logging.info("=" * 50)
 
-        logging.info("⏳ 等待5秒，确保platform_offer_id已入库...")
-        time.sleep(5)
+        time.sleep(3)
+        if send_update_offer_request(phone):
+            logging.info("✅ updateOffer请求成功！")
+        else:
+            logging.warning("⚠️ updateOffer请求失败，继续后续流程")
+
+        # --- 轮询send_status状态，等待SUCCESS ---
+        logging.info("\n" + "=" * 50)
+        logging.info("轮询send_status状态，等待SUCCESS")
+        logging.info("=" * 50)
+
+        selling_partner_id = f"spshouquanfs{phone}"
+        max_attempts = 60  # 最多轮询60次，每次5秒，总共5分钟
+        interval = 5
+
+        for attempt in range(max_attempts):
+            try:
+                db = get_global_db()
+                send_status_sql = f"""
+                    SELECT send_status FROM dpu_seller_center.dpu_manual_offer
+                    WHERE platform_seller_id = '{selling_partner_id}'
+                    ORDER BY created_at DESC LIMIT 1
+                """
+                send_status = db.execute_sql(send_status_sql)
+
+                if send_status == "SUCCESS":
+                    logging.info(f"✅ send_status已变为SUCCESS，可以执行步骤6.6")
+                    break
+                else:
+                    current_status = send_status if send_status else "NULL"
+                    logging.info(f"⏳ 第{attempt + 1}/{max_attempts}次查询，send_status={current_status}，等待{interval}秒后重试...")
+                    if attempt < max_attempts - 1:
+                        time.sleep(interval)
+            except Exception as e:
+                logging.warning(f"⚠️ 查询send_status异常: {e}，继续轮询...")
+                if attempt < max_attempts - 1:
+                    time.sleep(interval)
+        else:
+            logging.warning(f"⚠️ 轮询超时，send_status未变为SUCCESS，继续后续流程")
+
+        # --- 步骤 6.6: 查询platform_offer_id并访问redirect URL ---
+        logging.info("\n" + "=" * 50)
+        logging.info("步骤 6.6: 查询platform_offer_id并访问redirect URL")
+        logging.info("=" * 50)
 
         selling_partner_id = f"spshouquanfs{phone}"
         try:
@@ -2335,17 +2377,6 @@ def run_offline_automation():
         except Exception as e:
             logging.warning(f"⚠️ 查询platform_offer_id或访问redirect URL失败: {e}")
             logging.info("ℹ️  继续后续流程")
-
-        # --- 步骤 6.6: 发送updateOffer请求 (SP完成后、3PL前) ---
-        logging.info("\n" + "=" * 50)
-        logging.info("步骤 6.6: 发送updateOffer请求")
-        logging.info("=" * 50)
-
-        time.sleep(3)
-        if send_update_offer_request(phone):
-            logging.info("✅ updateOffer请求成功！")
-        else:
-            logging.warning("⚠️ updateOffer请求失败，继续后续流程")
 
         # --- 步骤 7: 填写公司信息 ---
         auto_fill_company = get_yes_no_choice("[流程] 是否自动填写公司信息?")
