@@ -21,6 +21,7 @@ import logging
 import socket
 import subprocess  # 新增：用于关闭进程
 import uuid  # 新增：用于生成UUID
+from datetime import datetime, timedelta, date
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
 from selenium import webdriver
@@ -783,12 +784,12 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
                             "marginRate": "0.02",
                             "fixedRate": "0.07"
                         },
-                        "term": 12,
-                        "termUnit": "Months",
+                        "term": 120,
+                        "termUnit": "Days",
                         "mintenor": 3,
                         "maxtenor": 24,
-                        "offerEndDate": "2024-10-15",
-                        "offerStartDate": "2023-10-16",
+                        "offerEndDate": (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d"),
+                        "offerStartDate": datetime.now().strftime("%Y-%m-%d"),
                         "approvedLimit": {"currency": "USD", "amount": amount},
                         "warterMark": {"currency": "USD", "amount": 0.00},
                         "signedLimit": {"currency": "USD", "amount": 0.00},

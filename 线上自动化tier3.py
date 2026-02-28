@@ -23,6 +23,7 @@ import logging
 import socket
 import subprocess  # 新增：用于关闭进程
 import uuid  # 新增：用于生成UUID
+from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
 from selenium import webdriver
@@ -50,7 +51,7 @@ _pause_manager = get_pause_manager()
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "uat"
 
 # 基础URL映射（参考mock_sit.py）
 BASE_URL_DICT = {
@@ -123,10 +124,10 @@ AMOUNT_CONFIG = {
         "esign_amount": 800000.00                  # 电子签额度（浮点数）
     },
     "uat": {
-        "underwritten_amount": "500000",
+        "underwritten_amount": "800000",
         "approved_amount": 500000.00,
-        "approved_amount_2nd": 600000.00,          # 第二次审批额度（额外信息提交后）
-        "esign_amount": 500000.00
+        "approved_amount_2nd": 800000.00,          # 第二次审批额度（额外信息提交后）
+        "esign_amount": 800000.00
     },
     "dev": {
         "underwritten_amount": "500000",
@@ -807,8 +808,8 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
                         "termUnit": "Months",
                         "mintenor": 3,
                         "maxtenor": 24,
-                        "offerEndDate": "2024-10-15",
-                        "offerStartDate": "2023-10-16",
+                        "offerEndDate": (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d"),
+                        "offerStartDate": datetime.now().strftime("%Y-%m-%d"),
                         "approvedLimit": {"currency": "USD", "amount": amount},
                         "warterMark": {"currency": "USD", "amount": 0.00},
                         "signedLimit": {"currency": "USD", "amount": 0.00},

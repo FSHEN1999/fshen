@@ -31,6 +31,7 @@ import requests
 import pymysql
 from pymysql.err import OperationalError
 from urllib.parse import urlencode
+from datetime import datetime, timedelta
 
 # ==============================================================================
 # --- 1. 配置与常量 (集中管理，易于维护) ---
@@ -632,8 +633,8 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
                         "termUnit": "Months",
                         "mintenor": 3,
                         "maxtenor": 24,
-                        "offerEndDate": "2024-10-15",
-                        "offerStartDate": "2023-10-16",
+                        "offerEndDate": (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d"),
+                        "offerStartDate": datetime.now().strftime("%Y-%m-%d"),
                         "approvedLimit": {"currency": "USD", "amount": amount},
                         "warterMark": {"currency": "USD", "amount": 0.00},
                         "signedLimit": {"currency": "USD", "amount": 0.00},

@@ -31,6 +31,7 @@ import requests
 import pymysql
 from pymysql.err import OperationalError
 from urllib.parse import urlencode
+from datetime import datetime, timedelta
 
 # ==============================================================================
 # --- 1. 配置与常量 (集中管理，易于维护) ---
@@ -39,7 +40,7 @@ from urllib.parse import urlencode
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "preprod"
+ENV = "sit"
 
 # 基础URL映射
 BASE_URL_DICT = {
@@ -632,8 +633,8 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
                         "termUnit": "Months",
                         "mintenor": 3,
                         "maxtenor": 24,
-                        "offerEndDate": "2024-10-15",
-                        "offerStartDate": "2023-10-16",
+                        "offerEndDate": (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d"),
+                        "offerStartDate": datetime.now().strftime("%Y-%m-%d"),
                         "approvedLimit": {"currency": "USD", "amount": amount},
                         "warterMark": {"currency": "USD", "amount": 0.00},
                         "signedLimit": {"currency": "USD", "amount": 0.00},
@@ -1437,8 +1438,8 @@ def handle_password_setup(driver: webdriver.Remote, phone: str) -> Optional[str]
     time.sleep(CONFIG.ACTION_DELAY)
 
     # 7. 勾选第二个复选框：授权
-    # safe_click(driver, "AUTHORIZATION_CHECKBOX", "授权复选框")
-    # time.sleep(CONFIG.ACTION_DELAY)
+    safe_click(driver, "AUTHORIZATION_CHECKBOX", "授权复选框")
+    time.sleep(CONFIG.ACTION_DELAY)
 
     # 8. 点击注册按钮
     safe_click(driver, "FINAL_REGISTER_BTN", "注册按钮")
