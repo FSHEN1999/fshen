@@ -13,6 +13,7 @@ import uuid
 import random
 from urllib.parse import urlencode
 from enum import Enum
+from pathlib import Path
 from typing import Optional, Dict, Any, Callable, Union
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -26,6 +27,9 @@ from pymysql.err import OperationalError
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod）
 ENV = "uat"
+
+# 脚本所在目录（用于统一文件路径，确保从任何目录执行都能找到文件）
+SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # 流程配置映射（清晰展示不同额度对应的流程步骤）
 STEPS = {
@@ -434,7 +438,7 @@ class DPUMockService:
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
             update_offer_url=f"{base_url}/dpu-auth/amazon-sp/updateOffer",
-            txt_path=f"./register_{self.db_executor.env}.txt"
+            txt_path=str(SCRIPT_DIR / f"register_{self.db_executor.env}.txt")
         )
 
     # ============================ 数据查询方法（精简SQL，提升可读性）============================
@@ -706,7 +710,7 @@ class DPUMockService:
             link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
-            txt_path=f"./register_{ENV}.txt"
+            txt_path=str(SCRIPT_DIR / f"register_{ENV}.txt")
         )
 
         # 创建offer_id（失败重试）
