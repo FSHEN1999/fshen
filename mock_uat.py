@@ -25,7 +25,7 @@ from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod）
-ENV = "preprod"
+ENV = "uat"
 
 # 流程配置映射（清晰展示不同额度对应的流程步骤）
 STEPS = {
@@ -184,6 +184,7 @@ class ApiConfig:
     link_sap_3pl_url: str
     create_psp_auth_url: str
     webhook_url: str
+    update_offer_url: str
     txt_path: str
 
 
@@ -432,6 +433,7 @@ class DPUMockService:
             link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
+            update_offer_url=f"{base_url}/dpu-auth/amazon-sp/updateOffer",
             txt_path=f"./register_{self.db_executor.env}.txt"
         )
 
@@ -1095,7 +1097,7 @@ class DPUMockService:
     def mock_multi_shop_3pl_redirect(self) -> None:
         """3PL重定向（多店铺第二步）"""
         if not self.generated_selling_partner_id:
-            log.error("无SP绑定ID，请先执行12-SP店铺绑定")
+            log.error("无SP绑定ID，请先执行11-SP店铺绑定")
             return
 
         platform_offer_id = self.get_platform_offer_id(self.generated_selling_partner_id)
@@ -1107,6 +1109,93 @@ class DPUMockService:
         log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
         log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
+
+    def mock_sp_status_update(self) -> None:
+        """SP状态更新（调用 updateOffer 接口）"""
+        log.info("开始处理SP状态更新...")
+
+        # 获取 platform_seller_id
+        platform_seller_id = input_with_validation(
+            prompt="请输入 platform_seller_id：\n",
+            validator=lambda x: bool(x.strip()),
+            error_msg="platform_seller_id 不能为空！"
+        )
+
+        # 从数据库查询 idempotency_key 和 platform_offer_id
+        idempotency_key_sql = f"""
+            SELECT idempotency_key FROM dpu_seller_center.dpu_manual_offer
+            WHERE platform_seller_id = '{platform_seller_id}'
+        """
+        platform_offer_id_sql = f"""
+            SELECT platform_offer_id FROM dpu_seller_center.dpu_manual_offer
+            WHERE platform_seller_id = '{platform_seller_id}'
+        """
+
+        idempotency_key = self.db_executor.execute_sql(idempotency_key_sql)
+        platform_offer_id = self.db_executor.execute_sql(platform_offer_id_sql)
+
+        if not idempotency_key:
+            log.error(f"未查询到 idempotency_key，platform_seller_id: {platform_seller_id}")
+            return
+        if not platform_offer_id:
+            log.error(f"未查询到 platform_offer_id，platform_seller_id: {platform_seller_id}")
+            return
+
+        log.info(f"查询成功 | idempotency_key: {idempotency_key} | platform_offer_id: {platform_offer_id}")
+
+        # 选择状态
+        status_map = {
+            "1": "SUCCESS",
+            "2": "FAIL"
+        }
+        status_input = input_with_validation(
+            prompt="请输入状态：\n1-SUCCESS  2-FAIL\n",
+            validator=lambda x: x in status_map,
+            error_msg="请输入1或2！"
+        )
+        send_status = status_map[status_input]
+
+        # 获取失败原因（如果选择 FAIL）
+        failure_reason = ""
+        if send_status == "FAIL":
+            reason_map = {
+                "1": "Lender and seller country not align(User do have US shop）",
+                "2": "Active credit approval exists",
+                "3": "An offer already exists for the seller for the same partner product combination"
+            }
+            prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
+            failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
+
+        # 构建请求体
+        payload = {
+            "idempotencyKey": idempotency_key,
+            "sendStatus": send_status,
+            "offerId": platform_offer_id,
+            "reason": failure_reason
+        }
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.update_offer_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            response.raise_for_status()
+            log.info(f"SP状态更新成功 | 响应: {response.text[:200]}...")
+        except requests.exceptions.RequestException as e:
+            error_detail = f"SP状态更新失败: {str(e)}"
+            if hasattr(e, 'response') and e.response is not None:
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                try:
+                    resp_json = e.response.json()
+                    error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
+                    error_detail += f"\n  - Status: {resp_json.get('status', 'N/A')}"
+                    error_detail += f"\n  - Message: {resp_json.get('message', 'N/A')}"
+                except:
+                    error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
+            log.error(error_detail)
 
     def mock_repayment_start_status(self) -> None:
         """模拟还款开始状态通知（固定状态为Start，无需选择状态）"""
@@ -1310,7 +1399,7 @@ def main():
 1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)
 4 - psp开始(psp_start)   5 - psp完成(psp_completed)  6 - 电子签(esign)
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
-10 - SP店铺绑定（多店铺第一步）  11 - 3PL重定向（多店铺第二步）
+10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
 q - 退出
 """
         operation_map = {
@@ -1324,7 +1413,8 @@ q - 退出
             "8": mock_service.mock_repayment_start_status,
             "9": mock_service.mock_repayment_status,
             "10": mock_service.mock_multi_shop_binding,
-            "11": mock_service.mock_multi_shop_3pl_redirect
+            "11": mock_service.mock_sp_status_update,
+            "12": mock_service.mock_multi_shop_3pl_redirect
         }
 
         # 菜单循环
