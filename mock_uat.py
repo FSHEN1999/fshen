@@ -1114,12 +1114,16 @@ class DPUMockService:
         """SP状态更新（调用 updateOffer 接口）"""
         log.info("开始处理SP状态更新...")
 
-        # 获取 platform_seller_id
-        platform_seller_id = input_with_validation(
-            prompt="请输入 platform_seller_id：\n",
-            validator=lambda x: bool(x.strip()),
-            error_msg="platform_seller_id 不能为空！"
-        )
+        # 获取 platform_seller_id（优先使用第10步生成的SP绑定ID）
+        if self.generated_selling_partner_id:
+            platform_seller_id = self.generated_selling_partner_id
+            log.info(f"使用已生成的SP绑定ID: {platform_seller_id}")
+        else:
+            platform_seller_id = input_with_validation(
+                prompt="请输入 platform_seller_id：\n",
+                validator=lambda x: bool(x.strip()),
+                error_msg="platform_seller_id 不能为空！"
+            )
 
         # 从数据库查询 idempotency_key 和 platform_offer_id
         idempotency_key_sql = f"""
