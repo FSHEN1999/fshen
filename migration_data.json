@@ -1,0 +1,63 @@
+{
+  "brn": "66551381",
+  "lender_approved_offer_id": "app-MIGRATION-66551381",
+  "lender_credit_id": "cred-MIGRATION-66551381",
+  "amzs": [
+    {
+      "amazon_seller_id": "spshouquanfs18231485349",
+      "psp_id": null,
+      "psp_name": null
+    }
+  ],
+  "application": {
+    "mobile_phone_country_code": "+86",
+    "mobile_phone": "18231485349",
+    "company_registration_date": "2021-11-22",
+    "company_english_name": "test HONG KONG HONGLIN TECHNOLOGY CO., LIMITED 66551381",
+    "contact_user_email": "dickhfqy05@fundpark.com",
+    "lender_company_id": "1081153629072654336",
+    "directors": [
+      {
+        "full_name_en": "WONG, Kin Yuen Thomas",
+        "full_name_cn": "王乾源",
+        "birthday": "1962-03-12"
+      }
+    ],
+    "shareholders": [
+      {
+        "full_name_en": "WONG, Kin Yuen Thomas",
+        "full_name_cn": "王乾源",
+        "ownership_percent": "100",
+        "birthday": "1962-03-12"
+      }
+    ]
+  },
+  "limit": {
+    "underwritten_amount": "60000.00000000",
+    "signed_limit": "8000.00",
+    "approved_limit": "8000.00000000",
+    "activate_limit": "8000.00000000",
+    "offer_start_date": "2026-03-03",
+    "offer_end_date": "2027-03-03",
+    "base_rate": "4",
+    "margin_rate": "10.5",
+    "banks": [
+      {
+        "bank_name": "CHINA CITIC BANK INTERNATIONAL LIMITED",
+        "bank_address": "DES VOEUX ROAD , 61-65 THE CHINESE BANK BUILDING, CENTRAL",
+        "bank_account_number": "456546546546",
+        "bank_account_name": "test Hong Kong Bawan Trading Co., Limited 66551381",
+        "swift_code": "KWHKHKHH",
+        "branch_code": null
+      }
+    ]
+  },
+  "drawdowns": [
+    {
+      "drawdown_id": "2028652493205876737",
+      "drawdown_amount": "8000.000000",
+      "drawdown_start_datetime": "2026-03-03",
+      "repayments": []
+    }
+  ]
+}
