@@ -16,7 +16,7 @@ from pymysql.constants import CLIENT
 
 # ================= 配置区域 =================
 # 环境选择：sit, uat, preprod, dev
-ENV = "sit"
+ENV = "preprod"
 
 # 多环境数据库配置
 DATABASE_CONFIG = {
@@ -202,13 +202,13 @@ def run_application(file_path):
                 # ================== Step 1: 查询用户 ==================
                 res1 = check_and_execute(
                     executor,
-                    f"SELECT * FROM dpu_users WHERE phone_number='{phone_number}'",
+                    f"SELECT merchant_id FROM dpu_users WHERE phone_number='{phone_number}'",
                     "Step 1: 查询用户"
                 )
                 if not res1['data']:
                     log.warning(f"未找到手机号为 {phone_number} 的用户，跳过此行")
                     continue
-                merchant_id = res1['data'][0][1]
+                merchant_id = res1['data'][0][0]
                 log.info(f"Step 1: merchant_id 为 {merchant_id}")
 
                 # ================== 遍历每个店铺进行PSP绑定 ==================
@@ -226,13 +226,13 @@ def run_application(file_path):
                     # ================== Step 2: 查询AMZ Token ==================
                     res01 = check_and_execute(
                         executor,
-                        f"SELECT * FROM dpu_auth_token WHERE authorization_id='{amazon_seller_id}'",
+                        f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_id='{amazon_seller_id}'",
                         f"Step 2.{shop_idx+1}: 查询AMZ Token"
                     )
                     if not res01['data']:
                         log.warning(f"未找到AMZ Seller ID 为 {amazon_seller_id} 的AMZ Token，跳过此店铺")
                         continue
-                    merchant_account_id = res01['data'][0][2]
+                    merchant_account_id = res01['data'][0][0]
                     log.info(f"Step 2.{shop_idx+1}: merchant_account_id 为 {merchant_account_id}")
 
                     # ================== Step 3: 插入PSP记录到auto token表 ==================

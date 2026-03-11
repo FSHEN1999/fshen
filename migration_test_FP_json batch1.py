@@ -234,7 +234,7 @@ def run_application(file_path):
                     drawdowns = data.get('drawdowns', [])
 
                 else:
-                    # CSV 格式数据提取（保持原有逻辑）
+                    # CSV 格式数据提取（保持���有逻辑）
                     phone_number = data.get('phone_number')
                     business_registration_number = data.get('business_registration_number')
                     company_registration_date = data.get('Company Registration Date')
@@ -348,19 +348,19 @@ def run_application(file_path):
                 log.info(f"生成的随机数合集: ids generated")
 
                 # 查询用户
-                res1 = check_and_execute(executor, f"SELECT * FROM dpu_users WHERE phone_number='{phone_number}'", "Step 1: 查询用户")
+                res1 = check_and_execute(executor, f"SELECT merchant_id FROM dpu_users WHERE phone_number='{phone_number}'", "Step 1: 查询用户")
                 if not res1['data']:
                     log.warning(f"未找到手机号为 {phone_number} 的用户，跳过此行")
                     continue
-                merchant_id = res1['data'][0][1]
+                merchant_id = res1['data'][0][0]
                 log.info(f"Step 1: merchant_id 为 {merchant_id}")
 
                 # 查询 AMZ Token
-                res01 = check_and_execute(executor, f"SELECT * FROM dpu_auth_token WHERE authorization_id='{amazon_seller_id}'", "Step 2: 查询AMZ Token")
+                res01 = check_and_execute(executor, f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_id='{amazon_seller_id}'", "Step 2: 查询AMZ Token")
                 if not res01['data']:
                     log.warning(f"未找到AMZ Seller ID 为 {amazon_seller_id} 的AMZ Token，跳过此行")
                     continue
-                merchant_account_id = res01['data'][0][2]
+                merchant_account_id = res01['data'][0][0]
                 log.info(f"Step 2: merchant_account_id 为 {merchant_account_id}")
 
                 # ==================== Step 4-5：3PL 更新 ====================
@@ -414,13 +414,13 @@ def run_application(file_path):
                             `lender_code` = 'FUNDPARK',
                             `merchant_account_id` = '{merchant_account_id}',
                             `platform_sync_status` = 'PENDING',
-                            `psp_status` = 'INITIAL',
+                            `psp_status` = 'SUCCESS',
                             `updated_at` = '{current_time}'
                              WHERE `merchant_id` = '{merchant_id}';"""
                 check_and_execute(executor, sql_mal, "Step 7: 更新Merchant Account Limit")
 
                 # ==================== 查询 Application（Step 8 保留查询逻辑，后续步骤需要这些变量） ====================
-                res_app = executor.execute_sql(f"SELECT * FROM dpu_application WHERE merchant_id='{merchant_id}'")
+                res_app = executor.execute_sql(f"SELECT id, application_unique_id FROM dpu_application WHERE merchant_id='{merchant_id}'")
                 application_id = ''
                 application_unique_id = ''
                 if res_app['data']:
@@ -431,7 +431,7 @@ def run_application(file_path):
                     log.warning(f"Step 8: 未找到 Application 记录")
 
                 # ==================== Step 9：插入/更新 Entity（需要在更新 Application 之前执行） ====================
-                res_entity = executor.execute_sql(f"SELECT * FROM dpu_entity WHERE merchant_id='{merchant_id}'")
+                res_entity = executor.execute_sql(f"SELECT id, submission_count FROM dpu_entity WHERE merchant_id='{merchant_id}'")
                 if not res_entity['data']:
                     # 不存在则插入
                     log.info(f"Step 9: 未找到 Entity 记录，插入新记录")
@@ -487,8 +487,8 @@ def run_application(file_path):
                     check_and_execute(executor, sql_entity, "Step 9.1: 插入Entity")
                 else:
                     # 存在则更新
-                    existing_entity_id = res_entity['data'][0][18]  # 获取已存在的 entity id
-                    existing_submission_count = res_entity['data'][0][30]  # 获取当前 submission_count
+                    existing_entity_id = res_entity['data'][0][0]  # 获取已存在的 entity id
+                    existing_submission_count = res_entity['data'][0][1]  # 获取当前 submission_count
                     ids['entity_id'] = existing_entity_id  # 使用已存在的 entity id
                     log.info(f"Step 9: 查询到 entity_id={existing_entity_id}，更新记录")
                     # 处理 submission_count 为 None 的情况
