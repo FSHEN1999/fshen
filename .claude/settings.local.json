@@ -51,7 +51,20 @@
       "Bash(python -m py_compile:*)",
       "Bash(chcp:*)",
       "Bash(git checkout:*)",
-      "Bash(.venv/Scripts/python:*)"
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(git restore:*)",
+      "Bash(ping:*)",
+      "Bash(git config:*)",
+      "Bash(git -c http.sslversion=sslv3 push)",
+      "Bash(git -c http.sslversion=tlsv1.3 push)",
+      "Bash(nslookup:*)",
+      "Read(//c/Users/PC/**)",
+      "Bash(pip install:*)",
+      "Bash(npm start)",
+      "Bash(netstat:*)"
+    ],
+    "additionalDirectories": [
+      "d:\\data\\project\\test\\nlp-text-analyzer"
     ]
   }
 }

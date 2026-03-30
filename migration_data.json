@@ -1,63 +1,270 @@
 {
-  "brn": "66551381",
-  "lender_approved_offer_id": "app-MIGRATION-66551381",
-  "lender_credit_id": "cred-MIGRATION-66551381",
-  "amzs": [
-    {
-      "amazon_seller_id": "spshouquanfs18231485349",
-      "psp_id": null,
-      "psp_name": null
-    }
-  ],
-  "application": {
-    "mobile_phone_country_code": "+86",
-    "mobile_phone": "18231485349",
-    "company_registration_date": "2021-11-22",
-    "company_english_name": "test HONG KONG HONGLIN TECHNOLOGY CO., LIMITED 66551381",
-    "contact_user_email": "dickhfqy05@fundpark.com",
-    "lender_company_id": "1081153629072654336",
-    "directors": [
-      {
-        "full_name_en": "WONG, Kin Yuen Thomas",
-        "full_name_cn": "王乾源",
-        "birthday": "1962-03-12"
-      }
+    "brn": "76380727",
+    "lender_approved_offer_id": "app-MIGRATION-76380727",
+    "lender_credit_id": "cred-MIGRATION-76380727",
+    "amzs": [
+        {
+            "amazon_seller_id": "spshouquanfs18245307447",
+            "psp_id": "acct_-ENCXBf7OBOSoHrQ8ZqxNg",
+            "psp_name": "Airwallex"
+        }
     ],
-    "shareholders": [
-      {
-        "full_name_en": "WONG, Kin Yuen Thomas",
-        "full_name_cn": "王乾源",
-        "ownership_percent": "100",
-        "birthday": "1962-03-12"
-      }
+    "application": {
+        "mobile_phone_country_code": "+86",
+        "mobile_phone": "18245307447",
+        "company_registration_date": "2024-03-28",
+        "company_english_name": "Xiaoxianglu Limited",
+        "contact_user_email": "609328232@qq.com",
+        "lender_company_id": "3753",
+        "directors": [
+            {
+                "full_name_en": " CHEN HAIXIA",
+                "full_name_cn": "陈海霞",
+                "birthday": "1982-07-23"
+            }
+        ],
+        "shareholders": [
+            {
+                "full_name_en": " CHEN HAIXIA",
+                "full_name_cn": "陈海霞",
+                "ownership_percent": "100.00",
+                "birthday": "1982-07-23"
+            }
+        ]
+    },
+    "limit": {
+        "underwritten_amount": "131837.85627500",
+        "signed_limit": "263675.00",
+        "approved_limit": "131837.85627500",
+        "activate_limit": "96570.84286900",
+        "offer_start_date": "2026-03-02",
+        "offer_end_date": "2027-03-02",
+        "base_rate": "4",
+        "margin_rate": "10",
+        "banks": [
+            {
+                "bank_name": "DBS BANK (HONG KONG) LIMITED",
+                "bank_address": "QUEEN’S ROAD, 99 THE CENTER GROUND FLOOR, CENTRAL",
+                "bank_account_number": "7950171258",
+                "bank_account_name": "Xiaoxianglu Limited",
+                "swift_code": "DHBKHKHH",
+                "branch_code": null
+            }
+        ]
+    },
+    "drawdowns": [
+        {
+            "drawdown_id": "651968210472554175",
+            "drawdown_amount": "26700.000000",
+            "drawdown_start_datetime": "2025-06-30",
+            "repayments": [
+                {
+                    "repayment_date": "2025-09-25",
+                    "repayment_principal": "993.000000",
+                    "repayment_interest": "34.840000"
+                },
+                {
+                    "repayment_date": "2025-09-25",
+                    "repayment_principal": "966.330000",
+                    "repayment_interest": "33.910000"
+                },
+                {
+                    "repayment_date": "2025-09-25",
+                    "repayment_principal": "3478.050000",
+                    "repayment_interest": "122.060000"
+                },
+                {
+                    "repayment_date": "2025-09-26",
+                    "repayment_principal": "7796.930000",
+                    "repayment_interest": "276.690000"
+                },
+                {
+                    "repayment_date": "2025-09-26",
+                    "repayment_principal": "12818.110000",
+                    "repayment_interest": "454.890000"
+                },
+                {
+                    "repayment_date": "2025-09-26",
+                    "repayment_principal": "647.580000",
+                    "repayment_interest": "22.980000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "700895655323406645",
+            "drawdown_amount": "1000.000000",
+            "drawdown_start_datetime": "2025-09-25",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-23",
+                    "repayment_principal": "1000.000000",
+                    "repayment_interest": "35.170000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "701546574825822345",
+            "drawdown_amount": "1000.000000",
+            "drawdown_start_datetime": "2025-09-25",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-23",
+                    "repayment_principal": "1000.000000",
+                    "repayment_interest": "35.170000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "702197494328238045",
+            "drawdown_amount": "4500.000000",
+            "drawdown_start_datetime": "2025-09-25",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-24",
+                    "repayment_principal": "4000.000000",
+                    "repayment_interest": "140.620000"
+                },
+                {
+                    "repayment_date": "2025-12-24",
+                    "repayment_principal": "500.000000",
+                    "repayment_interest": "17.570000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "702486791884867245",
+            "drawdown_amount": "7800.000000",
+            "drawdown_start_datetime": "2025-09-26",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-24",
+                    "repayment_principal": "4000.000000",
+                    "repayment_interest": "140.620000"
+                },
+                {
+                    "repayment_date": "2025-12-24",
+                    "repayment_principal": "3800.000000",
+                    "repayment_interest": "133.590000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "702974985925740000",
+            "drawdown_amount": "12800.000000",
+            "drawdown_start_datetime": "2025-09-26",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "2800.000000",
+                    "repayment_interest": "103.750000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "2979.050000",
+                    "repayment_interest": "110.380000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "6700.000000",
+                    "repayment_interest": "248.260000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "300.000000",
+                    "repayment_interest": "11.110000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "20.950000",
+                    "repayment_interest": "0.770000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "703625905428155700",
+            "drawdown_amount": "720.000000",
+            "drawdown_start_datetime": "2025-09-29",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "300.000000",
+                    "repayment_interest": "10.760000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "400.000000",
+                    "repayment_interest": "14.350000"
+                },
+                {
+                    "repayment_date": "2025-12-29",
+                    "repayment_principal": "20.000000",
+                    "repayment_interest": "0.710000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "706988985109909170",
+            "drawdown_amount": "7000.000000",
+            "drawdown_start_datetime": "2025-10-05",
+            "repayments": [
+                {
+                    "repayment_date": "2025-12-30",
+                    "repayment_principal": "38.380000",
+                    "repayment_interest": "1.270000"
+                },
+                {
+                    "repayment_date": "2025-12-30",
+                    "repayment_principal": "4016.070000",
+                    "repayment_interest": "134.550000"
+                },
+                {
+                    "repayment_date": "2026-01-05",
+                    "repayment_principal": "2945.550000",
+                    "repayment_interest": "105.400000"
+                }
+            ]
+        },
+        {
+            "drawdown_id": "2003361270237380610",
+            "drawdown_amount": "2100.000000",
+            "drawdown_start_datetime": "2025-12-23",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2003685841865613313",
+            "drawdown_amount": "4000.000000",
+            "drawdown_start_datetime": "2025-12-24",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2003737095346814978",
+            "drawdown_amount": "4500.000000",
+            "drawdown_start_datetime": "2025-12-24",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2003753676206473217",
+            "drawdown_amount": "3800.000000",
+            "drawdown_start_datetime": "2025-12-24",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2005917614944722945",
+            "drawdown_amount": "17600.000000",
+            "drawdown_start_datetime": "2025-12-30",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2008401887033106434",
+            "drawdown_amount": "2800.000000",
+            "drawdown_start_datetime": "2026-01-06",
+            "repayments": []
+        },
+        {
+            "drawdown_id": "2028386393721225218",
+            "drawdown_amount": "61700.000000",
+            "drawdown_start_datetime": "2026-03-02",
+            "repayments": []
+        }
     ]
-  },
-  "limit": {
-    "underwritten_amount": "60000.00000000",
-    "signed_limit": "8000.00",
-    "approved_limit": "8000.00000000",
-    "activate_limit": "8000.00000000",
-    "offer_start_date": "2026-03-03",
-    "offer_end_date": "2027-03-03",
-    "base_rate": "4",
-    "margin_rate": "10.5",
-    "banks": [
-      {
-        "bank_name": "CHINA CITIC BANK INTERNATIONAL LIMITED",
-        "bank_address": "DES VOEUX ROAD , 61-65 THE CHINESE BANK BUILDING, CENTRAL",
-        "bank_account_number": "456546546546",
-        "bank_account_name": "test Hong Kong Bawan Trading Co., Limited 66551381",
-        "swift_code": "KWHKHKHH",
-        "branch_code": null
-      }
-    ]
-  },
-  "drawdowns": [
-    {
-      "drawdown_id": "2028652493205876737",
-      "drawdown_amount": "8000.000000",
-      "drawdown_start_datetime": "2026-03-03",
-      "repayments": []
-    }
-  ]
 }

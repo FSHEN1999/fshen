@@ -1,0 +1,166 @@
+%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+  /Font <<
+    /F1 5 0 R
+  >>
+>>
+>>
+endobj
+
+4 0 obj
+<<
+/Length 999999999
+>>
+stream
+BT
+/F1 12 Tf
+100 750 Td
+(Test PDF File - 8MB Size Generated for Testing Purposes) Tj
+0 -20 Td
+(This is a large PDF file created for testing purposes. The file size is approximately 8MB.)
+
+100 700 Td
+(Chapter 1: Introduction) Tj
+0 -15 Td
+(This document contains various test content to simulate a large PDF file.)
+
+100 680 Td
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+100 660 Td
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+100 640 Td
+(The following text is repeated multiple times to increase file size...)
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+
+Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
+
+Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.
+
+Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur?
+
+Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur?
+
+EndStream
+endobj
+
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Times-Roman
+>>
+endobj
+
+xref
+0 6
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+0000000315 00000 n
+0000000964 00000 n
+trailer
+<<
+/Size 6
+/Root 1 0 R
+>>
+startxref
+999999999
+%%EOF
+
+
+% This is a simulated PDF file structure. In a real 8MB PDF file, there would be:
+% - Many more pages
+% - Images embedded
+% - Complex graphics
+% - Large amounts of text content
+% - Metadata and annotations
+% - Fonts and other resources
+
+% To create an actual 8MB PDF file, you would need to:
+% 1. Use a proper PDF generation library (like PyPDF2, ReportLab, or iText)
+% 2. Add substantial content (text, images, etc.)
+% 3. Ensure the total file size reaches approximately 8MB
+
+% For testing purposes, you can create a large PDF file using Python:
+
+"""
+Example Python code to generate an 8MB PDF file:
+
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+import os
+
+def create_large_pdf(filename, target_size_mb=8):
+    # Calculate the number of pages needed based on target size
+    # This is an approximation - actual size depends on content
+    target_size_bytes = target_size_mb * 1024 * 1024
+
+    # Create PDF document
+    doc = SimpleDocTemplate(filename, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Add title
+    title = Paragraph("Large Test PDF Document", styles['h1'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+
+    # Generate content until we reach target size
+    current_size = 0
+    page_count = 0
+
+    while current_size < target_size_bytes and page_count < 1000:  # Safety limit
+        # Add content to fill pages
+        for i in range(50):  # Add 50 paragraphs per page
+            para = Paragraph(f"This is paragraph number {i + page_count * 50}. " * 20, styles['Normal'])
+            story.append(para)
+
+        story.append(Spacer(1, 12))
+        page_count += 1
+
+        # Check current file size
+        if os.path.exists(filename):
+            current_size = os.path.getsize(filename)
+            print(f"Current size: {current_size / (1024*1024):.2f} MB, Pages: {page_count}")
+
+    # Build the document
+    doc.build(story)
+    print(f"Final file size: {os.path.getsize(filename) / (1024*1024):.2f} MB")
+
+# Generate an 8MB PDF
+create_large_pdf("test_8mb.pdf", 8)
+"""
+
+% Note: This is just a text representation of what an 8MB PDF file might look like.
+% The actual file would be a binary PDF document with proper structure and content.

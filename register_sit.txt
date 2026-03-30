@@ -347,3 +347,15 @@ https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.l
 200K
 13403590109
 https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.hjp82mgc8cuh4braggsckqTESTOFFER 2k
+
+500K
+18082117548
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.qfw8ox8obi3icm7rpfaoy7TESTOFFER
+
+500K
+15938083442
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.xkk2cn4zn0szvri4vqlv1pTESTOFFER
+
+500K
+13485981723
+https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.4vx4aq7f9qo8wpkfyc241wTESTOFFER

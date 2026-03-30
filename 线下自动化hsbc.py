@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+  # -*- coding: utf-8 -*-
 """
 HSBC 线下自动化注册工具 (DMF版本)
 
@@ -11,6 +11,14 @@ HSBC 线下自动化注册工具 (DMF版本)
     2. 自动化完成注册流程（支持5种浏览器的无痕模式）
     3. 完整的流程：注册→SP授权→公司信息→董事信息→核保→审批→PSP→电子签
     4. 详细的日志记录和错误处理机制
+    5. 实时暂停/继续控制（按空格键暂停，方便检查UI和数据库）
+
+暂停功能使用说明:
+    - 在脚本运行过程中，按 [空格键] 可以随时随刻暂停执行（实时监听）
+    - 暂停后会显示提示信息，再次按 [空格键] 继续执行
+    - 支持在任何时刻暂停，无需等待检查点
+    - 按 [F12键] 可以停止脚本执行，但浏览器会保持打开状态供手动检查
+    - 适合在关键步骤前暂停检查UI状态或数据库变化
 """
 
 import time
@@ -33,7 +41,7 @@ from pymysql.err import OperationalError
 from urllib.parse import urlencode
 
 # 暂停管理器：支持通过空格键暂停/继续脚本
-from pause_manager import get_pause_manager
+from pause_manager import get_pause_manager, StopScriptException
 
 # 全局暂停管理器实例
 _pause_manager = get_pause_manager()
@@ -144,10 +152,10 @@ CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG.get(ENV, AMOUNT_CONFIG["uat"])
 
 # 线下注册固定URL（根据环境切换）
 OFFLINE_SIGNUP_URL_DICT = {
-    "sit": "https://expressfinance-dpu-sit.dowsure.com/zh-Hans/hsbc-dmf",
+    "sit": "https://expressfinance-sit.business.hsbc.com/zh-Hans/hsbc-dmf",
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
     "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/hsbc-dmf",
-    "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/sign-up",
+    "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/hsbc-dmf",
 }
 OFFLINE_SIGNUP_URL = OFFLINE_SIGNUP_URL_DICT.get(ENV, OFFLINE_SIGNUP_URL_DICT["sit"])
 
@@ -1681,7 +1689,8 @@ def handle_company_info(driver: webdriver.Remote, auto_fill: bool):
         safe_send_keys(driver, "COMPANY_CN_NAME_INPUT", "测试有限公司", "公司中文名称")
 
         # 4. 填写商业登记号(BRN)
-        safe_send_keys(driver, "BUSINESS_REG_NO_INPUT", "00000001", "商业登记号(BRN)")
+        brn = f"{random.randint(0, 99999999):08d}"
+        safe_send_keys(driver, "BUSINESS_REG_NO_INPUT", brn, "商业登记号(BRN)")
 
         # 5. 填写公司注册日期
         safe_send_keys(driver, "ESTABLISHED_DATE_INPUT", "2025/12/01", "公司注册日期")
@@ -2279,7 +2288,7 @@ def run_offline_automation():
         else:
             logging.warning("⚠️ updateOffer请求失败，继续后续流程")
 
-        # --- 轮询send_status状态，等待SUCCESS ---
+        # --- 轮询send_status状态，等待2 ---
         logging.info("\n" + "=" * 50)
         logging.info("轮询send_status状态，等待SUCCESS")
         logging.info("=" * 50)
@@ -2406,6 +2415,30 @@ def run_offline_automation():
         _pause_manager.check_pause()
 
         # --- 步骤 7: 发起核保→审批→点击按钮→PSP→电子签 ---
+        # 流程开始前提供用户确认
+        print("\n" + "=" * 60)
+        print("⚠️  即将开始步骤 7: 发起核保→审批→点击按钮→PSP→电子签")
+        print("=" * 60)
+        print("📋 此步骤将执行以下操作:")
+        print("   1. 发送核保请求 (underwritten)")
+        print("   2. 发送审批请求 (approved)")
+        print("   3. 点击激活额度按钮")
+        print("   4. 点击接受按钮")
+        print("   5. 发送PSP验证开始请求")
+        print("   6. 发送PSP验证完成请求")
+        print("   7. 发送电子签完成请求")
+        print("=" * 60)
+        
+        while True:
+            user_input = input("请输入 1 确认开始步骤 7，或按其他键跳过: ").strip()
+            if user_input == "1":
+                print("✅ 已确认，开始执行步骤 7...")
+                break
+            else:
+                print("⏭️  跳过步骤 7，继续后续流程...")
+                submitted_success = False  # 设置为False以跳过步骤7
+                break
+        
         if submitted_success:
             logging.info("\n" + "=" * 50)
             logging.info("步骤 7: 发起核保→审批→点击按钮→PSP→电子签")
@@ -2475,6 +2508,16 @@ def run_offline_automation():
         while True:
             time.sleep(10)
 
+    except StopScriptException as e:
+        logging.info("\n" + "=" * 50)
+        logging.info("🛑 用户请求停止脚本执行")
+        logging.info(f"📱 本次操作的手机号: {phone}")
+        logging.info("ℹ️  浏览器将保持打开状态，供您手动检查。")
+        logging.info("=" * 50)
+        # 不关闭浏览器，保持打开状态
+        while True:
+            time.sleep(10)
+
     except Exception as e:
         logging.error("\n" + "=" * 50)
         logging.error(f"❌ 自动化流程在执行过程中发生致命错误: {e}")
@@ -2508,6 +2551,14 @@ if __name__ == "__main__":
     logging.info(f"📌 API基础URL: {BASE_URL}")
     logging.info(f"📌 线下注册URL: {OFFLINE_SIGNUP_URL}")
     logging.info(f"📌 数据库: {DATABASE_CONFIG_DICT[ENV]['host']}")
+    print()
+
+    # 显示暂停功能提示
+    print("⏸️  暂停功能说明:")
+    print("   • 脚本运行中按 [空格键] 可随时随刻暂停执行（实时监听）")
+    print("   • 暂停后再次按 [空格键] 继续执行")
+    print("   • 支持在任何时刻暂停，无需等待检查点")
+    print("   • 适合在关键步骤前暂停检查UI状态或数据库变化")
     print()
 
     # 建立全局数据库连接（单例模式，保持连接不关闭）

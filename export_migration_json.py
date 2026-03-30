@@ -321,7 +321,7 @@ class MigrationDataExporter:
 # ================= 主函数 =================
 def print_split_jsons(phone_number: str):
     """
-    根据手机号查询数据，每笔 drawdown 单独打印一段 JSON
+    根据手机号查询数据，将所有 drawdowns 合并到一个 JSON 中打印
 
     参数:
         phone_number: 手机号码
@@ -362,33 +362,27 @@ def print_split_jsons(phone_number: str):
             log.warning(f"未找到 drawdown 记录")
             return
 
-        log.info(f"找到 {len(drawdown_data)} 笔 drawdown 记录")
+        # 构建单个 JSON，包含所有 drawdowns
+        drawdowns_list = []
+        for dd in drawdown_data:
+            if dd[0] and dd[1]:  # 确保字段不为空
+                drawdowns_list.append({
+                    "drawdown_id": dd[0],
+                    "dpu_loan_id": dd[1]
+                })
+
+        result = {
+            "brn": brn,
+            "merchant_id": merchant_id,
+            "dpu_application_id": dpu_application_id,
+            "drawdowns": drawdowns_list
+        }
+
+        log.info(f"找到 {len(drawdowns_list)} 笔 drawdown 记录")
         print("\n" + "=" * 60)
-
-        # 每笔 drawdown 单独打印一段 JSON
-        for idx, dd in enumerate(drawdown_data, 1):
-            drawdown_id = dd[0]
-            dpu_loan_id = dd[1]
-
-            result = {
-                "brn": brn,
-                "merchant_id": merchant_id,
-                "dpu_application_id": dpu_application_id,
-                "drawdowns": [
-                    {
-                        "drawdown_id": drawdown_id,
-                        "dpu_loan_id": dpu_loan_id
-                    }
-                ]
-            }
-
-            print(f"\n第 {idx} 笔 JSON:")
-            print("-" * 40)
-            print(json.dumps(result, ensure_ascii=False, indent=2))
-            print("-" * 40)
-
-        print("\n" + "=" * 60)
-        log.info(f"共输出 {len(drawdown_data)} 段 JSON")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print("=" * 60)
+        log.info(f"共输出 1 个 JSON，包含 {len(drawdowns_list)} 笔 drawdown")
 
 
 def main():

@@ -29,7 +29,7 @@ from pymysql.constants import CLIENT
 
 # ================= 配置区域 =================
 # 默认环境：sit, uat, preprod, dev
-ENV = "preprod"
+ENV = "sit"
 
 # 多环境数据库配置
 DATABASE_CONFIG = {

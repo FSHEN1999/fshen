@@ -43,7 +43,7 @@ from urllib.parse import urlencode
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "preprod"
+ENV = "uat"
 
 # 基础URL映射（参考mock_sit.py）
 BASE_URL_DICT = {

@@ -183,3 +183,8 @@ Registration operations append to environment-specific log files:
 - `register_dev.txt` - Dev registrations
 
 Format: journey type, phone number, redirect URL
+
+
+
+prod注意事项：bacth1，3 替换migration_data为生成真实客户json内容，配置migration_test_FP_json batch1的生存环境数据库，执行完毕migration脚本执行export_migration_json脚本（同样需要配置生产数据库），控制台输入手机号，得到需要回传FP的json。   
+             batch 2 替换migration_data为生成真实客户json内容（只配置用户的第一家店铺），配置migration_test_FP_json batch1.py的生存环境数据库，执行完毕migration脚本执行export_migration_json脚本（同样需要配置生产数据库），控制台输入手机号，得到需要回传FP的json。用户完成剩余店铺SP/3P通知我们后，替换migration_data多店铺为生成真实客户json内容，配置migration_test_FP_json 多店铺绑定psp.py的生存环境数据库，执行migration_test_FP_json 多店铺绑定psp.py

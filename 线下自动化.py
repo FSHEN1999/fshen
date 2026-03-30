@@ -40,7 +40,7 @@ from datetime import datetime, timedelta
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "uat"
 
 # 基础URL映射
 BASE_URL_DICT = {
@@ -494,7 +494,7 @@ def close_global_db():
 
 
 # ==============================================================================
-# --- 6. Webhook请求函数 ---
+# --- 6. Webhook请求函数 --- 
 # ==============================================================================
 def send_underwritten_request(phone: str, amount: str = None) -> bool:
     """发送核保完成请求 (underwrittenLimit.completed)"""
@@ -2176,65 +2176,93 @@ def run_offline_automation():
         except Exception as e:
             logging.warning(f"⚠️ SP授权请求异常: {e}")
 
-        # --- 步骤 6.5: 查询platform_offer_id并访问redirect URL ---
+        # --- 步骤 6.5: 发送updateOffer请求 (SP完成后、3PL前) ---
         logging.info("\n" + "=" * 50)
-        logging.info("步骤 6.5: 查询platform_offer_id并访问redirect URL")
-        logging.info("=" * 50)
-
-        logging.info("⏳ 等待5秒，确保platform_offer_id已入库...")
-        time.sleep(5)
-
-        selling_partner_id = f"spshouquanfs{phone}"
-        try:
-            db = get_global_db()
-            platform_offer_sql = f"""
-                SELECT platform_offer_id FROM dpu_manual_offer
-                WHERE platform_seller_id = '{selling_partner_id}'
-                ORDER BY created_at DESC LIMIT 1
-            """
-            platform_offer_id = db.execute_sql(platform_offer_sql)
-
-            if not platform_offer_id:
-                logging.warning(f"⚠️ 未查询到platform_offer_id，selling_partner_id: {selling_partner_id}")
-                logging.info("ℹ️  跳过redirect URL访问，继续后续流程")
-            else:
-                logging.info(f"✅ 查询到platform_offer_id: {platform_offer_id}")
-
-                # 构建redirect URL（根据环境选择正确的域名）
-                if ENV == "sit":
-                    redirect_base = "https://dpu-gateway-sit.dowsure.com"
-                elif ENV == "uat":
-                    redirect_base = "https://uat.api.expressfinance.business.hsbc.com"
-                elif ENV == "preprod":
-                    redirect_base = "https://preprod.api.expressfinance.business.hsbc.com"
-                else:
-                    redirect_base = f"https://expressfinance-dpu-{ENV}.dowsure.com"
-
-                redirect_url = f"{redirect_base}/dpu-merchant/amazon/redirect?offerId={platform_offer_id}"
-                logging.info(f"[REDIRECT] 正在新窗口中访问: {redirect_url}")
-
-                # 在新窗口中打开（不切换窗口，保持原窗口激活）
-                try:
-                    driver.execute_script(f"window.open('{redirect_url}', '_blank');")
-                    time.sleep(CONFIG.ACTION_DELAY)
-                    logging.info(f"✅ redirect页面已在新窗口中打开")
-                except Exception as e:
-                    logging.warning(f"⚠️ redirect页面访问异常: {e}")
-
-        except Exception as e:
-            logging.warning(f"⚠️ 查询platform_offer_id或访问redirect URL失败: {e}")
-            logging.info("ℹ️  继续后续流程")
-
-        # --- 步骤 6.6: 发送updateOffer请求 (SP完成后、3PL前) ---
-        logging.info("\n" + "=" * 50)
-        logging.info("步骤 6.6: 发送updateOffer请求")
+        logging.info("步骤 6.5: 发送updateOffer请求")
         logging.info("=" * 50)
 
         time.sleep(3)
         if send_update_offer_request(phone):
             logging.info("✅ updateOffer请求成功！")
+
+            # 轮询查询send_status是否为SUCCESS
+            logging.info("⏳ 等待send_status更新为SUCCESS...")
+            send_status_success = False
+            selling_partner_id = f"spshouquanfs{phone}"
+            for attempt in range(1, 31):  # 最多尝试30次
+                try:
+                    db = get_global_db()
+                    send_status_sql = f"""
+                        SELECT send_status FROM dpu_seller_center.dpu_manual_offer
+                        WHERE platform_seller_id = '{selling_partner_id}'
+                        ORDER BY created_at DESC LIMIT 1
+                    """
+                    send_status = db.execute_sql(send_status_sql)
+
+                    if send_status == "SUCCESS":
+                        logging.info(f"✅ send_status已更新为SUCCESS（尝试次数: {attempt}）")
+                        send_status_success = True
+                        break
+                    else:
+                        logging.info(f"[轮询 {attempt}/30] send_status: {send_status}")
+                except Exception as e:
+                    logging.warning(f"[轮询 {attempt}/30] 查询send_status失败: {e}")
+
+                if attempt < 30:
+                    time.sleep(2)
+
+            if send_status_success:
+                # --- 步骤 6.6: 查询platform_offer_id并访问redirect URL ---
+                logging.info("\n" + "=" * 50)
+                logging.info("步骤 6.6: 查询platform_offer_id并访问redirect URL")
+                logging.info("=" * 50)
+
+                logging.info("⏳ 等待5秒，确保platform_offer_id已入库...")
+                time.sleep(5)
+
+                try:
+                    db = get_global_db()
+                    platform_offer_sql = f"""
+                        SELECT platform_offer_id FROM dpu_manual_offer
+                        WHERE platform_seller_id = '{selling_partner_id}'
+                        ORDER BY created_at DESC LIMIT 1
+                    """
+                    platform_offer_id = db.execute_sql(platform_offer_sql)
+
+                    if not platform_offer_id:
+                        logging.warning(f"⚠️ 未查询到platform_offer_id，selling_partner_id: {selling_partner_id}")
+                        logging.info("ℹ️  跳过redirect URL访问，继续后续流程")
+                    else:
+                        logging.info(f"✅ 查询到platform_offer_id: {platform_offer_id}")
+
+                        # 构建redirect URL（根据环境选择正确的域名）
+                        if ENV == "sit":
+                            redirect_base = "https://dpu-gateway-sit.dowsure.com"
+                        elif ENV == "uat":
+                            redirect_base = "https://uat.api.expressfinance.business.hsbc.com"
+                        elif ENV == "preprod":
+                            redirect_base = "https://preprod.api.expressfinance.business.hsbc.com"
+                        else:
+                            redirect_base = f"https://expressfinance-dpu-{ENV}.dowsure.com"
+
+                        redirect_url = f"{redirect_base}/dpu-merchant/amazon/redirect?offerId={platform_offer_id}"
+                        logging.info(f"[REDIRECT] 正在新窗口中访问: {redirect_url}")
+
+                        # 在新窗口中打开（不切换窗口，保持原窗口激活）
+                        try:
+                            driver.execute_script(f"window.open('{redirect_url}', '_blank');")
+                            time.sleep(CONFIG.ACTION_DELAY)
+                            logging.info(f"✅ redirect页面已在新窗口中打开")
+                        except Exception as e:
+                            logging.warning(f"⚠️ redirect页面访问异常: {e}")
+
+                except Exception as e:
+                    logging.warning(f"⚠️ 查询platform_offer_id或访问redirect URL失败: {e}")
+                    logging.info("ℹ️  继续后续流程")
+            else:
+                logging.warning("⚠️ send_status未更新为SUCCESS，跳过platform_offer_id查询和redirect URL访问")
         else:
-            logging.warning("⚠️ updateOffer请求失败，继续后续流程")
+            logging.warning("⚠️ updateOffer请求失败，跳过后续步骤")
 
         # --- 步骤 7: 填写公司信息 ---
         auto_fill_company = get_yes_no_choice("[流程] 是否自动填写公司信息?")
