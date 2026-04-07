@@ -2,7 +2,7 @@
 """
 DPU状态模拟工具
 功能：支持账号注册、SP授权、核保/审批/PSP/电子签/放款/还款等状态模拟，支持多环境切换和多店铺场景
-环境支持：sit/local/dev/uat/preprod
+环境支持：sit/local/dev/uat/preprod/reg
 核心特性：自动重连数据库、输入验证、日志颜色区分、统一请求处理
 """
 import json
@@ -26,8 +26,8 @@ from pymysql.constants import CLIENT
 from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
-# 环境配置（支持：sit/local/dev/uat/preprod）
-ENV = "uat"
+# 环境配置（支持：sit/local/dev/uat/preprod/reg）
+ENV = "reg"
 
 # 脚本所在目录（用于统一文件路径，确保从任何目录执行都能找到文件）
 SCRIPT_DIR = Path(__file__).parent.absolute()
@@ -236,6 +236,16 @@ class DatabaseConfig:
             "connect_timeout": 1500,
             "read_timeout": 15,
         },
+        "reg": {
+            "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+            "user": "dpu_reg",
+            "password": "r4asUYBX3R6LNdp",
+            "database": "dpu_seller_center",
+            "port": 3306,
+            "charset": "utf8mb4",
+            "connect_timeout": 1500,
+            "read_timeout": 15,
+        },
         "local": {
             "host": "localhost",
             "user": "root",
@@ -410,11 +420,14 @@ class DPUMockService:
     """DPU状态模拟服务（封装所有业务操作，支持单例共享多店铺状态）"""
     generated_selling_partner_id: Optional[str] = None  # 多店铺共享SP绑定ID
     cached_lender_repayment_id: Optional[str] = None  # 缓存的还款ID，确保连续还款操作ID一致
+    hsbc_psp_pending_account_id_by_merchant: Dict[str, str] = {}  # HSBC PSP流程中待完成的merchantAccountId
+    hsbc_psp_completed_account_ids_in_session: set[str] = set()  # 当前会话中已完成的merchantAccountId
 
     def __init__(self, phone_number: str, db_executor: DatabaseExecutor):
         self.phone_number = phone_number
         self.db_executor = db_executor
         self.merchant_id = self.get_merchant_id()
+        self.preferred_currency = self.get_preferred_currency()
         self.seller_id: Optional[str] = None
         self.api_config = self._init_api_config()  # 初始化API配置
 
@@ -426,6 +439,7 @@ class DPUMockService:
             "dev": "https://dpu-gateway-dev.dowsure.com",
             "uat": "https://uat.api.expressfinance.business.hsbc.com",
             "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+            "reg": "https://dpu-gateway-reg.dowsure.com",
             "local": "http://192.168.11.3:8080"
         }
         base_url = base_url_dict[self.db_executor.env]
@@ -462,6 +476,16 @@ class DPUMockService:
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
+
+    def get_preferred_currency(self) -> str:
+        """根据merchant_id查询用户偏好货币"""
+        sql = f"""
+            SELECT prefer_finance_product_currency FROM dpu_users 
+            WHERE merchant_id = '{self.merchant_id}' 
+            LIMIT 1
+        """
+        currency = self.db_executor.execute_sql(sql)
+        return currency or "USD"  # 默认USD如果为空
 
     def get_platform_offer_id(self, seller_id: str) -> Optional[str]:
         """根据seller_id查询platform_offer_id"""
@@ -546,13 +570,27 @@ class DPUMockService:
     def dpu_auth_token_seller_id(self) -> Optional[str]:
         """获取SP授权的seller_id"""
         sql = f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{self.merchant_id}' 
-            AND authorization_party = 'SP' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
             AND authorization_id IS NOT NULL
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
+
+    @property
+    def latest_sp_auth_token_info(self) -> Optional[Dict[str, Any]]:
+        """获取最新SP授权记录中的merchant_id和authorization_id"""
+        sql = f"""
+            SELECT merchant_id, authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
+            AND authorization_id IS NOT NULL
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_query(sql)
 
     def _get_or_create_lender_repayment_id(self) -> str:
         """获取或创建还款ID（确保连续操作ID一致）"""
@@ -878,14 +916,14 @@ class DPUMockService:
         log.info("【SP-3PL关联】完整请求信息")
         log.info("=" * 60)
         log.info(f"请求URL: {self.api_config.link_sap_3pl_url}")
-        log.info(f"请求方法: GET")
+        log.info(f"请求方法: POST")
         log.info(f"请求Params:")
         log.info(f"  phone: {self.phone_number}")
         log.info("=" * 60)
 
         # 发送请求
         try:
-            response = requests.get(
+            response = requests.post(
                 self.api_config.link_sap_3pl_url,
                 params={"phone": self.phone_number},
                 timeout=30
@@ -985,8 +1023,8 @@ class DPUMockService:
                     "baseRate": "3.5",
                     "baseRateType": "FIXED",
                     "creditLimit": {
-                        "currency": "CNY",
-                        "underwrittenAmount": {"currency": "CNY", "amount": underwritten_amount}
+                        "currency": self.preferred_currency,
+                        "underwrittenAmount": {"currency": self.preferred_currency, "amount": underwritten_amount}
                     }
                 }
             }
@@ -1104,13 +1142,13 @@ class DPUMockService:
                         "maxtenor": 24,
                         "offerEndDate": calculate_future_date(90),
                         "offerStartDate": get_current_time("%Y-%m-%d"),
-                        "approvedLimit": {"currency": "USD", "amount": approved_amount},
-                        "warterMark": {"currency": "USD", "amount": 0.00},
-                        "signedLimit": {"currency": "USD", "amount": 0.00},
+                        "approvedLimit": {"currency": self.preferred_currency, "amount": approved_amount},
+                        "warterMark": {"currency": self.preferred_currency, "amount": 0.00},
+                        "signedLimit": {"currency": self.preferred_currency, "amount": 0.00},
                         "feeOrCharge": {
                             "type": "PROCESSING_FEE",
                             "feeOrChargeDate": "2023-10-16",
-                            "netAmount": {"currency": "USD", "amount": 0.00}
+                            "netAmount": {"currency": self.preferred_currency, "amount": 0.00}
                         }
                     }
                 }
@@ -1193,7 +1231,7 @@ class DPUMockService:
             {
                 "lenderApprovedOfferId": self.lender_approved_offer_id,
                 "result": esign_status,
-                "signedLimit": {"amount": signed_amount, "currency": "USD"}
+                "signedLimit": {"amount": signed_amount, "currency": self.preferred_currency}
             }
         )
 
@@ -1297,7 +1335,7 @@ class DPUMockService:
                     "lastUpdatedOn": get_current_time(),
                     "lastUpdatedBy": "system",
                     "disbursement": {
-                        "loanAmount": {"currency": "USD", "amount": f"{float(drawdown_amount):.2f}"},
+                        "loanAmount": {"currency": self.preferred_currency, "amount": f"{float(drawdown_amount):.2f}"},
                         "rate": {"chargeBases": "Float", "baseRateType": "SOFR", "baseRate": "10.00",
                                  "marginRate": "0.00"},
                         "term": "90",
@@ -1307,7 +1345,7 @@ class DPUMockService:
                     },
                     "repayment": {
                         "expectedRepaymentDate": calculate_future_date(90),
-                        "expectedRepaymentAmount": {"currency": "USD", "amount": f"{float(drawdown_amount):.2f}"},
+                        "expectedRepaymentAmount": {"currency": self.preferred_currency, "amount": f"{float(drawdown_amount):.2f}"},
                         "repaymentTerm": "90"
                     }
                 }
@@ -1396,6 +1434,11 @@ class DPUMockService:
         status_input = input_with_validation(prompt=status_prompt, validator=lambda x: x in status_map)
         psp_status = status_map[status_input]
 
+        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=not is_start)
+        if not sp_auth_info:
+            return
+        merchant_account_id = sp_auth_info["authorization_id"]
+
         data = self._build_common_webhook_data(
             event_type,
             psp_status,
@@ -1403,7 +1446,7 @@ class DPUMockService:
                 "applicationId": "EFA17590311621044381",
                 "pspId": "pspId123457",
                 "pspName": "AirWallex",
-                "merchantAccountId": self.dpu_auth_token_seller_id,
+                "merchantAccountId": merchant_account_id,
                 "lenderApprovedOfferId": self.lender_approved_offer_id,
                 "result": psp_status
             }
@@ -1441,7 +1484,14 @@ class DPUMockService:
             log.info("=" * 60)
 
             if response.status_code == 200:
-                log.info(f"PSP{'开始' if is_start else '完成'}状态更新成功 | 状态={psp_status}")
+                if is_start:
+                    self.hsbc_psp_pending_account_id_by_merchant[self.merchant_id] = merchant_account_id
+                else:
+                    self.hsbc_psp_completed_account_ids_in_session.add(merchant_account_id)
+                    self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+                log.info(
+                    f"PSP{'开始' if is_start else '完成'}状态更新成功 | 状态={psp_status} | merchantAccountId={merchant_account_id}"
+                )
             else:
                 log.error(f"PSP{'开始' if is_start else '完成'}状态更新失败 | 状态码={response.status_code}")
 
@@ -1473,6 +1523,222 @@ class DPUMockService:
         """模拟PSP完成状态"""
         self._mock_psp_status(is_start=False)
 
+    def _get_hsbc_psp_completed_account_ids(self) -> set[str]:
+        """获取已完成的HSBC PSP merchantAccountId"""
+        sql = f"""
+            SELECT JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.merchantAccountId')) AS merchant_account_id
+            FROM dpu_lender_event
+            WHERE merchant_id = '{self.merchant_id}'
+            AND event_type = 'psp.verification.completed'
+            AND JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.merchantAccountId')) IS NOT NULL
+            ORDER BY received_at DESC
+        """
+        rows = self.db_executor.execute_query_all(sql)
+        completed_account_ids = {
+            row["merchant_account_id"]
+            for row in rows
+            if row.get("merchant_account_id") and not str(row["merchant_account_id"]).startswith("{{")
+        }
+        completed_account_ids.update(self.hsbc_psp_completed_account_ids_in_session)
+        return completed_account_ids
+
+    def _select_hsbc_psp_auth_token_info(self, for_completed: bool = False) -> Optional[Dict[str, Any]]:
+        """选择HSBC PSP通知要使用的SP授权记录"""
+        sql = f"""
+            SELECT merchant_id, authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
+            AND authorization_id IS NOT NULL
+            ORDER BY created_at DESC
+        """
+        sp_auth_infos = self.db_executor.execute_query_all(sql)
+        if not sp_auth_infos:
+            log.error(f"未查询到SP授权记录，merchant_id: {self.merchant_id}")
+            return None
+
+        completed_account_ids = self._get_hsbc_psp_completed_account_ids()
+        pending_account_id = self.hsbc_psp_pending_account_id_by_merchant.get(self.merchant_id)
+        if pending_account_id in completed_account_ids:
+            self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+            pending_account_id = None
+
+        selected_info = None
+        if for_completed and pending_account_id:
+            selected_info = next(
+                (item for item in sp_auth_infos if item["authorization_id"] == pending_account_id),
+                None
+            )
+
+        if not selected_info:
+            selected_info = next(
+                (item for item in sp_auth_infos if item["authorization_id"] not in completed_account_ids),
+                None
+            )
+
+        if not selected_info:
+            log.error(
+                f"未查询到可用的未完成SP授权记录，merchant_id: {self.merchant_id} | 已完成数量={len(completed_account_ids)}"
+            )
+            return None
+
+        return selected_info
+
+    def _get_hsbc_psp_notification_context(self, for_completed: bool = False) -> Optional[Dict[str, str]]:
+        """获取HSBC版PSP通知所需的上下文"""
+        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=for_completed)
+        if not sp_auth_info:
+            return None
+
+        merchant_id = sp_auth_info["merchant_id"]
+        merchant_account_id = sp_auth_info["authorization_id"]
+        limit_application_unique_id = self.dpu_limit_application_id
+
+        if not limit_application_unique_id:
+            limit_application_unique_id = input_with_validation(
+                prompt="未查询到limitApplicationUniqueId，请输入：\n",
+                validator=lambda x: bool(x.strip()),
+                error_msg="limitApplicationUniqueId不能为空！"
+            )
+
+        return {
+            "merchant_id": merchant_id,
+            "merchant_account_id": merchant_account_id,
+            "limit_application_unique_id": limit_application_unique_id
+        }
+
+    def _send_hsbc_psp_notification(
+            self,
+            event_type: str,
+            result: str,
+            failure_reason: Optional[str],
+            title: str,
+            for_completed: bool = False
+    ) -> None:
+        """发送HSBC版PSP通知"""
+        context = self._get_hsbc_psp_notification_context(for_completed=for_completed)
+        if not context:
+            return
+
+        payload = {
+            "eventType": event_type,
+            "eventReceiver": "DPU",
+            "eventData": {
+                "merchantId": context["merchant_id"],
+                "merchantAccountId": context["merchant_account_id"],
+                "limitApplicationUniqueId": context["limit_application_unique_id"],
+                "pspName": "Payoneer",
+                "pspId": "PSP_12345",
+                "result": result,
+                "failureReason": failure_reason,
+                "lastUpdatedOn": get_current_time("%Y-%m-%dT%H:%M:%S"),
+                "lastUpdatedBy": "HSBC_SYSTEM"
+            }
+        }
+
+        host_header = self.api_config.base_url.replace("https://", "").replace("http://", "")
+        headers = {
+            "X-Internal-Request": "true",
+            "Authorization": "Bearer",
+            "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "Host": host_header,
+            "Connection": "keep-alive",
+            "Cookie": "Cookie_1=value"
+        }
+        url = f"{self.api_config.base_url}/dpu-openapi/notification/system-events"
+
+        log.info("=" * 60)
+        log.info(f"【{title}】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            log.info(f"\n【{title}】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                if for_completed:
+                    self.hsbc_psp_completed_account_ids_in_session.add(context["merchant_account_id"])
+                    self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+                else:
+                    self.hsbc_psp_pending_account_id_by_merchant[self.merchant_id] = context["merchant_account_id"]
+                log.info(
+                    f"{title}通知发送成功 | merchantId={context['merchant_id']} | merchantAccountId={context['merchant_account_id']}"
+                )
+            else:
+                log.error(f"{title}通知发送失败 | 状态码={response.status_code}")
+        except requests.exceptions.RequestException as e:
+            log.error(f"\n【{title}】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except Exception:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def mock_psp_start_status_hsbc(self) -> None:
+        """发送HSBC版PSP开始通知"""
+        log.info("开始处理PSP开始（HSBC）...")
+        self._send_hsbc_psp_notification(
+            event_type="psp.verification.started",
+            result="PROCESSING",
+            failure_reason=None,
+            title="PSP开始（HSBC）",
+            for_completed=False
+        )
+
+    def mock_psp_completed_status_hsbc(self) -> None:
+        """发送HSBC版PSP完成通知"""
+        log.info("开始处理PSP完成（HSBC）...")
+
+        status_map = {
+            "1": "SUCCESS",
+            "2": "FAIL"
+        }
+        status_input = input_with_validation(
+            prompt="请输入result：\n1-SUCCESS  2-FAIL\n",
+            validator=lambda x: x in status_map,
+            error_msg="请输入1或2！"
+        )
+        result = status_map[status_input]
+        failure_reason = None if result == "SUCCESS" else "Bank account verification failed"
+
+        self._send_hsbc_psp_notification(
+            event_type="psp.verification.completed",
+            result=result,
+            failure_reason=failure_reason,
+            title="PSP完成（HSBC）",
+            for_completed=True
+        )
+
     def mock_multi_shop_binding(self) -> None:
         """SP店铺绑定（多店铺第一步）"""
         state = input_with_validation(prompt="请输入state值：\n", validator=lambda x: bool(x),
@@ -1487,61 +1753,19 @@ class DPUMockService:
         }
         full_auth_url = f"{self.api_config.multi_shop_sp_auth_url}?{urlencode(params)}"
 
-        # ========== 增强日志：打印完整请求信息 ==========
         log.info("=" * 60)
-        log.info("【多店铺-SP绑定】完整请求信息")
-        log.info("=" * 60)
-        log.info(f"请求URL: {self.api_config.multi_shop_sp_auth_url}")
-        log.info(f"请求方法: GET")
-        log.info(f"请求Params:")
-        for key, value in params.items():
-            log.info(f"  {key}: {value}")
+        log.info("【多店铺-SP绑定】")
         log.info("=" * 60)
 
-        # 发送请求
-        try:
-            response = requests.get(
-                self.api_config.multi_shop_sp_auth_url,
-                params=params,
-                timeout=30
-            )
+        # 发送请求（静默执行）
+        requests.get(
+            self.api_config.multi_shop_sp_auth_url,
+            params=params,
+            timeout=30
+        )
 
-            # ========== 增强日志：打印完整响应内容 ==========
-            log.info("\n【多店铺-SP绑定】完整响应信息")
-            log.info("=" * 60)
-            log.info(f"响应状态码: {response.status_code}")
-            log.info(f"响应Headers:")
-            for key, value in response.headers.items():
-                log.info(f"  {key}: {value}")
-            log.info(f"响应Body:")
-            log.info(response.text)
-            log.info("=" * 60)
-
-            if response.status_code == 200:
-                log.info(f"【多店铺】SP绑定成功 | SP绑定ID：{self.generated_selling_partner_id}")
-                log.info(f"【多店铺】SP授权URL：{full_auth_url}")
-            else:
-                log.error(f"【多店铺】SP绑定失败 | 状态码={response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            # ========== 增强日志：打印异常详细信息 ==========
-            log.error("\n【多店铺-SP绑定】请求异常详细信息")
-            log.info("=" * 60)
-            log.error(f"异常类型: {type(e).__name__}")
-            log.error(f"异常信息: {str(e)}")
-
-            if hasattr(e, 'response') and e.response is not None:
-                log.error(f"响应状态码: {e.response.status_code}")
-                log.error(f"响应Headers:")
-                for key, value in e.response.headers.items():
-                    log.error(f"  {key}: {value}")
-                log.error(f"响应Body:")
-                try:
-                    resp_json = e.response.json()
-                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
-                except:
-                    log.error(e.response.text)
-            log.info("=" * 60)
+        log.info(f"【多店铺】SP绑定成功 | SP绑定ID：{self.generated_selling_partner_id}")
+        log.info(f"【多店铺】SP授权URL：{full_auth_url}")
 
     def mock_multi_shop_3pl_redirect(self) -> None:
         """3PL重定向（多店铺第二步）"""
@@ -1556,61 +1780,21 @@ class DPUMockService:
 
         full_redirect_url = f"{self.api_config.redirect_url}?offerId={platform_offer_id}"
 
-        # ========== 增强日志：打印完整请求信息 ==========
         log.info("=" * 60)
-        log.info("【多店铺-3PL重定向】完整请求信息")
-        log.info("=" * 60)
-        log.info(f"请求URL: {self.api_config.redirect_url}")
-        log.info(f"请求方法: GET")
-        log.info(f"请求Params:")
-        log.info(f"  offerId: {platform_offer_id}")
+        log.info("【多店铺-3PL重定向】")
         log.info("=" * 60)
 
-        # 发送请求
-        try:
-            response = requests.get(
-                self.api_config.redirect_url,
-                params={"offerId": platform_offer_id},
-                timeout=30
-            )
+        # 发送请求（静默执行）
+        requests.get(
+            self.api_config.redirect_url,
+            params={"offerId": platform_offer_id},
+            timeout=30
+        )
 
-            # ========== 增强日志：打印完整响应内容 ==========
-            log.info("\n【多店铺-3PL重定向】完整响应信息")
-            log.info("=" * 60)
-            log.info(f"响应状态码: {response.status_code}")
-            log.info(f"响应Headers:")
-            for key, value in response.headers.items():
-                log.info(f"  {key}: {value}")
-            log.info(f"响应Body:")
-            log.info(response.text)
-            log.info("=" * 60)
-
-            if response.status_code == 200:
-                log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
-                log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
-                log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
-            else:
-                log.error(f"【多店铺】3PL重定向失败 | 状态码={response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            # ========== 增强日志：打印异常详细信息 ==========
-            log.error("\n【多店铺-3PL重定向】请求异常详细信息")
-            log.info("=" * 60)
-            log.error(f"异常类型: {type(e).__name__}")
-            log.error(f"异常信息: {str(e)}")
-
-            if hasattr(e, 'response') and e.response is not None:
-                log.error(f"响应状态码: {e.response.status_code}")
-                log.error(f"响应Headers:")
-                for key, value in e.response.headers.items():
-                    log.error(f"  {key}: {value}")
-                log.error(f"响应Body:")
-                try:
-                    resp_json = e.response.json()
-                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
-                except:
-                    log.error(e.response.text)
-            log.info("=" * 60)
+        log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
+        log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
+        log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
+        log.info("=" * 60)
 
     def mock_sp_status_update(self) -> None:
         """SP状态更新（调用 updateOffer 接口）"""
@@ -1635,6 +1819,7 @@ class DPUMockService:
         platform_offer_id_sql = f"""
             SELECT platform_offer_id FROM dpu_seller_center.dpu_manual_offer
             WHERE platform_seller_id = '{platform_seller_id}'
+            ORDER BY created_at DESC LIMIT 1
         """
 
         idempotency_key = self.db_executor.execute_sql(idempotency_key_sql)
@@ -1643,10 +1828,6 @@ class DPUMockService:
         if not idempotency_key:
             log.error(f"未查询到 idempotency_key，platform_seller_id: {platform_seller_id}")
             return
-        if not platform_offer_id:
-            log.error(f"未查询到 platform_offer_id，platform_seller_id: {platform_seller_id}")
-            return
-
         log.info(f"查询成功 | idempotency_key: {idempotency_key} | platform_offer_id: {platform_offer_id}")
 
         # 选择状态
@@ -1672,11 +1853,17 @@ class DPUMockService:
             prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
 
+        if send_status == "SUCCESS" and not platform_offer_id:
+            log.error(f"SUCCESS 场景需要 platform_offer_id，platform_seller_id: {platform_seller_id}")
+            return
+
+        payload_offer_id = platform_offer_id if send_status == "SUCCESS" else ""
+
         # 构建请求体
         payload = {
             "idempotencyKey": idempotency_key,
             "sendStatus": send_status,
-            "offerId": platform_offer_id,
+            "offerId": payload_offer_id,
             "reason": failure_reason
         }
 
@@ -1782,11 +1969,11 @@ class DPUMockService:
                     "failureReason": failure_reason,
                     "fundSource": "BankTransfer",
                     "paidOn": get_current_time(),
-                    "totalPaidAmount": {"currency": "USD", "amount": total_amount},
-                    "principalPaidAmount": {"currency": "USD", "amount": principal_amount},
-                    "interestPaidAmount": {"currency": "USD", "amount": interest_amount},
-                    "feePaidAmount": {"currency": "USD", "amount": 0.00},
-                    "outstandingAmount": {"currency": "USD", "amount": outstanding_amount}
+                    "totalPaidAmount": {"currency": self.preferred_currency, "amount": total_amount},
+                    "principalPaidAmount": {"currency": self.preferred_currency, "amount": principal_amount},
+                    "interestPaidAmount": {"currency": self.preferred_currency, "amount": interest_amount},
+                    "feePaidAmount": {"currency": self.preferred_currency, "amount": 0.00},
+                    "outstandingAmount": {"currency": self.preferred_currency, "amount": outstanding_amount}
                 }
             }
         )
@@ -1914,11 +2101,11 @@ class DPUMockService:
                     "failureReason": failure_reason,
                     "fundSource": "BankTransfer",
                     "paidOn": get_current_time(),
-                    "totalPaidAmount": {"currency": "USD", "amount": total_amount},
-                    "principalPaidAmount": {"currency": "USD", "amount": principal_amount},
-                    "interestPaidAmount": {"currency": "USD", "amount": interest_amount},
-                    "feePaidAmount": {"currency": "USD", "amount": 0.00},
-                    "outstandingAmount": {"currency": "USD", "amount": outstanding_amount}
+                    "totalPaidAmount": {"currency": self.preferred_currency, "amount": total_amount},
+                    "principalPaidAmount": {"currency": self.preferred_currency, "amount": principal_amount},
+                    "interestPaidAmount": {"currency": self.preferred_currency, "amount": interest_amount},
+                    "feePaidAmount": {"currency": self.preferred_currency, "amount": 0.00},
+                    "outstandingAmount": {"currency": self.preferred_currency, "amount": outstanding_amount}
                 }
             }
         )
@@ -2142,9 +2329,10 @@ def check_is_registered(phone_number: str, db_executor: DatabaseExecutor) -> boo
 
         # 校验3PL授权
         offer_id = db_executor.execute_sql(f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{merchant_id}' 
-            AND authorization_party = '3PL' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{merchant_id}'
+            AND authorization_party = '3PL'
+            AND status = 'ACTIVE'
             ORDER BY created_at DESC LIMIT 1
         """)
         if offer_id:
@@ -2183,17 +2371,28 @@ def main():
                 error_msg="请输入有效的已注册手机号（8位或11位数字）！"
             )
 
+        # 查询并打印用户信息
+        user_info = db_executor.execute_query(
+            f"SELECT merchant_id, prefer_finance_product_currency FROM dpu_users WHERE phone_number = '{phone_number}' LIMIT 1"
+        )
+        if user_info:
+            log.info(f"📱 手机号: {phone_number}")
+            log.info(f"🆔 Merchant ID: {user_info['merchant_id']}")
+            log.info(f"💰 偏好融资产品货币: {user_info['prefer_finance_product_currency']}")
+        else:
+            log.warning(f"⚠️ 未找到手机号 {phone_number} 的用户信息")
+
         # 初始化服务
         mock_service = DPUMockService(phone_number, db_executor)
 
-        # 主菜单配置（结构化管理，便于维护）- 移除了1(spapi授权)、5(创建psp记录)、14(清空缓存)选项
+        # 主菜单配置（结构化管理，便于维护）
         menu = """
 请输入要执行的操作：
 1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)
 4 - psp开始(psp_start)   5 - psp完成(psp_completed)  6 - 电子签(esign)
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
 10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
-13 - 系统事件通知
+13 - 系统事件通知       14 - psp开始（hsbc）      15 - psp完成（hsbc）
 q - 退出
 """
         operation_map = {
@@ -2209,7 +2408,9 @@ q - 退出
             "10": mock_service.mock_multi_shop_binding,
             "11": mock_service.mock_sp_status_update,
             "12": mock_service.mock_multi_shop_3pl_redirect,
-            "13": mock_service.mock_system_event_notification
+            "13": mock_service.mock_system_event_notification,
+            "14": mock_service.mock_psp_start_status_hsbc,
+            "15": mock_service.mock_psp_completed_status_hsbc
         }
 
         # 菜单循环

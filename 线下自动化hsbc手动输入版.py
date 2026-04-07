@@ -19,6 +19,7 @@ import time
 import os
 import random
 import logging
+import re
 import socket
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
@@ -45,7 +46,7 @@ _pause_manager = get_pause_manager()
 # ==============================================================================
 
 # ============================ 环境配置 ============================
-# 支持的环境：sit, uat, dev, preprod, local
+# 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
 ENV = "uat"
 
@@ -55,7 +56,15 @@ BASE_URL_DICT = {
     "dev": "https://dpu-gateway-dev.dowsure.com",
     "uat": "https://uat.api.expressfinance.business.hsbc.com",
     "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+    "reg": "https://dpu-gateway-reg.dowsure.com",
     "local": "http://192.168.11.3:8080"
+}
+
+# 金额配置（统一金额配置）
+AMOUNT_CONFIG = {
+    "underwritten_amount": "500000",
+    "approved_amount": 500000.00,
+    "esign_amount": 500000.00
 }
 
 # 数据库配置
@@ -92,6 +101,14 @@ DATABASE_CONFIG_DICT = {
         "port": 3306,
         "charset": "utf8mb4"
     },
+    "reg": {
+        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_reg",
+        "password": "r4asUYBX3R6LNdp",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4"
+    },
     "local": {
         "host": "localhost",
         "user": "root",
@@ -108,41 +125,13 @@ DEFAULT_TOKEN_DICT = {
     "uat": "mjx0FpE9gnTC3OTmrX7znQzIgXRNQwV4umkOhF5wVb6AJB0DuVwmqh6zxiwma4B",
     "dev": "",
     "preprod": "",
+    "reg": "",
     "local": ""
-}
-
-# 金额配置（每个环境的各种额度）
-AMOUNT_CONFIG = {
-    "sit": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "uat": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "dev": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "preprod": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "local": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    }
 }
 
 # 获取当前环境的基础URL和金额配置
 BASE_URL = BASE_URL_DICT.get(ENV, BASE_URL_DICT["uat"])
-CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG.get(ENV, AMOUNT_CONFIG["uat"])
+CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
 
 # 线下注册固定URL（根据环境切换）
 OFFLINE_SIGNUP_URL_DICT = {
@@ -150,6 +139,7 @@ OFFLINE_SIGNUP_URL_DICT = {
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
     "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/hsbc-dmf",
     "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/sign-up",
+    "reg": "https://expressfinance-dpu-reg.dowsure.com/en/",
 }
 OFFLINE_SIGNUP_URL = OFFLINE_SIGNUP_URL_DICT.get(ENV, OFFLINE_SIGNUP_URL_DICT["sit"])
 
@@ -213,7 +203,7 @@ LOCATORS = {
     # 密码设置页 - 使用绝对XPath路径（与线上流程一致）
     "PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[2]/div/div[1]/div/input"),
     "CONFIRM_PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[5]/div/div[1]/div/input"),
-    "SECURITY_QUESTION_DROPDOWN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div[1]/div[1]/div[1]/div[1]/input"),
+    "SECURITY_QUESTION_DROPDOWN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div/div[1]/div[1]/div[2]"),
     "SECURITY_ANSWER_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[4]/div/div[1]/div/input"),
     "EMAIL_ADDRESS_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[3]/div[2]/div/div[1]/div/input"),
     "AGREE_DECLARATION_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/label/span[1]/span"),
@@ -577,6 +567,9 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
+        preferred_currency = db.execute_sql(
+            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
+        ) or "USD"
         dpu_auth_token_seller_id = db.execute_sql(
             f"SELECT authorization_id FROM dpu_auth_token WHERE merchant_id = '{merchant_id}' AND authorization_party = 'SP' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -621,11 +614,11 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
                         "baseRateType": "FIXED",
                         "eSign": "PENDING",
                         "creditLimit": {
-                            "currency": "CNY",
-                            "underwrittenAmount": {"currency": "CNY", "amount": amount},
-                            "availableLimit": {"currency": "CNY", "amount": "0.00"},
-                            "signedLimit": {"currency": "CNY", "amount": "0.00"},
-                            "watermark": {"currency": "CNY", "amount": "0.00"}
+                            "currency": preferred_currency,
+                            "underwrittenAmount": {"currency": preferred_currency, "amount": amount},
+                            "availableLimit": {"currency": preferred_currency, "amount": "0.00"},
+                            "signedLimit": {"currency": preferred_currency, "amount": "0.00"},
+                            "watermark": {"currency": preferred_currency, "amount": "0.00"}
                         }
                     }
                 }
@@ -664,6 +657,9 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
+        preferred_currency = db.execute_sql(
+            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
+        ) or "USD"
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -704,13 +700,13 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
                         "maxtenor": 24,
                         "offerEndDate": "2024-10-15",
                         "offerStartDate": "2023-10-16",
-                        "approvedLimit": {"currency": "USD", "amount": amount},
-                        "warterMark": {"currency": "USD", "amount": 0.00},
-                        "signedLimit": {"currency": "USD", "amount": 0.00},
+                        "approvedLimit": {"currency": preferred_currency, "amount": amount},
+                        "warterMark": {"currency": preferred_currency, "amount": 0.00},
+                        "signedLimit": {"currency": preferred_currency, "amount": 0.00},
                         "feeOrCharge": {
                             "type": "PROCESSING_FEE",
                             "feeOrChargeDate": "2023-10-16",
-                            "netAmount": {"currency": "USD", "amount": 0.00}
+                            "netAmount": {"currency": preferred_currency, "amount": 0.00}
                         }
                     }
                 }
@@ -879,6 +875,9 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
+        preferred_currency = db.execute_sql(
+            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
+        ) or "USD"
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -901,7 +900,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
                     "lenderApprovedOfferId": lender_approved_offer_id,
                     "result": "SUCCESS",
                     "failureReason": None,
-                    "signedLimit": {"amount": amount, "currency": "USD"},
+                    "signedLimit": {"amount": amount, "currency": preferred_currency},
                     "lastUpdatedOn": get_local_time_str(),
                     "lastUpdatedBy": "esign_system"
                 }
@@ -1155,6 +1154,9 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
+        preferred_currency = db.execute_sql(
+            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
+        ) or "USD"
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -1190,7 +1192,7 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
                     "lastUpdatedOn": get_local_time_str(),
                     "lastUpdatedBy": "system",
                     "disbursement": {
-                        "loanAmount": {"currency": "USD", "amount": amount},
+                        "loanAmount": {"currency": preferred_currency, "amount": amount},
                         "rate": {"chargeBases": "Float", "baseRateType": "SOFR", "baseRate": "6.00", "marginRate": "0.00"},
                         "term": "120",
                         "termUnit": "Days",
@@ -1199,7 +1201,7 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
                     },
                     "repayment": {
                         "expectedRepaymentDate": "2026-06-21",
-                        "expectedRepaymentAmount": {"currency": "USD", "amount": amount},
+                        "expectedRepaymentAmount": {"currency": preferred_currency, "amount": amount},
                         "repaymentTerm": "90"
                     }
                 }
@@ -1495,7 +1497,77 @@ def upload_company_document(driver: webdriver.Remote, locator_key: str, doc_name
 # ==============================================================================
 # --- 7. 页面处理函数 ---
 # ==============================================================================
+def extract_sms_code_from_placeholders(placeholders: Any) -> Optional[str]:
+    """Extract a 6-digit verification code from placeholders."""
+    if placeholders is None:
+        return None
+    match = re.search(r"(?<!\d)(\d{6})(?!\d)", str(placeholders))
+    return match.group(1) if match else None
+
+
+def get_sms_verification_code(phone: str, max_attempts: int = 10, interval: float = 2.0) -> str:
+    """Fetch the latest SMS verification code from dpu_sms_record."""
+    fallback_code = CONFIG.VERIFICATION_CODE
+    sql = f"""
+        SELECT placeholders FROM dpu_sms_record
+        WHERE phone_number = '{phone}'
+        ORDER BY COALESCE(send_time, create_time) DESC
+        LIMIT 1
+    """
+
+    try:
+        db = get_global_db()
+        for attempt in range(1, max_attempts + 1):
+            placeholders = db.execute_sql(sql)
+            verification_code = extract_sms_code_from_placeholders(placeholders)
+            if verification_code:
+                logging.info(f"[DB] SMS code fetched on attempt {attempt}: {verification_code}")
+                return verification_code
+            if attempt < max_attempts:
+                time.sleep(interval)
+    except Exception as e:
+        logging.warning(f"[DB] Failed to fetch SMS code from dpu_sms_record: {e}")
+
+    logging.warning(f"[DB] SMS code not found, fallback to default code: {fallback_code}")
+    return fallback_code
+
+
 def handle_initial_registration(driver: webdriver.Remote, phone: str, email: str) -> Optional[str]:
+    logging.info("\n" + "=" * 50)
+    logging.info("Step 2: fill registration info")
+    logging.info("=" * 50)
+    safe_send_keys(driver, "PHONE_INPUT", phone, "phone number")
+
+    send_code_btn_xpath = "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[6]/div/button"
+    try:
+        send_code_btn = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+            EC.element_to_be_clickable((By.XPATH, send_code_btn_xpath))
+        )
+        try:
+            send_code_btn.click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", send_code_btn)
+        logging.info("[UI] Send verification code button clicked")
+        time.sleep(CONFIG.ACTION_DELAY)
+    except Exception as e:
+        logging.warning(f"[UI] Failed to click send verification code button: {e}")
+
+    verification_code = get_sms_verification_code(phone)
+    if len(verification_code) < 6:
+        verification_code = CONFIG.VERIFICATION_CODE
+
+    logging.info(f"[UI] Filling verification code: {verification_code}")
+    code_inputs = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_all_elements_located(LOCATORS["VERIFICATION_CODE_INPUTS"])
+    )
+    for i, code_input in enumerate(code_inputs):
+        if i < len(verification_code):
+            code_input.send_keys(verification_code[i])
+    logging.info("[UI] Verification code filled")
+
+    safe_click(driver, "REG_NEXT_BTN", "registration next button")
+    time.sleep(CONFIG.ACTION_DELAY * 3)
+    return handle_password_setup(driver, phone, email)
     """处理初始注册信息页面，返回从浏览器获取的token"""
     logging.info("\n" + "=" * 50)
     logging.info("步骤 2: 填写注册信息")
@@ -2246,8 +2318,8 @@ def run_offline_automation():
                 WHERE merchant_id IN (
                     SELECT merchant_id FROM dpu_users
                     WHERE phone_number = '{phone}'
-                    AND authorization_party = 'SP'
                 )
+                AND authorization_party = 'SP'
                 ORDER BY created_at DESC LIMIT 1
             """
             state = db.execute_sql(state_sql)
@@ -2275,6 +2347,7 @@ def run_offline_automation():
 
         auth_url = f"{sp_auth_url}?{urlencode(params)}"
         logging.info(f"[AUTH] SP授权URL: {auth_url}")
+        logging.info(f"[AUTH] selling_partner_id: {selling_partner_id}")
 
         # 在新窗口中打开SP授权URL
         try:
@@ -2358,6 +2431,8 @@ def run_offline_automation():
                     redirect_base = "https://uat.api.expressfinance.business.hsbc.com"
                 elif ENV == "preprod":
                     redirect_base = "https://preprod.api.expressfinance.business.hsbc.com"
+                elif ENV == "reg":
+                    redirect_base = "https://dpu-gateway-reg.dowsure.com"
                 else:
                     redirect_base = f"https://expressfinance-dpu-{ENV}.dowsure.com"
 

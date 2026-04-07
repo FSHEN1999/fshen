@@ -25,6 +25,7 @@ import time
 import os
 import random
 import logging
+import re
 import socket
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
@@ -43,6 +44,14 @@ from urllib.parse import urlencode
 # 暂停管理器：支持通过空格键暂停/继续脚本
 from pause_manager import get_pause_manager, StopScriptException
 
+# 导入新的辅助模块
+from db_helper import DatabaseHelper
+from locators import (
+    RegistrationPage, PasswordSetupPage, CompanyInfoPage, DirectorInfoPage,
+    BankAccountPage, ContactInfoPage, ApprovalPage, LandingPage, APILocators
+)
+import js_scripts
+
 # 全局暂停管理器实例
 _pause_manager = get_pause_manager()
 
@@ -51,7 +60,7 @@ _pause_manager = get_pause_manager()
 # ==============================================================================
 
 # ============================ 环境配置 ============================
-# 支持的环境：sit, uat, dev, preprod, local
+# 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
 ENV = "uat"
 
@@ -61,7 +70,15 @@ BASE_URL_DICT = {
     "dev": "https://dpu-gateway-dev.dowsure.com",
     "uat": "https://uat.api.expressfinance.business.hsbc.com",
     "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+    "reg": "https://dpu-gateway-reg.dowsure.com",
     "local": "http://192.168.11.3:8080"
+}
+
+# 金额配置（统一金额配置）
+AMOUNT_CONFIG = {
+    "underwritten_amount": "500000",
+    "approved_amount": 500000.00,
+    "esign_amount": 500000.00
 }
 
 # 数据库配置
@@ -98,6 +115,14 @@ DATABASE_CONFIG_DICT = {
         "port": 3306,
         "charset": "utf8mb4"
     },
+    "reg": {
+        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_reg",
+        "password": "r4asUYBX3R6LNdp",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4"
+    },
     "local": {
         "host": "localhost",
         "user": "root",
@@ -114,41 +139,13 @@ DEFAULT_TOKEN_DICT = {
     "uat": "mjx0FpE9gnTC3OTmrX7znQzIgXRNQwV4umkOhF5wVb6AJB0DuVwmqh6zxiwma4B",
     "dev": "",
     "preprod": "",
+    "reg": "",
     "local": ""
-}
-
-# 金额配置（每个环境的各种额度）
-AMOUNT_CONFIG = {
-    "sit": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "uat": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "dev": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "preprod": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    },
-    "local": {
-        "underwritten_amount": "500000",
-        "approved_amount": 500000.00,
-        "esign_amount": 500000.00
-    }
 }
 
 # 获取当前环境的基础URL和金额配置
 BASE_URL = BASE_URL_DICT.get(ENV, BASE_URL_DICT["uat"])
-CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG.get(ENV, AMOUNT_CONFIG["uat"])
+CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
 
 # 线下注册固定URL（根据环境切换）
 OFFLINE_SIGNUP_URL_DICT = {
@@ -156,6 +153,7 @@ OFFLINE_SIGNUP_URL_DICT = {
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
     "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/hsbc-dmf",
     "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/hsbc-dmf",
+    "reg": "https://expressfinance-dpu-reg.dowsure.com/en/",
 }
 OFFLINE_SIGNUP_URL = OFFLINE_SIGNUP_URL_DICT.get(ENV, OFFLINE_SIGNUP_URL_DICT["sit"])
 
@@ -219,7 +217,7 @@ LOCATORS = {
     # 密码设置页 - 使用绝对XPath路径（与线上流程一致）
     "PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[2]/div/div[1]/div/input"),
     "CONFIRM_PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[5]/div/div[1]/div/input"),
-    "SECURITY_QUESTION_DROPDOWN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div[1]/div[1]/div[1]/div[1]/input"),
+    "SECURITY_QUESTION_DROPDOWN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div/div[1]/div[1]/div[2]"),
     "SECURITY_ANSWER_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[4]/div/div[1]/div/input"),
     "EMAIL_ADDRESS_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[3]/div[2]/div/div[1]/div/input"),
     "AGREE_DECLARATION_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/label/span[1]/span"),
@@ -527,6 +525,28 @@ class DatabaseExecutor:
                 logging.error(f"❌ SQL执行失败: {e}, SQL: {sql[:100]}")
                 raise
 
+    def execute_sql_param(self, sql: str, params: tuple = ()) -> Optional[Any]:
+        """执行参数化SQL查询并返回单个结果（防止SQL注入，带自动重连）"""
+        for attempt in range(1, self.MAX_RECONNECT_ATTEMPTS + 1):
+            try:
+                self._ensure_connected()
+                self.cursor.execute(sql, params)
+                result = self.cursor.fetchone()
+                return result[0] if result else None
+            except OperationalError as e:
+                error_code = e.args[0]
+                if error_code in [2006, 2013, 10054] and attempt < self.MAX_RECONNECT_ATTEMPTS:
+                    logging.warning(f"⚠️ 数据库连接丢失 (错误码: {error_code}, 尝试 {attempt}/{self.MAX_RECONNECT_ATTEMPTS})")
+                    logging.info(f"⏳ {self.RECONNECT_DELAY}秒后重试...")
+                    time.sleep(self.RECONNECT_DELAY)
+                    self._connect_with_retry()
+                else:
+                    logging.error(f"❌ SQL执行失败: {e}, SQL: {sql[:100]}")
+                    raise
+            except Exception as e:
+                logging.error(f"❌ SQL执行失败: {e}, SQL: {sql[:100]}")
+                raise
+
     def close(self):
         """关闭数据库连接"""
         if self.cursor:
@@ -571,407 +591,6 @@ def close_global_db():
 # ==============================================================================
 # --- 6. Webhook请求函数 ---
 # ==============================================================================
-def send_underwritten_request(phone: str, amount: str = None) -> bool:
-    """发送核保完成请求 (underwrittenLimit.completed)"""
-    if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["underwritten_amount"]
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
-
-    try:
-        db = get_global_db()
-
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        dpu_auth_token_seller_id = db.execute_sql(
-            f"SELECT authorization_id FROM dpu_auth_token WHERE merchant_id = '{merchant_id}' AND authorization_party = 'SP' ORDER BY created_at DESC LIMIT 1;"
-        )
-        dpu_limit_application_id = db.execute_sql(
-            f"SELECT limit_application_unique_id FROM dpu_limit_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-
-        if not all([merchant_id, dpu_limit_application_id, application_unique_id]):
-            logging.error("❌ 数据库查询失败，缺少必要信息")
-            return False
-
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-
-        request_body = {
-            "data": {
-                "eventType": "underwrittenLimit.completed",
-                "eventId": generate_uuid(),
-                "eventMessage": "核保完成通知",
-                "enquiryUrl": "https://api.example.com/enquiry/123",
-                "datetime": get_utc_time(),
-                "details": {
-                    "merchantId": merchant_id,
-                    "dpuMerchantAccountId": [
-                        {"MerchantAccountId": dpu_auth_token_seller_id}] if dpu_auth_token_seller_id else [],
-                    "dpuLimitApplicationId": dpu_limit_application_id,
-                    "originalRequestId": "req_EFAL17621784619057169",
-                    "status": "APPROVED",
-                    "failureReason": None,
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "system",
-                    "lenderLoanId": "lloan_6001",
-                    "lenderRepaymentScheduled": "lrs_7001",
-                    "lenderCreditId": "lcredit_8001",
-                    "lenderRepaymentId": "lrepay_9001",
-                    "credit": {
-                        "marginRate": "2.5",
-                        "chargeBases": "Fixed",
-                        "baseRate": "3.5",
-                        "baseRateType": "FIXED",
-                        "eSign": "PENDING",
-                        "creditLimit": {
-                            "currency": "CNY",
-                            "underwrittenAmount": {"currency": "CNY", "amount": amount},
-                            "availableLimit": {"currency": "CNY", "amount": "0.00"},
-                            "signedLimit": {"currency": "CNY", "amount": "0.00"},
-                            "watermark": {"currency": "CNY", "amount": "0.00"}
-                        }
-                    }
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-
-        response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            logging.info(f"✅ 核保(underwritten)请求成功 - 响应: {response.text[:100]}...")
-            return True
-        else:
-            logging.error(f"❌ 核保请求失败 | 状态码: {response.status_code}")
-            logging.error(f"📋 完整响应内容:\n{response.text}")
-            return False
-
-    except Exception as e:
-        logging.error(f"❌ 核保请求异常: {e}")
-        return False
-
-
-def send_approved_request(phone: str, amount: float = None) -> bool:
-    """发送审批完成请求 (approvedoffer.completed)"""
-    if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["approved_amount"]
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
-
-    try:
-        db = get_global_db()
-
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-
-        if not all([merchant_id, application_unique_id]):
-            logging.error("❌ 数据库查询失败，缺少必要信息")
-            return False
-
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-
-        request_body = {
-            "data": {
-                "eventType": "approvedoffer.completed",
-                "eventId": generate_uuid(),
-                "eventMessage": "Application approval process completed successfully",
-                "enquiryUrl": "https://api.lender.com/enquiry/12345",
-                "datetime": get_utc_time(),
-                "details": {
-                    "merchantId": merchant_id,
-                    "dpuApplicationId": application_unique_id,
-                    "originalRequestId": " ",
-                    "status": "APPROVED",
-                    "failureReason": None,
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "system",
-                    "lenderApprovedOfferId": lender_approved_offer_id,
-                    "offer": {
-                        "rate": {
-                            "chargeBases": "Float",
-                            "baseRateType": "SOFR",
-                            "baseRate": "0.05",
-                            "marginRate": "0.02",
-                            "fixedRate": "0.07"
-                        },
-                        "term": 12,
-                        "termUnit": "Months",
-                        "mintenor": 3,
-                        "maxtenor": 24,
-                        "offerEndDate": "2024-10-15",
-                        "offerStartDate": "2023-10-16",
-                        "approvedLimit": {"currency": "USD", "amount": amount},
-                        "warterMark": {"currency": "USD", "amount": 0.00},
-                        "signedLimit": {"currency": "USD", "amount": 0.00},
-                        "feeOrCharge": {
-                            "type": "PROCESSING_FEE",
-                            "feeOrChargeDate": "2023-10-16",
-                            "netAmount": {"currency": "USD", "amount": 0.00}
-                        }
-                    }
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-
-        response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            logging.info(f"✅ 审批(approved)请求成功 - 响应: {response.text[:100]}...")
-            return True
-        else:
-            logging.error(f"❌ 审批请求失败 | 状态码: {response.status_code}")
-            logging.error(f"📋 完整响应内容:\n{response.text}")
-            return False
-
-    except Exception as e:
-        logging.error(f"❌ 审批请求异常: {e}")
-        return False
-
-
-def send_psp_start_request(phone: str) -> bool:
-    """发送PSP验证开始请求 (psp.verification.started)"""
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
-
-    try:
-        db = get_global_db()
-
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        dpu_auth_token_seller_id = db.execute_sql(
-            f"SELECT authorization_id FROM dpu_auth_token WHERE merchant_id = '{merchant_id}' AND authorization_party = 'SP' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-
-        if not all([merchant_id, application_unique_id]):
-            logging.error("❌ 数据库查询失败，缺少必要信息")
-            return False
-
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-
-        request_body = {
-            "data": {
-                "eventType": "psp.verification.started",
-                "eventId": generate_uuid(),
-                "eventMessage": "PSP验证已开始",
-                "enquiryUrl": "https://api.example.com/enquiry/psp/123",
-                "datetime": get_utc_time(),
-                "applicationId": "EFA17590311621044381",
-                "details": {
-                    "pspId": "pspId123457",
-                    "pspName": "AirWallex",
-                    "merchantAccountId": dpu_auth_token_seller_id,
-                    "merchantId": merchant_id,
-                    "lenderApprovedOfferId": lender_approved_offer_id,
-                    "result": "PROCESSING",
-                    "failureReason": None,
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "system_psp"
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-
-        response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            logging.info(f"✅ PSP开始请求成功 - 响应: {response.text[:100]}...")
-            return True
-        else:
-            logging.error(f"❌ PSP开始请求失败 | 状态码: {response.status_code}")
-            logging.error(f"📋 完整响应内容:\n{response.text}")
-            return False
-
-    except Exception as e:
-        logging.error(f"❌ PSP开始请求异常: {e}")
-        return False
-
-
-def send_psp_completed_request(phone: str) -> bool:
-    """发送PSP验证完成请求 (psp.verification.completed)"""
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
-
-    try:
-        db = get_global_db()
-
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        dpu_auth_token_seller_id = db.execute_sql(
-            f"SELECT authorization_id FROM dpu_auth_token WHERE merchant_id = '{merchant_id}' AND authorization_party = 'SP' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-
-        if not all([merchant_id, application_unique_id]):
-            logging.error("❌ 数据库查询失败，缺少必要信息")
-            return False
-
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-
-        request_body = {
-            "data": {
-                "eventType": "psp.verification.completed",
-                "eventId": generate_uuid(),
-                "eventMessage": "PSP验证已完成",
-                "enquiryUrl": "https://api.example.com/enquiry/psp/123",
-                "datetime": get_utc_time(),
-                "applicationId": "EFA17590311621044381",
-                "details": {
-                    "pspId": "pspId123457",
-                    "pspName": "AirWallex",
-                    "merchantAccountId": dpu_auth_token_seller_id,
-                    "merchantId": merchant_id,
-                    "lenderApprovedOfferId": lender_approved_offer_id,
-                    "result": "SUCCESS",
-                    "failureReason": None,
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "system_psp"
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-
-        response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            logging.info(f"✅ PSP完成请求成功 - 响应: {response.text[:100]}...")
-            return True
-        else:
-            logging.error(f"❌ PSP完成请求失败 | 状态码: {response.status_code}")
-            logging.error(f"📋 完整响应内容:\n{response.text}")
-            return False
-
-    except Exception as e:
-        logging.error(f"❌ PSP完成请求异常: {e}")
-        return False
-
-
-def send_esign_request(phone: str, amount: float = None) -> bool:
-    """发送电子签完成请求 (esign.completed)"""
-    if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["esign_amount"]
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
-
-    try:
-        db = get_global_db()
-
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-
-        if not all([merchant_id, application_unique_id]):
-            logging.error("❌ 数据库查询失败，缺少必要信息")
-            return False
-
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-
-        request_body = {
-            "data": {
-                "eventType": "esign.completed",
-                "eventId": generate_uuid(),
-                "eventMessage": "电子签章已完成",
-                "enquiryUrl": "https://api.example.com/enquiry/esign/456",
-                "datetime": get_utc_time(),
-                "details": {
-                    "merchantId": merchant_id,
-                    "lenderApprovedOfferId": lender_approved_offer_id,
-                    "result": "SUCCESS",
-                    "failureReason": None,
-                    "signedLimit": {"amount": amount, "currency": "USD"},
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "esign_system"
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-
-        response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            logging.info(f"✅ 电子签请求成功 - 响应: {response.text[:100]}...")
-            return True
-        else:
-            logging.error(f"❌ 电子签请求失败 | 状态码: {response.status_code}")
-            logging.error(f"📋 完整响应内容:\n{response.text}")
-            return False
-
-    except Exception as e:
-        logging.error(f"❌ 电子签请求异常: {e}")
-        return False
-
-
-def send_post_request(url: str, phone: str = None) -> bool:
-    """发送POST请求（用于关联店铺等操作）"""
-    try:
-        headers = {
-            "Content-Type": "application/json",
-        }
-        data = {"phone": phone} if phone else {}
-
-        # 记录请求的手机号
-        if phone:
-            logging.info(f"[API] 发送POST请求到: {url}")
-            logging.info(f"[API] 请求手机号: {phone}")
-
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            # 检查业务code
-            try:
-                response_data = response.json()
-                business_code = response_data.get("code")
-                if business_code == 200 or business_code == "200":
-                    logging.info(f"✅ POST请求成功 - 响应: {response.text[:100]}...")
-                    return True
-                else:
-                    logging.error(f"❌ POST请求业务失败 | code: {business_code} | message: {response_data.get('message')} | 响应: {response.text[:200]}...")
-                    return False
-            except:
-                # 无法解析JSON，按HTTP状态码判断
-                logging.info(f"✅ POST请求成功 - 响应: {response.text[:100]}...")
-                return True
-        else:
-            logging.warning(f"⚠️ POST请求失败 | 状态码: {response.status_code} | 响应: {response.text[:200]}...")
-            return False
-    except Exception as e:
-        logging.error(f"❌ POST请求异常: {e}")
-        return False
-
-
 def send_update_offer_request(phone: str) -> bool:
     """发送updateOffer请求 (SP完成后、3PL前)"""
     update_offer_url = f"{BASE_URL}/dpu-auth/amazon-sp/updateOffer"
@@ -980,20 +599,9 @@ def send_update_offer_request(phone: str) -> bool:
         db = get_global_db()
         selling_partner_id = f"spshouquanfs{phone}"
 
-        # 查询idempotencyKey和offerId
-        idempotency_sql = f"""
-            SELECT idempotency_key FROM dpu_seller_center.dpu_manual_offer
-            WHERE platform_seller_id = '{selling_partner_id}'
-            ORDER BY created_at DESC LIMIT 1
-        """
-        idempotency_key = db.execute_sql(idempotency_sql)
-
-        offer_id_sql = f"""
-            SELECT platform_offer_id FROM dpu_seller_center.dpu_manual_offer
-            WHERE platform_seller_id = '{selling_partner_id}'
-            ORDER BY created_at DESC LIMIT 1
-        """
-        offer_id = db.execute_sql(offer_id_sql)
+        # 使用DatabaseHelper和参数化查询获取idempotencyKey和offerId
+        idempotency_key = DatabaseHelper.get_idempotency_key(db, selling_partner_id)
+        offer_id = DatabaseHelper.get_platform_offer_id(db, selling_partner_id)
 
         if not all([idempotency_key, offer_id]):
             logging.error("❌ 数据库查询失败，缺少idempotencyKey或offerId")
@@ -1151,84 +759,81 @@ def poll_drawdown_status(phone: str, authorization_token: str = None, max_attemp
     return False
 
 
-def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> bool:
-    """发送放款完成请求 (disbursement.completed)"""
-    webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
+def send_system_events_request(phone: str) -> bool:
+    """发送INDICATIVE-OFFER系统事件通知"""
+    webhook_url = f"{BASE_URL}/dpu-openapi/notification/system-events"
 
     try:
         db = get_global_db()
 
-        merchant_id = db.execute_sql(
-            f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        application_unique_id = db.execute_sql(
-            f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
-        loan_id = db.execute_sql(
-            f"SELECT loan_id FROM dpu_drawdown WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
-        )
+        # 使用DatabaseHelper获取必要的ID信息
+        merchant_id = DatabaseHelper.get_merchant_id(db, phone)
+        application_unique_id = DatabaseHelper.get_application_unique_id(db, merchant_id)
+        fund_application_id = DatabaseHelper.get_fund_application_id(db, merchant_id)
 
-        if not all([merchant_id, application_unique_id, loan_id]):
+        if not all([merchant_id, application_unique_id, fund_application_id]):
             logging.error("❌ 数据库查询失败，缺少必要信息")
             return False
 
-        lender_approved_offer_id = f"lender-{application_unique_id}"
-        dpu_loan_id = loan_id
-        lender_loan_id = f"lender-{loan_id}"
+        # 固定的Authorization token (JWS格式)
+        authorization_token = (
+            "JWS eyJ2ZXIiOiIxLjAiLCJraWQiOiJCQzAwMDAxMTA2NyIsInR5cCI6IkpXVCIsImFsZyI6IlJTMjU2In0."
+            "eyJzdWIiOiJCQzAwMDAxMTA2NyIsImF1ZCI6IkdCQS1FQ09NTSIsInBheWxvYWRfaGFzaF9hbGciOiJTSEEtMjU2IiwicGF5bG9hZF9oYXNoIjoi"
+            "OWFkNjQyZmM4MGY1YmJkZTYwZDFhMmI1ZjJmMTJkNjY4OTJiZGQ4MGVlMzc4ODUzOTE4NTA2MmJkNjFjMzg5YyIsImlhdCI6"
+            "MTc2OTA3NjQ4OCwianRpIjoiYjQ1OWJjMWYtZWNkZi00Mjc4LWIwMjMtNTQ2YzM4Y2ZmNWRhIn0.ULI-b7nl8E1n4JXjCR7jAOY1maoUlL5_kBex-FHITC"
+            "fVa7VPRPPKRiU4RZhFlGVdRS1sJzGmlce4Gn0nidbWUISI7JzN-94N3GxMuMinVoLi6U_3SIH1a3Ykx4LdSACRL7DC2Jw1kcjKqgzaO-"
+            "30TnR4iR1JtwcUPqcmSII8CxoYDFrrMh-Hqwq16fvj92VcgkMQB_TPu0ZezwBus01YLetiA4wCkCk-1Jq4K5E8EImHzDUISAiHyDovQo79t37bTX18"
+            "ir0q1MvSqIgCDyMcb7-13REKXDjAE6AJKxprwE6RsrDULc0texMPra2j1PUdIfGGggsBjz0dlHDuaHXyCw"
+        )
+
+        # 生成唯一的请求ID
+        import uuid
+        correlation_id = str(uuid.uuid4()).replace("-", "")[:32]
+        idempotency_key = str(uuid.uuid4())
+        trust_token = "".join([random.choice("0123456789ABCDEF") for _ in range(16)])
 
         request_body = {
-            "data": {
-                "eventType": "disbursement.completed",
-                "eventId": generate_uuid(),
-                "eventMessage": "Disbursement completed",
-                "enquiryUrl": f"/loans?merchantId={merchant_id}&loanId=LEND1",
-                "datetime": get_utc_time(),
-                "details": {
-                    "merchantId": merchant_id,
-                    "lenderApprovedOfferId": lender_approved_offer_id,
-                    "dpuLoanId": dpu_loan_id,
-                    "lenderLoanId": lender_loan_id,
-                    "originalRequestId": "e37b91d056114e48a466b433934e2068",
-                    "lenderCreditId": "CR1",
-                    "lenderCompanyId": "LEND1",
-                    "lenderDrawdownId": "DRA1",
-                    "drawdownStatus": "APPROVED",
-                    "lastUpdatedOn": get_local_time_str(),
-                    "lastUpdatedBy": "system",
-                    "disbursement": {
-                        "loanAmount": {"currency": "USD", "amount": amount},
-                        "rate": {"chargeBases": "Float", "baseRateType": "SOFR", "baseRate": "6.00", "marginRate": "0.00"},
-                        "term": "120",
-                        "termUnit": "Days",
-                        "drawdownSuccessDate": time.strftime("%Y-%m-%d", time.localtime()),
-                        "actualDrawdownDate": time.strftime("%Y-%m-%d", time.localtime())
-                    },
-                    "repayment": {
-                        "expectedRepaymentDate": "2026-06-21",
-                        "expectedRepaymentAmount": {"currency": "USD", "amount": amount},
-                        "repaymentTerm": "90"
-                    }
-                }
+            "applicationUniqueId": application_unique_id,
+            "eventType": "INDICATIVE-OFFER",
+            "eventReceiver": "dpu",
+            "eventData": {
+                "thirdPartyCustomerId": merchant_id,
+                "applicationId": fund_application_id,
+                "eventTime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                "errorCode": "",
+                "errorMessage": ""
             }
         }
 
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Authorization": authorization_token,
+            "X-HSBC-Request-Correlation-Id": correlation_id,
+            "X-HSBC-E2E-Trust-Token": trust_token,
+            "X-HSBC-Request-Idempotency-Key": idempotency_key,
+            "X-HSBC-PROFILEID": "DPUSIT-B2B-P-2025-ACTIVE",
+            "Accept": "*/*",
+            "Funder-Resource": "HSBC",
+            "Content-Type": "application/json"
         }
+
+        logging.info(f"[SYSTEM-EVENTS] 发送INDICATIVE-OFFER通知...")
+        logging.info(f"   URL: {webhook_url}")
+        logging.info(f"   applicationUniqueId: {application_unique_id}")
+        logging.info(f"   fundApplicationId: {fund_application_id}")
+        logging.info(f"   thirdPartyCustomerId: {merchant_id}")
 
         response = requests.post(webhook_url, json=request_body, headers=headers, timeout=30)
 
         if response.status_code == 200:
-            logging.info(f"✅ 放款请求成功 - 响应: {response.text[:100]}...")
+            logging.info(f"✅ INDICATIVE-OFFER通知请求成功 - 响应: {response.text[:200]}...")
             return True
         else:
-            logging.error(f"❌ 放款请求失败 | 状态码: {response.status_code}")
+            logging.error(f"❌ INDICATIVE-OFFER通知请求失败 | 状态码: {response.status_code}")
             logging.error(f"📋 完整响应内容:\n{response.text}")
             return False
 
     except Exception as e:
-        logging.error(f"❌ 放款请求异常: {e}")
+        logging.error(f"❌ INDICATIVE-OFFER通知请求异常: {e}")
         return False
 
 
@@ -1501,7 +1106,77 @@ def upload_company_document(driver: webdriver.Remote, locator_key: str, doc_name
 # ==============================================================================
 # --- 7. 页面处理函数 ---
 # ==============================================================================
+def extract_sms_code_from_placeholders(placeholders: Any) -> Optional[str]:
+    """Extract a 6-digit verification code from placeholders."""
+    if placeholders is None:
+        return None
+    match = re.search(r"(?<!\d)(\d{6})(?!\d)", str(placeholders))
+    return match.group(1) if match else None
+
+
+def get_sms_verification_code(phone: str, max_attempts: int = 10, interval: float = 2.0) -> str:
+    """Fetch the latest SMS verification code from dpu_sms_record."""
+    fallback_code = CONFIG.VERIFICATION_CODE
+    sql = f"""
+        SELECT placeholders FROM dpu_sms_record
+        WHERE phone_number = '{phone}'
+        ORDER BY COALESCE(send_time, create_time) DESC
+        LIMIT 1
+    """
+
+    try:
+        db = get_global_db()
+        for attempt in range(1, max_attempts + 1):
+            placeholders = db.execute_sql(sql)
+            verification_code = extract_sms_code_from_placeholders(placeholders)
+            if verification_code:
+                logging.info(f"[DB] SMS code fetched on attempt {attempt}: {verification_code}")
+                return verification_code
+            if attempt < max_attempts:
+                time.sleep(interval)
+    except Exception as e:
+        logging.warning(f"[DB] Failed to fetch SMS code from dpu_sms_record: {e}")
+
+    logging.warning(f"[DB] SMS code not found, fallback to default code: {fallback_code}")
+    return fallback_code
+
+
 def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optional[str]:
+    logging.info("\n" + "=" * 50)
+    logging.info("Step 2: fill registration info")
+    logging.info("=" * 50)
+    safe_send_keys(driver, "PHONE_INPUT", phone, "phone number")
+
+    send_code_btn_xpath = "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[6]/div/button"
+    try:
+        send_code_btn = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+            EC.element_to_be_clickable((By.XPATH, send_code_btn_xpath))
+        )
+        try:
+            send_code_btn.click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", send_code_btn)
+        logging.info("[UI] Send verification code button clicked")
+        time.sleep(CONFIG.ACTION_DELAY)
+    except Exception as e:
+        logging.warning(f"[UI] Failed to click send verification code button: {e}")
+
+    verification_code = get_sms_verification_code(phone)
+    if len(verification_code) < 6:
+        verification_code = CONFIG.VERIFICATION_CODE
+
+    logging.info(f"[UI] Filling verification code: {verification_code}")
+    code_inputs = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_all_elements_located(LOCATORS["VERIFICATION_CODE_INPUTS"])
+    )
+    for i, code_input in enumerate(code_inputs):
+        if i < len(verification_code):
+            code_input.send_keys(verification_code[i])
+    logging.info("[UI] Verification code filled")
+
+    safe_click(driver, "REG_NEXT_BTN", "registration next button")
+    time.sleep(CONFIG.ACTION_DELAY * 3)
+    return handle_password_setup(driver, phone)
     """处理初始注册信息页面，返回从浏览器获取的token"""
     logging.info("\n" + "=" * 50)
     logging.info("步骤 2: 填写注册信息")
@@ -2070,6 +1745,31 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 
+def _create_chrome_options(browser_name: str) -> ChromeOptions:
+    """创建Chrome系列浏览器的统一配置选项"""
+    options = ChromeOptions()
+    
+    # 公共参数
+    options.add_argument("--incognito")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    
+    # 360浏览器特定参数
+    if browser_name == "360":
+        options.add_argument("--remote-debugging-port=9222")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--disable-sync")
+        options.add_argument("--metrics-recording-only")
+        options.add_argument("--mute-audio")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
+    
+    return options
+
+
 def init_browser(browser_name: str) -> webdriver.Remote:
     """根据浏览器名称初始化并返回一个浏览器驱动实例（均为无痕模式）"""
     browser_name = browser_name.upper()
@@ -2079,22 +1779,22 @@ def init_browser(browser_name: str) -> webdriver.Remote:
     config = BROWSER_CONFIG[browser_name]
     logging.info(f"[Browser] 正在初始化 {browser_name} 浏览器 (无痕模式)...")
 
+    # 处理Chrome系列浏览器（Chrome、QQ、360、Edge）
     if browser_name in ["CHROME", "QQ", "360", "EDGE"]:
-        options = ChromeOptions() if browser_name != "EDGE" else EdgeOptions()
-        options.add_argument("--incognito")
         if browser_name == "EDGE":
+            options = EdgeOptions()
             options.add_argument("--inprivate")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-
+        else:
+            options = _create_chrome_options(browser_name)
+        
+        # 配置浏览器路径（如果指定了）
         if config["binary_path"] and os.path.exists(config["binary_path"]):
             options.binary_location = config["binary_path"]
             logging.info(f"[Browser] 使用指定的浏览器路径: {config['binary_path']}")
         elif config["binary_path"]:
             logging.warning(f"[Browser] 配置的浏览器路径不存在: {config['binary_path']}，将尝试使用默认路径。")
 
-        # QQ浏览器
+        # 处理QQ浏览器驱动
         if browser_name == "QQ":
             qq_driver_path = r"C:\WebDrivers\chromedriver_123.exe"
             if not os.path.exists(qq_driver_path):
@@ -2108,7 +1808,7 @@ def init_browser(browser_name: str) -> webdriver.Remote:
             service = ChromeService(executable_path=qq_driver_path)
             return webdriver.Chrome(service=service, options=options)
 
-        # 360浏览器
+        # 处理360浏览器驱动
         if browser_name == "360":
             se_driver_path = r"C:\WebDrivers\chromedriver_132.exe"
             if not os.path.exists(se_driver_path):
@@ -2119,23 +1819,16 @@ def init_browser(browser_name: str) -> webdriver.Remote:
                     f"请从 https://googlechromelabs.github.io/chrome-for-testing/ 下载 ChromeDriver 132\n"
                     f"并将其放置到: C:\\WebDrivers\\chromedriver_132.exe"
                 )
-            options.add_argument("--remote-debugging-port=9222")
-            options.add_argument("--disable-extensions")
-            options.add_argument("--disable-background-networking")
-            options.add_argument("--disable-default-apps")
-            options.add_argument("--disable-sync")
-            options.add_argument("--metrics-recording-only")
-            options.add_argument("--mute-audio")
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option("useAutomationExtension", False)
             service = ChromeService(executable_path=se_driver_path)
             return webdriver.Chrome(service=service, options=options)
 
+        # 处理Chrome和Edge（使用系统默认驱动）
         if browser_name == "CHROME":
             return webdriver.Chrome(options=options)
         elif browser_name == "EDGE":
             return webdriver.Edge(options=options)
 
+    # 处理Firefox浏览器
     elif browser_name == "FIREFOX":
         options = FirefoxOptions()
         options.add_argument("--private")
@@ -2238,8 +1931,8 @@ def run_offline_automation():
                 WHERE merchant_id IN (
                     SELECT merchant_id FROM dpu_users
                     WHERE phone_number = '{phone}'
-                    AND authorization_party = 'SP'
                 )
+                AND authorization_party = 'SP'
                 ORDER BY created_at DESC LIMIT 1
             """
             state = db.execute_sql(state_sql)
@@ -2267,6 +1960,7 @@ def run_offline_automation():
 
         auth_url = f"{sp_auth_url}?{urlencode(params)}"
         logging.info(f"[AUTH] SP授权URL: {auth_url}")
+        logging.info(f"[AUTH] selling_partner_id: {selling_partner_id}")
 
         # 在新窗口中打开SP授权URL
         try:
@@ -2350,6 +2044,8 @@ def run_offline_automation():
                     redirect_base = "https://uat.api.expressfinance.business.hsbc.com"
                 elif ENV == "preprod":
                     redirect_base = "https://preprod.api.expressfinance.business.hsbc.com"
+                elif ENV == "reg":
+                    redirect_base = "https://dpu-gateway-reg.dowsure.com"
                 else:
                     redirect_base = f"https://expressfinance-dpu-{ENV}.dowsure.com"
 
@@ -2414,88 +2110,23 @@ def run_offline_automation():
         # 检查暂停（按空格键暂停/继续）
         _pause_manager.check_pause()
 
-        # --- 步骤 7: 发起核保→审批→点击按钮→PSP→电子签 ---
-        # 流程开始前提供用户确认
-        print("\n" + "=" * 60)
-        print("⚠️  即将开始步骤 7: 发起核保→审批→点击按钮→PSP→电子签")
-        print("=" * 60)
-        print("📋 此步骤将执行以下操作:")
-        print("   1. 发送核保请求 (underwritten)")
-        print("   2. 发送审批请求 (approved)")
-        print("   3. 点击激活额度按钮")
-        print("   4. 点击接受按钮")
-        print("   5. 发送PSP验证开始请求")
-        print("   6. 发送PSP验证完成请求")
-        print("   7. 发送电子签完成请求")
-        print("=" * 60)
-        
-        while True:
-            user_input = input("请输入 1 确认开始步骤 7，或按其他键跳过: ").strip()
-            if user_input == "1":
-                print("✅ 已确认，开始执行步骤 7...")
-                break
-            else:
-                print("⏭️  跳过步骤 7，继续后续流程...")
-                submitted_success = False  # 设置为False以跳过步骤7
-                break
-        
+        # --- 步骤 7: 获取到SUBMITTED后调用system-events接口 ---
         if submitted_success:
             logging.info("\n" + "=" * 50)
-            logging.info("步骤 7: 发起核保→审批→点击按钮→PSP→电子签")
+            logging.info("步骤 7: 调用system-events接口发送INDICATIVE-OFFER通知")
             logging.info("=" * 50)
 
-            # 1. 核保请求
             time.sleep(3)
-            if send_underwritten_request(phone):
-                logging.info("✅ 核保请求成功！")
+
+            # 调用system-events接口
+            if send_system_events_request(phone):
+                logging.info("✅ INDICATIVE-OFFER通知发送成功！")
             else:
-                logging.error("❌ 核保请求失败！")
-                return
+                logging.error("❌ INDICATIVE-OFFER通知发送失败！")
 
-            # 2. 审批请求
-            time.sleep(3)
-            if send_approved_request(phone):
-                logging.info("✅ 审批请求成功！")
-
-                # 3. 点击激活额度按钮
-                time.sleep(5)
-                safe_click(driver, "ACTIVATE_CREDIT_BTN", "激活额度按钮")
-                logging.info("✅ 已点击激活额度按钮")
-
-                # 4. 点击接受按钮
-                time.sleep(5)
-                safe_click(driver, "ACCEPT_BTN", "接受按钮")
-                logging.info("✅ 已点击接受按钮")
-
-                # 5. PSP开始请求
-                time.sleep(5)
-                logging.info("\n[5/6] 发送PSP验证开始请求...")
-                if send_psp_start_request(phone):
-                    logging.info("✅ PSP开始请求成功！")
-                else:
-                    logging.error("❌ PSP开始请求失败！")
-
-                # 6. PSP完成请求
-                time.sleep(5)
-                logging.info("\n[6/6] 发送PSP验证完成请求...")
-                if send_psp_completed_request(phone):
-                    logging.info("✅ PSP完成请求成功！")
-                else:
-                    logging.error("❌ PSP完成请求失败！")
-
-                # 7. 电子签请求
-                time.sleep(5)
-                logging.info("\n[7/7] 发送电子签完成请求...")
-                if send_esign_request(phone):
-                    logging.info("✅ 电子签请求成功！")
-                else:
-                    logging.error("❌ 电子签请求失败！")
-
-                logging.info("\n" + "=" * 50)
-                logging.info("🎉 核保、审批、PSP和电子签请求已完成！")
-                logging.info("=" * 50)
-            else:
-                logging.error("❌ 审批请求失败！")
+            logging.info("\n" + "=" * 50)
+            logging.info("🎉 INDICATIVE-OFFER通知流程已完成！")
+            logging.info("=" * 50)
         else:
             logging.warning("⚠️ 信用报价状态未达到SUBMITTED，跳过后续流程")
 
@@ -2527,14 +2158,33 @@ def run_offline_automation():
             driver.save_screenshot(error_screenshot_path)
             logging.error(f"📸 错误状态截图已保存至: {os.path.abspath(error_screenshot_path)}")
     finally:
+        """
+        资源清理:
+        1. 关闭全局数据库连接
+        2. 关闭浏览器驱动
+        """
+        # 关闭全局数据库连接
+        try:
+            close_global_db()
+            logging.info("✅ 全局数据库连接已关闭")
+        except Exception as e:
+            logging.warning(f"⚠️ 关闭数据库时出错: {e}")
+        
+        # 保持浏览器打开，等待用户手动关闭或按Ctrl+C
         if driver:
             try:
+                logging.info("\n[流程] 浏览器保持打开状态，请按 Ctrl+C 关闭...")
                 while True:
                     time.sleep(60)
             except KeyboardInterrupt:
                 logging.info("\n[流程] 用户手动中断，正在关闭浏览器...")
-                driver.quit()
-                logging.info("[流程] 浏览器已关闭。")
+                try:
+                    driver.quit()
+                    logging.info("✅ 浏览器已关闭")
+                except Exception as e:
+                    logging.warning(f"⚠️ 关闭浏览器时出错: {e}")
+            except Exception as e:
+                logging.warning(f"⚠️ 浏览器保持打开时出错: {e}")
 
 
 # ==============================================================================
