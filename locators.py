@@ -64,7 +64,7 @@ class DirectorInfoPage:
 
 class BankAccountPage:
     """银行账户信息页面元素定位"""
-    BANK_SELECT_CONTAINER = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[1]")
+    BANK_SELECT_CONTAINER = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[3]/div/div/div/div[1]")
     BANK_SELECT_DROPDOWN = (By.XPATH, "//input[contains(@class, 'el-select__input') and @role='combobox']")
     BANK_SELECT_OPTIONS = (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]")
     BANK_ACCOUNT_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[4]/div/div/div/input")

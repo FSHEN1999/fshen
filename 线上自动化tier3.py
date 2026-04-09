@@ -53,7 +53,7 @@ _pause_manager = get_pause_manager()
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
-ENV = "uat"
+ENV = "reg"
 
 # 基础URL映射（参考mock_sit.py）
 BASE_URL_DICT = {
@@ -197,7 +197,7 @@ class AppConfig:
 
     # Selenium配置
     WAIT_TIMEOUT: int = 30  # 元素等待超时时间（秒）
-    ACTION_DELAY: float = 1.5  # 操作间延迟（秒），提高稳定性
+    ACTION_DELAY: float = 0.5  # 操作间延迟（秒），兼顾稳定性与执行速度
     VERIFICATION_CODE: str = "666666"  # 固定验证码
     # 新增：密码设置页配置
     PASSWORD: str = "Aa11111111.."  # 密码
@@ -255,7 +255,7 @@ LOCATORS = {
 
     # 银行账户信息页
     # 银行选择主定位器（精准定位）
-    "BANK_SELECT_CONTAINER": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[1]"),
+    "BANK_SELECT_CONTAINER": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[3]/div/div/div/div[1]"),
     "BANK_SELECT_DROPDOWN": (By.XPATH, "//input[contains(@class, 'el-select__input') and @role='combobox']"),
     "BANK_SELECT_OPTIONS": (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]"),
     "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[4]/div/div/div/input"),
@@ -1203,8 +1203,7 @@ def safe_click(driver: webdriver.Remote, locator_key: str, action_description: s
             raise Exception(f"无法通过任何定位器找到元素: {action_description}")
 
         # 滚动到元素可见
-        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-        time.sleep(CONFIG.ACTION_DELAY)
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
 
         # 尝试点击
         try:
@@ -1400,7 +1399,9 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
             code_inputs[i].send_keys(char)
     time.sleep(CONFIG.ACTION_DELAY)
     safe_click(driver, "REG_NEXT_BTN", "registration next button")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_element_located(LOCATORS["PASSWORD_INPUT"])
+    )
     return handle_password_setup(driver, phone)
     """第三步：处理初始注册信息页面，返回从浏览器获取的token"""
     logging.info("\n" + "=" * 50)
@@ -1421,7 +1422,9 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
     # safe_click(driver, "REGISTER_BTN", "立即注册按钮")
     # 新增：点击注册页面的下一步按钮
     safe_click(driver, "REG_NEXT_BTN", "注册页面下一步按钮")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_element_located(LOCATORS["PASSWORD_INPUT"])
+    )
 
     # 新增：处理密码设置页，并获取token
     auth_token = handle_password_setup(driver, phone)
@@ -1465,11 +1468,49 @@ def handle_password_setup(driver: webdriver.Remote, phone: str) -> Optional[str]
 
     # 8. 点击最终注册按钮
     safe_click(driver, "FINAL_REGISTER_BTN", "注册按钮")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
 
     # 8. 从浏览器获取token
-    auth_token = get_token_from_browser(driver)
+    auth_token = wait_for_browser_token(driver)
     return auth_token
+
+
+def wait_for_browser_token(driver: webdriver.Remote, max_attempts: int = 8, interval: float = 0.3) -> Optional[str]:
+    """短轮询浏览器存储中的token，替代固定等待。"""
+    for attempt in range(1, max_attempts + 1):
+        auth_token = get_token_from_browser(driver)
+        if auth_token:
+            return auth_token
+        if attempt < max_attempts:
+            time.sleep(interval)
+    return None
+
+
+def wait_for_sp_auth_state(phone: str, max_attempts: int = 15, interval: float = 1.0) -> Optional[str]:
+    """轮询等待SP授权state入库，替代固定等待。"""
+    try:
+        db = get_global_db()
+        state_sql = f"""
+            SELECT state FROM dpu_auth_token
+            WHERE merchant_id IN (
+                SELECT merchant_id FROM dpu_users
+                WHERE phone_number = '{phone}'
+            )
+            AND authorization_party = 'SP'
+            ORDER BY created_at DESC LIMIT 1
+        """
+
+        for attempt in range(1, max_attempts + 1):
+            state = db.execute_sql(state_sql)
+            if state:
+                logging.info(f"✅ 查询到state: {state}（尝试 {attempt}/{max_attempts}）")
+                return state
+            if attempt < max_attempts:
+                time.sleep(interval)
+    except Exception as e:
+        logging.error(f"❌ 查询state失败: {e}")
+        return None
+
+    return None
 
 
 def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
@@ -1525,7 +1566,8 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
         if not has_valid_global_currency():
             update_global_currency_from_mapping(local_storage, "localStorage")
         for key, value in local_storage.items():
-            logging.info(f"  - {key}: {value[:50] if len(value) > 50 else value}...")
+            value_text = "(null)" if value is None else str(value)
+            logging.info(f"  - {key}: {value_text[:50] if len(value_text) > 50 else value_text}...")
 
         for key in token_keys:
             if key in local_storage and local_storage[key]:
@@ -1560,7 +1602,8 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
         if not has_valid_global_currency():
             update_global_currency_from_mapping(session_storage, "sessionStorage")
         for key, value in session_storage.items():
-            logging.info(f"  - {key}: {value[:50] if len(value) > 50 else value}...")
+            value_text = "(null)" if value is None else str(value)
+            logging.info(f"  - {key}: {value_text[:50] if len(value_text) > 50 else value_text}...")
 
         for key in token_keys:
             if key in session_storage and session_storage[key]:
@@ -1650,8 +1693,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
         # 点击银行选择框
         logging.info("[UI] 点击银行选择框...")
         element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(LOCATORS["BANK_SELECT_CONTAINER"]))
-        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-        time.sleep(0.3)
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+        time.sleep(0.1)
         element.click()
         logging.info("[UI] 已点击银行选择框")
 
@@ -1721,8 +1764,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                 # 尝试直接点击第3个选项（跳过前两个）
                 if len(bank_options) > 2:
                     selected_option = bank_options[2]
-                    driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'nearest'});", selected_option)
-                    time.sleep(0.3)
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'nearest'});", selected_option)
+                    time.sleep(0.1)
                     try:
                         selected_option.click()
                         # 尝试获取文本（可能失败）
@@ -1758,8 +1801,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                 EC.visibility_of_element_located(LOCATORS["BANK_ACCOUNT_INPUT"])
             )
             # 确保元素可交互
-            driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", account_input)
-            time.sleep(0.3)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", account_input)
+            time.sleep(0.1)
             account_input.clear()
             account_input.send_keys(bank_account)
             logging.info(f"[UI] 已输入银行账号: {bank_account}")
@@ -2704,7 +2747,7 @@ def run_automation(url: str, phone: str, tier_name: str):
 
         driver = init_browser(selected_browser)
         driver.set_page_load_timeout(CONFIG.WAIT_TIMEOUT)
-        driver.implicitly_wait(CONFIG.WAIT_TIMEOUT)
+        driver.implicitly_wait(0)
 
         # --- 后续流程不变 ---
         logging.info(f"\n[UI] 正在访问URL: {url}")
@@ -2727,32 +2770,10 @@ def run_automation(url: str, phone: str, tier_name: str):
         logging.info("步骤 5/8: 完成SP授权请求")
         logging.info("=" * 50)
 
-        # 等待5秒，确保state已入库
-        logging.info("⏳ 等待5秒，确保state已入库...")
-        time.sleep(5)
-
-        # 1. 从数据库查询state
-        try:
-            db = get_global_db()
-            # 使用子查询获取SP授权的state
-            state_sql = f"""
-                SELECT state FROM dpu_auth_token
-                WHERE merchant_id IN (
-                    SELECT merchant_id FROM dpu_users
-                    WHERE phone_number = '{phone}'
-                )
-                AND authorization_party = 'SP'
-                ORDER BY created_at DESC LIMIT 1
-            """
-            state = db.execute_sql(state_sql)
-
-            if not state:
-                logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
-                return
-
-            logging.info(f"✅ 查询到state: {state}")
-        except Exception as e:
-            logging.error(f"❌ 查询state失败: {e}")
+        logging.info("⏳ 轮询等待state入库...")
+        state = wait_for_sp_auth_state(phone)
+        if not state:
+            logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
             return
 
         # 2. 构建SP授权URL

@@ -542,6 +542,20 @@ class DPUMockService:
         return f"lender-{self.application_unique_id}" if self.application_unique_id else "lender-default"
 
     @property
+    def credit_offer_lender_approved_offer_id(self) -> Optional[str]:
+        """从dpu_credit_offer查询已落库的lender_approved_offer_id"""
+        if not self.merchant_id or not self.application_unique_id:
+            return None
+
+        sql = f"""
+            SELECT lender_approved_offer_id FROM dpu_credit_offer
+            WHERE merchant_id = '{self.merchant_id}'
+              AND application_unique_id = '{self.application_unique_id}'
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_sql(sql)
+
+    @property
     def dpu_loan_id(self) -> Optional[str]:
         """获取dpu_loan_id"""
         sql = f"""
@@ -1248,12 +1262,19 @@ class DPUMockService:
             error_msg="请输入1或2！"
         )
         esign_status = DPUStatus.SUCCESS.value if status_input == "1" else DPUStatus.FAIL.value
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
 
         data = self._build_common_webhook_data(
             "esign.completed",
             esign_status,
             {
-                "lenderApprovedOfferId": self.lender_approved_offer_id,
+                "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
                 "result": esign_status,
                 "signedLimit": {"amount": signed_amount, "currency": self.preferred_currency}
             }
@@ -1336,6 +1357,13 @@ class DPUMockService:
             prompt = "请选择放款失败原因：\n" + "\n".join(
                 [f"{k}-{item.value[0]}({item.value[1]})" for k, item in enumerate(DrawdownFailureReason, 1)]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
 
         current_date = get_current_time("%Y-%m-%d")
         request_body = {
@@ -1347,7 +1375,7 @@ class DPUMockService:
                 "datetime": get_utc_time(),
                 "details": {
                     "merchantId": self.merchant_id or "de04dcca3dee4461a581e8ffed19612e",
-                    "lenderApprovedOfferId": self.lender_approved_offer_id,
+                    "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
                     "dpuLoanId": self.dpu_loan_id or "EFL17613857845725084",
                     "lenderLoanId": self.lender_loan_id or "lender-EFL17613857845725084",
                     "originalRequestId": "e37b91d056114e48a466b433934e2068",
@@ -1462,6 +1490,13 @@ class DPUMockService:
         if not sp_auth_info:
             return
         merchant_account_id = sp_auth_info["authorization_id"]
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
 
         data = self._build_common_webhook_data(
             event_type,
@@ -1471,7 +1506,7 @@ class DPUMockService:
                 "pspId": "pspId123457",
                 "pspName": "AirWallex",
                 "merchantAccountId": merchant_account_id,
-                "lenderApprovedOfferId": self.lender_approved_offer_id,
+                "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
                 "result": psp_status
             }
         )

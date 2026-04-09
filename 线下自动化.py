@@ -180,7 +180,7 @@ class Config:
 
     # Selenium配置
     WAIT_TIMEOUT: int = 30
-    ACTION_DELAY: float = 1.5
+    ACTION_DELAY: float = 0.5
     VERIFICATION_CODE: str = "666666"
 
     # 新增：密码设置页配置
@@ -239,10 +239,10 @@ LOCATORS = {
 
     # 银行账户信息页
     # 银行选择主定位器（精准定位）
-    "BANK_SELECT_CONTAINER": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[1]"),
+    "BANK_SELECT_CONTAINER": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[3]/div/div/div/div[1]"),
     "BANK_SELECT_DROPDOWN": (By.XPATH, "//input[contains(@class, 'el-select__input') and @role='combobox']"),
     "BANK_SELECT_OPTIONS": (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]"),
-    "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[5]/div/div/div/input"),
+    "BANK_ACCOUNT_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[4]/div/div/div/input"),
     # 银行选择备选定位器
     "BANK_SELECT_SVG_ICON": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[2]/i/svg"),
     "BANK_SELECT_DIV": (By.XPATH, "//div[contains(@class, 'el-select')]"),
@@ -1321,8 +1321,7 @@ def safe_click(driver: webdriver.Remote, locator_key: str, action_description: s
         if not element:
             raise Exception(f"无法通过任何定位器找到元素: {action_description}")
 
-        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-        time.sleep(CONFIG.ACTION_DELAY)
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
 
         try:
             element.click()
@@ -1562,7 +1561,9 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
     logging.info("[UI] Verification code filled")
 
     safe_click(driver, "REG_NEXT_BTN", "registration next button")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_element_located(LOCATORS["PASSWORD_INPUT"])
+    )
     return handle_password_setup(driver, phone)
     """处理初始注册信息页面，返回从浏览器获取的token"""
     logging.info("\n" + "=" * 50)
@@ -1579,7 +1580,9 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
 
     # 点击下一步
     safe_click(driver, "REG_NEXT_BTN", "注册页面下一步按钮")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.visibility_of_element_located(LOCATORS["PASSWORD_INPUT"])
+    )
 
     # 处理密码设置页，并获取token
     auth_token = handle_password_setup(driver, phone)
@@ -1634,11 +1637,49 @@ def handle_password_setup(driver: webdriver.Remote, phone: str) -> Optional[str]
 
     # 8. 点击注册按钮
     safe_click(driver, "FINAL_REGISTER_BTN", "注册按钮")
-    time.sleep(CONFIG.ACTION_DELAY * 3)
 
     # 7. 从浏览器获取token
-    auth_token = get_token_from_browser(driver)
+    auth_token = wait_for_browser_token(driver)
     return auth_token
+
+
+def wait_for_browser_token(driver: webdriver.Remote, max_attempts: int = 8, interval: float = 0.3) -> Optional[str]:
+    """短轮询浏览器存储中的token，替代固定等待。"""
+    for attempt in range(1, max_attempts + 1):
+        auth_token = get_token_from_browser(driver)
+        if auth_token:
+            return auth_token
+        if attempt < max_attempts:
+            time.sleep(interval)
+    return None
+
+
+def wait_for_sp_auth_state(phone: str, max_attempts: int = 15, interval: float = 1.0) -> Optional[str]:
+    """轮询等待SP授权state入库，替代固定等待。"""
+    try:
+        db = get_global_db()
+        state_sql = f"""
+            SELECT state FROM dpu_auth_token
+            WHERE merchant_id IN (
+                SELECT merchant_id FROM dpu_users
+                WHERE phone_number = '{phone}'
+            )
+            AND authorization_party = 'SP'
+            ORDER BY created_at DESC LIMIT 1
+        """
+
+        for attempt in range(1, max_attempts + 1):
+            state = db.execute_sql(state_sql)
+            if state:
+                logging.info(f"✅ 查询到state: {state}（尝试 {attempt}/{max_attempts}）")
+                return state
+            if attempt < max_attempts:
+                time.sleep(interval)
+    except Exception as e:
+        logging.error(f"❌ 查询state失败: {e}")
+        return None
+
+    return None
 
 
 def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
@@ -1860,8 +1901,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
         # 点击银行选择框
         logging.info("[UI] 点击银行选择框...")
         element = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(LOCATORS["BANK_SELECT_CONTAINER"]))
-        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
-        time.sleep(0.3)
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+        time.sleep(0.1)
         element.click()
         logging.info("[UI] 已点击银行选择框")
 
@@ -1931,8 +1972,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                 # 尝试直接点击第3个选项（跳过前两个）
                 if len(bank_options) > 2:
                     selected_option = bank_options[2]
-                    driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'nearest'});", selected_option)
-                    time.sleep(0.3)
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'nearest'});", selected_option)
+                    time.sleep(0.1)
                     try:
                         selected_option.click()
                         # 尝试获取文本（可能失败）
@@ -1985,8 +2026,8 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
 
             if is_interactable:
                 # 滚动到元素位置
-                driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", account_input)
-                time.sleep(0.5)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", account_input)
+                time.sleep(0.1)
                 # 使用JavaScript直接输入（更可靠）
                 driver.execute_script("""
                     arguments[0].focus();
@@ -2148,33 +2189,49 @@ def handle_bank_account_info(driver: webdriver.Remote, auto_fill: bool):
                     logging.info(f"[UI] 已通过最终备用方法输入银行账号: {bank_account} (索引: {result.get('index')})")
                     account_input_found = True
 
-        # 验证银行账号是否已成功输入（始终执行验证）
+        # 验证银行账号是否已成功输入（使用更宽松的验证逻辑）
         logging.info("[UI] 验证银行账号是否已输入...")
-        verify_js = f"""
+        bank_account_clean = bank_account.replace(' ', '').replace('-', '')
+        verify_js = f'''
         (function() {{
             var inputs = document.querySelectorAll('input');
-            for (var i = 0; i < inputs.length; i++) {{
-                if (inputs[i].value === '{bank_account}') {{
-                    return {{success: true, found: true, index: i}};
-                }}
-            }}
-            // 如果没找到，列出所有输入框的值用于调试
             var allValues = [];
             for (var i = 0; i < inputs.length; i++) {{
-                if (inputs[i].value && inputs[i].offsetParent !== null) {{
-                    allValues.push({{index: i, value: inputs[i].value, type: inputs[i].type}});
+                var value = inputs[i].value;
+                if (value) {{
+                    allValues.push({{index: i, value: value, type: inputs[i].type}});
+                    var cleanValue = value.replace(/\\s/g, '').replace(/-/g, '');
+                    if (cleanValue === '{bank_account_clean}') {{
+                        return {{success: true, found: true, value: value, method: 'exact', index: i}};
+                    }}
+                    if (cleanValue.includes('{bank_account_clean}') || '{bank_account_clean}'.includes(cleanValue)) {{
+                        return {{success: true, found: true, partial: true, value: value, method: 'partial', index: i}};
+                    }}
+                }}
+            }}
+            var spans = document.querySelectorAll('.el-input__inner');
+            for (var j = 0; j < spans.length; j++) {{
+                if (spans[j].value) {{
+                    var cleanValue = spans[j].value.replace(/\\s/g, '').replace(/-/g, '');
+                    if (cleanValue === '{bank_account_clean}' || cleanValue.includes('{bank_account_clean}')) {{
+                        return {{success: true, found: true, value: spans[j].value, method: 'el-input', index: j}};
+                    }}
                 }}
             }}
             return {{success: true, found: false, visibleValues: allValues}};
         }})();
-        """
+        '''
         result = driver.execute_script(verify_js)
         if result and result.get('found'):
-            logging.info(f"[UI] ✓ 验证成功：银行账号 {bank_account} 已在输入框中（索引: {result.get('index')}）")
+            match_type = "完全匹配" if not result.get('partial') else "部分匹配"
+            display_value = result.get('value', 'N/A')
+            method = result.get('method', 'unknown')
+            logging.info(f"[UI] 验证成功：银行账号 {match_type} ({method}) - 显示值: {display_value}")
             account_input_found = True
         else:
             visible_values = result.get('visibleValues', []) if result else []
-            logging.warning(f"[UI] ✗ 验证失败：银行账号 {bank_account} 未找到")
+            logging.warning(f"[UI] ⚠️ 自动验证未找到完全匹配的银行账号")
+            logging.warning(f"[UI] 💡 预期银行账号: {bank_account} (清理后: {bank_account_clean})")
             if visible_values:
                 logging.warning("[UI] 当前可见输入框的值:")
                 for v in visible_values[:5]:
@@ -2358,7 +2415,7 @@ def run_offline_automation():
 
         driver = init_browser(selected_browser)
         driver.set_page_load_timeout(CONFIG.WAIT_TIMEOUT)
-        driver.implicitly_wait(CONFIG.WAIT_TIMEOUT)
+        driver.implicitly_wait(0)
 
         # --- 步骤 2: 自动生成手机号 ---
         logging.info("\n" + "=" * 50)
@@ -2398,29 +2455,9 @@ def run_offline_automation():
         logging.info("步骤 6: 完成SP授权请求")
         logging.info("=" * 50)
 
-        time.sleep(5)
-
-        # 从数据库查询state
-        try:
-            db = get_global_db()
-            state_sql = f"""
-                SELECT state FROM dpu_auth_token
-                WHERE merchant_id IN (
-                    SELECT merchant_id FROM dpu_users
-                    WHERE phone_number = '{phone}'
-                )
-                AND authorization_party = 'SP'
-                ORDER BY created_at DESC LIMIT 1
-            """
-            state = db.execute_sql(state_sql)
-
-            if not state:
-                logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
-                return
-
-            logging.info(f"✅ 查询到state: {state}")
-        except Exception as e:
-            logging.error(f"❌ 查询state失败: {e}")
+        state = wait_for_sp_auth_state(phone)
+        if not state:
+            logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
             return
 
         # 构建SP授权URL
