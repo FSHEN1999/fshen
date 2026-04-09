@@ -19,6 +19,7 @@ import random
 import logging
 import re
 import socket
+import json
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
 from selenium import webdriver
@@ -41,7 +42,7 @@ from datetime import datetime, timedelta
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "reg"
 
 # 基础URL映射
 BASE_URL_DICT = {
@@ -128,7 +129,7 @@ CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
 
 # 线下注册固定URL（根据环境切换）
 OFFLINE_SIGNUP_URL_DICT = {
-    "sit": "https://expressfinance-dpu-sit.dowsure.com/en/sign-up-step1",
+    "sit": "https://expressfinance-dpu-sit.dowsure.com/en/",
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
     "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/sign-up",
     "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/sign-up",
@@ -455,6 +456,115 @@ class DatabaseExecutor:
 # --- 5. 全局数据库连接（单例模式） ---
 # ==============================================================================
 _global_db: Optional[DatabaseExecutor] = None
+_global_currency: Optional[str] = None  # 全局存储用户选择的融资产品货币，初始为空
+
+SUPPORTED_CURRENCIES = {"CNY", "USD"}
+CURRENCY_KEY_CANDIDATES = (
+    "product-currency", "productCurrency", "product_currency",
+    "preferredCurrency", "preferred_currency", "preferFinanceProductCurrency",
+    "financeProductCurrency", "finance_product_currency",
+    "currency", "Currency", "CURRENCY",
+    "selectedCurrency", "selected_currency",
+    "defaultCurrency", "default_currency",
+    "userCurrency", "user_currency",
+    "appCurrency", "app_currency",
+    "financingCurrency", "financing_currency",
+)
+CURRENCY_LOOKUP_KEYS = tuple(dict.fromkeys(key.strip().lower() for key in CURRENCY_KEY_CANDIDATES))
+
+
+def has_valid_global_currency() -> bool:
+    """判断全局货币是否已是可用值。"""
+    return _global_currency in SUPPORTED_CURRENCIES
+
+
+def normalize_currency_value(value: Any) -> Optional[str]:
+    """将不同来源的currency值规范化为支持的货币代码。"""
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in SUPPORTED_CURRENCIES:
+            return normalized
+
+        stripped = value.strip()
+        if stripped.startswith("{"):
+            try:
+                return normalize_currency_value(json.loads(stripped))
+            except (TypeError, json.JSONDecodeError):
+                return None
+        return None
+
+    if isinstance(value, dict):
+        normalized_mapping = {
+            str(key).strip().lower(): item
+            for key, item in value.items()
+            if isinstance(key, str)
+        }
+        for lookup_key in CURRENCY_LOOKUP_KEYS:
+            if lookup_key in normalized_mapping:
+                normalized = normalize_currency_value(normalized_mapping[lookup_key])
+                if normalized:
+                    return normalized
+        return None
+
+    return None
+
+
+def extract_currency_from_mapping(mapping: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """从headers/storage这类键值映射中提取currency，返回命中的键和值。"""
+    if not isinstance(mapping, dict):
+        return None
+
+    normalized_mapping: Dict[str, Any] = {}
+    original_key_map: Dict[str, str] = {}
+    for key, value in mapping.items():
+        if not isinstance(key, str):
+            continue
+        normalized_key = key.strip().lower()
+        if not normalized_key:
+            continue
+        normalized_mapping[normalized_key] = value
+        original_key_map.setdefault(normalized_key, key)
+
+    for lookup_key in CURRENCY_LOOKUP_KEYS:
+        if lookup_key not in normalized_mapping:
+            continue
+        normalized = normalize_currency_value(normalized_mapping[lookup_key])
+        if normalized:
+            return original_key_map.get(lookup_key, lookup_key), normalized
+
+    for normalized_key, value in normalized_mapping.items():
+        if "currency" not in normalized_key:
+            continue
+        normalized = normalize_currency_value(value)
+        if normalized:
+            return original_key_map.get(normalized_key, normalized_key), normalized
+
+    return None
+
+
+def update_global_currency_from_mapping(mapping: Dict[str, Any], source_name: str) -> bool:
+    """尝试从映射中更新全局currency，成功时记录命中来源。"""
+    global _global_currency
+
+    found_currency = extract_currency_from_mapping(mapping)
+    if not found_currency:
+        return False
+
+    matched_key, currency = found_currency
+    _global_currency = currency
+    logging.info(f"✅ 从{source_name}提取currency (键: {matched_key}): {_global_currency}")
+    return True
+
+
+def enable_network_currency_capture(driver: webdriver.Remote) -> bool:
+    """尽早开启Chromium网络监听，避免错过注册阶段的请求头。"""
+    try:
+        driver.execute_cdp_cmd("Network.enable", {})
+        logging.debug("[Browser] 已启用CDP Network监听")
+        return True
+    except Exception as e:
+        logging.debug(f"[Browser] 无法启用CDP Network监听: {e}")
+        return False
 
 def get_global_db() -> DatabaseExecutor:
     """获取全局数据库连接（单例模式）"""
@@ -498,9 +608,7 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = _global_currency or "USD"  # 使用从浏览器提取的全局货币值，缺省USD
         dpu_auth_token_seller_id = db.execute_sql(
             f"SELECT authorization_id FROM dpu_auth_token WHERE merchant_id = '{merchant_id}' AND authorization_party = 'SP' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -588,9 +696,7 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = _global_currency  # 使用从浏览器提取的全局货币值
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -806,9 +912,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = _global_currency or "USD"  # 使用从浏览器提取的全局货币值，缺省USD
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -1083,9 +1187,7 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = _global_currency or "USD"  # 使用从浏览器提取的全局货币值，缺省USD
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -1523,8 +1625,20 @@ def handle_password_setup(driver: webdriver.Remote, phone: str) -> Optional[str]
 
 
 def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
-    """从浏览器存储中获取授权token"""
-    logging.info("[Browser] 正在从浏览器存储中获取token...")
+    """从浏览器存储中获取授权token，同时提取currency"""
+    global _global_currency
+    
+    logging.info("[Browser] 正在从浏览器存储中获取token和currency...")
+
+    # 优先从请求头提取currency
+    if not has_valid_global_currency():
+        enable_network_currency_capture(driver)
+        currency_from_logs = extract_currency_from_network_logs(driver)
+        if currency_from_logs:
+            _global_currency = currency_from_logs
+            logging.info(f"✅ 从请求头提取currency: {_global_currency}")
+        else:
+            logging.info("[Browser] 本轮未从网络请求头提取到currency，继续尝试浏览器存储")
 
     token_keys = [
         'token', 'Token', 'TOKEN',
@@ -1539,7 +1653,7 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
         'auth', 'Auth',
         'sid', 'sessionId'
     ]
-
+    
     # 1. 尝试从 localStorage 获取
     try:
         local_storage = driver.execute_script("""
@@ -1552,7 +1666,14 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
             return items;
         """)
         logging.info(f"[Browser] localStorage键数量: {len(local_storage)}")
+        # 调试输出localStorage内容
+        logging.debug(f"[Browser] localStorage内容: {list(local_storage.keys())}")
+        
+        # 如果还未获取到currency，从localStorage提取
+        if not has_valid_global_currency():
+            update_global_currency_from_mapping(local_storage, "localStorage")
 
+        # 提取token
         for key in token_keys:
             if key in local_storage and local_storage[key]:
                 token_value = local_storage[key]
@@ -1582,6 +1703,15 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
             return items;
         """)
 
+        logging.info(f"[Browser] sessionStorage键数量: {len(session_storage)}")
+        # 调试输出sessionStorage内容
+        logging.debug(f"[Browser] sessionStorage内容: {list(session_storage.keys())}")
+
+        # 如果还未获取到currency，从sessionStorage提取
+        if not has_valid_global_currency():
+            update_global_currency_from_mapping(session_storage, "sessionStorage")
+
+        # 提取token
         for key in token_keys:
             if key in session_storage and session_storage[key]:
                 token_value = session_storage[key]
@@ -1610,8 +1740,11 @@ def handle_company_info(driver: webdriver.Remote, auto_fill: bool):
     logging.info("=" * 50)
     if auto_fill:
         logging.info("[流程] 选择自动填写公司信息...")
-        safe_send_keys(driver, "COMPANY_EN_NAME_INPUT", "fengshen test", "公司英文名称")
-        safe_send_keys(driver, "BUSINESS_REG_NO_INPUT", "00000001", "商业登记号(BRN)")
+        safe_send_keys(driver, "COMPANY_EN_NAME_INPUT", "测试有限公司", "公司中文名称")
+        currency = (_global_currency or "").upper()
+        brn_value = "91330201MA2AFFT07Q" if currency == "CNY" else "00000001"
+        logging.info(f"[货币] 当前货币: {currency}, BRN值: {brn_value}")
+        safe_send_keys(driver, "BUSINESS_REG_NO_INPUT", brn_value, "商业登记号(BRN)")
     else:
         logging.info("[流程] 跳过自动填写，请手动填写公司信息")
         input("填写完成后按回车继续...")
@@ -2063,14 +2196,10 @@ def init_browser(browser_name: str) -> webdriver.Remote:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
+        options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        if browser_name == "EDGE":
+            options.set_capability("ms:loggingPrefs", {"performance": "ALL"})
 
-        if config["binary_path"] and os.path.exists(config["binary_path"]):
-            options.binary_location = config["binary_path"]
-            logging.info(f"[Browser] 使用指定的浏览器路径: {config['binary_path']}")
-        elif config["binary_path"]:
-            logging.warning(f"[Browser] 配置的浏览器路径不存在: {config['binary_path']}，将尝试使用默认路径。")
-
-        # QQ浏览器
         if browser_name == "QQ":
             qq_driver_path = r"C:\WebDrivers\chromedriver_123.exe"
             if not os.path.exists(qq_driver_path):
@@ -2082,9 +2211,10 @@ def init_browser(browser_name: str) -> webdriver.Remote:
                     f"并将其放置到: C:\\WebDrivers\\chromedriver_123.exe"
                 )
             service = ChromeService(executable_path=qq_driver_path)
-            return webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=service, options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
-        # 360浏览器
         if browser_name == "360":
             se_driver_path = r"C:\WebDrivers\chromedriver_132.exe"
             if not os.path.exists(se_driver_path):
@@ -2105,12 +2235,18 @@ def init_browser(browser_name: str) -> webdriver.Remote:
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option("useAutomationExtension", False)
             service = ChromeService(executable_path=se_driver_path)
-            return webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=service, options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
         if browser_name == "CHROME":
-            return webdriver.Chrome(options=options)
+            driver = webdriver.Chrome(options=options)
+            enable_network_currency_capture(driver)
+            return driver
         elif browser_name == "EDGE":
-            return webdriver.Edge(options=options)
+            driver = webdriver.Edge(options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
     elif browser_name == "FIREFOX":
         options = FirefoxOptions()
@@ -2127,6 +2263,54 @@ def init_browser(browser_name: str) -> webdriver.Remote:
 
     else:
         raise ValueError(f"未知的浏览器类型: {browser_name}")
+
+
+def extract_currency_from_network_logs(driver: webdriver.Remote) -> Optional[str]:
+    """从浏览器性能日志中提取请求头中的currency"""
+    enable_network_currency_capture(driver)
+
+    for attempt in range(1, 4):
+        try:
+            logs = driver.get_log("performance")
+        except Exception as e:
+            logging.debug(f"[Browser] 浏览器不支持performance日志类型，跳过网络日志提取: {e}")
+            return None
+
+        if logs:
+            logging.info(f"[Browser] 第{attempt}次扫描performance日志，条数: {len(logs)}")
+
+        for entry in logs:
+            try:
+                message = json.loads(entry.get("message", "{}"))
+                payload = message.get("message", {})
+                method = payload.get("method")
+                params = payload.get("params", {})
+
+                if method == "Network.requestWillBeSent":
+                    headers = params.get("request", {}).get("headers", {})
+                    request_url = params.get("request", {}).get("url", "")
+                elif method == "Network.requestWillBeSentExtraInfo":
+                    headers = params.get("headers", {})
+                    request_url = params.get("associatedCookies", "")
+                else:
+                    continue
+
+                found_currency = extract_currency_from_mapping(headers)
+                if found_currency:
+                    matched_key, currency = found_currency
+                    logging.info(
+                        f"✅ 从网络日志提取currency: {currency} | method={method} | key={matched_key}"
+                    )
+                    if request_url:
+                        logging.debug(f"[Browser] 命中currency的请求: {request_url}")
+                    return currency
+            except Exception:
+                continue
+
+        if attempt < 3:
+            time.sleep(1)
+
+    return None
 
 
 # ==============================================================================

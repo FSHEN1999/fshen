@@ -41,6 +41,7 @@ BASE_URL_DICT = {
     "dev": "https://dpu-gateway-dev.dowsure.com",
     "uat": "https://uat.api.expressfinance.business.hsbc.com",
     "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+    "reg": "https://dpu-gateway-reg.dowsure.com",
     "local": "http://localhost:8080"
 }
 
@@ -77,6 +78,14 @@ DATABASE_CONFIG = {
         "host": "43.199.241.190",
         "user": "dpu_preprod",
         "password": "OWBSNfx8cC5c#Or0",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4"
+    },
+    "reg": {
+        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_reg",
+        "password": "r4asUYBX3R6LNdp",
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4"

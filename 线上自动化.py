@@ -22,6 +22,7 @@ import re
 import socket
 import subprocess  # 新增：用于关闭进程
 import uuid  # 新增：用于生成UUID
+import json
 from datetime import datetime, timedelta, date
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
@@ -50,7 +51,7 @@ _pause_manager = get_pause_manager()
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
-ENV = "sit"
+ENV = "uat"
 
 # 基础URL映射（参考mock_sit.py）
 BASE_URL_DICT = {
@@ -215,10 +216,7 @@ LOCATORS = {
     "CONFIRM_PASSWORD_INPUT": (By.XPATH,
                                "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[5]/div/div[1]/div/input"),
     "SECURITY_QUESTION_DROPDOWN": (By.XPATH,
-                                   "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div[1]/div[1]/div[1]/div[1]/input"),
-    # 新增：指定的安全问题选项定位器
-    "SPECIFIC_SECURITY_QUESTION_OPTION": (By.XPATH,
-                                          "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div/div[2]/div/div/div[1]/ul/li[4]/span"),
+                                   "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div/div[1]/div[1]/div[2]"),
     "SECURITY_ANSWER_INPUT": (By.XPATH,
                               "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[4]/div/div[1]/div/input"),
     "EMAIL_ADDRESS_INPUT": (By.XPATH,
@@ -655,10 +653,7 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
             f"SELECT limit_application_unique_id FROM dpu_limit_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
 
-        # 获取用户偏好货币
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = resolve_preferred_currency(db, merchant_id)
 
         if not all([merchant_id, dpu_limit_application_id]):
             logging.error("❌ 数据库查询失败，缺少必要信息")
@@ -752,10 +747,7 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
             logging.error("❌ 数据库查询失败，缺少必要信息")
             return False
 
-        # 获取用户偏好货币
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = resolve_preferred_currency(db, merchant_id)
 
         lender_approved_offer_id = f"lender-{application_unique_id}"
 
@@ -1000,10 +992,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
             logging.error("❌ 数据库查询失败，缺少必要信息")
             return False
 
-        # 获取用户偏好货币
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = resolve_preferred_currency(db, merchant_id)
 
         lender_approved_offer_id = f"lender-{application_unique_id}"
 
@@ -1078,10 +1067,7 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
             logging.error("❌ 数据库查询失败，缺少必要信息（merchant_id/application_unique_id/loan_id）")
             return False
 
-        # 获取用户偏好货币
-        preferred_currency = db.execute_sql(
-            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
-        ) or "USD"
+        preferred_currency = resolve_preferred_currency(db, merchant_id)
 
         lender_approved_offer_id = f"lender-{application_unique_id}"
         dpu_loan_id = loan_id
@@ -1340,25 +1326,22 @@ def upload_image(driver: webdriver.Remote, description: str):
 
 def select_specific_security_question(driver: webdriver.Remote):
     """
-    点击安全问题下拉框并选择指定的第4个选项
+    使用线下自动化相同的定位器与选择方式，展开后选择第一个安全问题选项
     """
     try:
-        # 点击下拉框展开选项
         safe_click(driver, "SECURITY_QUESTION_DROPDOWN", "安全问题下拉框")
         time.sleep(CONFIG.ACTION_DELAY)
 
-        # 等待选项加载并点击指定的安全问题选项
-        safe_click(driver, "SPECIFIC_SECURITY_QUESTION_OPTION", "指定的安全问题选项(第4项)")
-
-        # 获取选中的选项文本
-        selected_text = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
-            EC.visibility_of_element_located(LOCATORS["SPECIFIC_SECURITY_QUESTION_OPTION"])
-        ).text.strip()
+        first_option = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+            EC.element_to_be_clickable((By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')][1]"))
+        )
+        selected_text = first_option.text.strip()
+        first_option.click()
         logging.info(f"[UI] 已选择安全问题: {selected_text}")
 
         return selected_text
     except Exception as e:
-        logging.error(f"[UI] 选择指定安全问题选项时发生错误: {e}")
+        logging.error(f"[UI] 选择安全问题选项时发生错误: {e}")
         raise
 
 
@@ -1586,7 +1569,18 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
     Returns:
         Optional[str]: 授权token，失败返回None
     """
-    logging.info("[Browser] 正在从浏览器存储中获取token...")
+    global _global_currency
+
+    logging.info("[Browser] 正在从浏览器存储中获取token和currency...")
+
+    if not has_valid_global_currency():
+        enable_network_currency_capture(driver)
+        currency_from_logs = extract_currency_from_network_logs(driver)
+        if currency_from_logs:
+            _global_currency = currency_from_logs
+            logging.info(f"✅ 从请求头提取currency: {_global_currency}")
+        else:
+            logging.info("[Browser] 本轮未从网络请求头提取到currency，继续尝试浏览器存储")
 
     # 扩展的token键名列表（包含更多可能的后端变量命名）
     token_keys = [
@@ -1615,6 +1609,8 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
             return items;
         """)
         logging.info(f"[Browser] localStorage键数量: {len(local_storage)}")
+        if not has_valid_global_currency():
+            update_global_currency_from_mapping(local_storage, "localStorage")
         for key, value in local_storage.items():
             logging.info(f"  - {key}: {value[:50] if len(value) > 50 else value}...")
 
@@ -1648,6 +1644,8 @@ def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
             return items;
         """)
         logging.info(f"[Browser] sessionStorage键数量: {len(session_storage)}")
+        if not has_valid_global_currency():
+            update_global_currency_from_mapping(session_storage, "sessionStorage")
         for key, value in session_storage.items():
             logging.info(f"  - {key}: {value[:50] if len(value) > 50 else value}...")
 
@@ -2013,6 +2011,138 @@ def handle_financing_choice(driver: webdriver.Remote) -> bool:
 # --- 6. 全局数据库连接（单例模式） ---
 # ==============================================================================
 _global_db: Optional[DatabaseExecutor] = None
+_global_currency: Optional[str] = None  # 全局存储注册流程中识别到的融资产品货币
+
+SUPPORTED_CURRENCIES = {"CNY", "USD"}
+CURRENCY_KEY_CANDIDATES = (
+    "product-currency", "productCurrency", "product_currency",
+    "preferredCurrency", "preferred_currency", "preferFinanceProductCurrency",
+    "financeProductCurrency", "finance_product_currency",
+    "currency", "Currency", "CURRENCY",
+    "selectedCurrency", "selected_currency",
+    "defaultCurrency", "default_currency",
+    "userCurrency", "user_currency",
+    "appCurrency", "app_currency",
+    "financingCurrency", "financing_currency",
+)
+CURRENCY_LOOKUP_KEYS = tuple(dict.fromkeys(key.strip().lower() for key in CURRENCY_KEY_CANDIDATES))
+
+
+def has_valid_global_currency() -> bool:
+    """判断当前全局货币是否有效。"""
+    return _global_currency in SUPPORTED_CURRENCIES
+
+
+def normalize_currency_value(value: Any) -> Optional[str]:
+    """把不同来源的currency值归一化为标准货币代码。"""
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in SUPPORTED_CURRENCIES:
+            return normalized
+
+        stripped = value.strip()
+        if stripped.startswith("{"):
+            try:
+                return normalize_currency_value(json.loads(stripped))
+            except (TypeError, json.JSONDecodeError):
+                return None
+        return None
+
+    if isinstance(value, dict):
+        normalized_mapping = {
+            str(key).strip().lower(): item
+            for key, item in value.items()
+            if isinstance(key, str)
+        }
+        for lookup_key in CURRENCY_LOOKUP_KEYS:
+            if lookup_key in normalized_mapping:
+                normalized = normalize_currency_value(normalized_mapping[lookup_key])
+                if normalized:
+                    return normalized
+        return None
+
+    return None
+
+
+def extract_currency_from_mapping(mapping: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """从headers/storage映射里提取currency，返回命中的键和值。"""
+    if not isinstance(mapping, dict):
+        return None
+
+    normalized_mapping: Dict[str, Any] = {}
+    original_key_map: Dict[str, str] = {}
+    for key, value in mapping.items():
+        if not isinstance(key, str):
+            continue
+        normalized_key = key.strip().lower()
+        if not normalized_key:
+            continue
+        normalized_mapping[normalized_key] = value
+        original_key_map.setdefault(normalized_key, key)
+
+    for lookup_key in CURRENCY_LOOKUP_KEYS:
+        if lookup_key not in normalized_mapping:
+            continue
+        normalized = normalize_currency_value(normalized_mapping[lookup_key])
+        if normalized:
+            return original_key_map.get(lookup_key, lookup_key), normalized
+
+    for normalized_key, value in normalized_mapping.items():
+        if "currency" not in normalized_key:
+            continue
+        normalized = normalize_currency_value(value)
+        if normalized:
+            return original_key_map.get(normalized_key, normalized_key), normalized
+
+    return None
+
+
+def update_global_currency_from_mapping(mapping: Dict[str, Any], source_name: str) -> bool:
+    """尝试从映射中提取并更新全局currency。"""
+    global _global_currency
+
+    found_currency = extract_currency_from_mapping(mapping)
+    if not found_currency:
+        return False
+
+    matched_key, currency = found_currency
+    _global_currency = currency
+    logging.info(f"✅ 从{source_name}提取currency (键: {matched_key}): {_global_currency}")
+    return True
+
+
+def enable_network_currency_capture(driver: webdriver.Remote) -> bool:
+    """尽早开启Chromium网络监听，避免错过注册阶段请求头。"""
+    try:
+        driver.execute_cdp_cmd("Network.enable", {})
+        logging.debug("[Browser] 已启用CDP Network监听")
+        return True
+    except Exception as e:
+        logging.debug(f"[Browser] 无法启用CDP Network监听: {e}")
+        return False
+
+
+def resolve_preferred_currency(db: DatabaseExecutor, merchant_id: Optional[str]) -> str:
+    """优先使用浏览器抓到的currency，缺失时回退数据库。"""
+    global _global_currency
+
+    if has_valid_global_currency():
+        return _global_currency or "USD"
+
+    if not merchant_id:
+        return "USD"
+
+    preferred_currency = normalize_currency_value(
+        db.execute_sql(
+            f"SELECT prefer_finance_product_currency FROM dpu_users WHERE merchant_id = '{merchant_id}' LIMIT 1;"
+        )
+    )
+    if preferred_currency:
+        _global_currency = preferred_currency
+        logging.info(f"✅ 从数据库回退获取currency: {_global_currency}")
+        return preferred_currency
+
+    return "USD"
 
 
 def get_global_db() -> DatabaseExecutor:
@@ -2041,6 +2171,24 @@ def close_global_db():
             logging.warning(f"⚠️ 关闭数据库连接时出错: {e}")
         finally:
             _global_db = None
+
+
+def open_url_in_new_window(driver: webdriver.Remote, url: str, page_name: str) -> bool:
+    """通过浏览器新窗口访问URL，并保持当前窗口上下文不变。"""
+    try:
+        current_handle = driver.current_window_handle
+        previous_window_count = len(driver.window_handles)
+        driver.execute_script("window.open(arguments[0], '_blank');", url)
+        WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+            lambda d: len(d.window_handles) > previous_window_count
+        )
+        driver.switch_to.window(current_handle)
+        time.sleep(CONFIG.ACTION_DELAY)
+        logging.info(f"✅ {page_name}已在新窗口中打开")
+        return True
+    except Exception as e:
+        logging.warning(f"⚠️ {page_name}打开异常: {e}")
+        return False
 
 
 # ==============================================================================
@@ -2084,6 +2232,9 @@ def init_browser(browser_name: str) -> webdriver.Remote:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
+        options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        if browser_name == "EDGE":
+            options.set_capability("ms:loggingPrefs", {"performance": "ALL"})
 
         if config["binary_path"] and os.path.exists(config["binary_path"]):
             options.binary_location = config["binary_path"]
@@ -2108,7 +2259,9 @@ def init_browser(browser_name: str) -> webdriver.Remote:
                     f"并将其放置到: C:\\WebDrivers\\chromedriver_123.exe"
                 )
             service = ChromeService(executable_path=qq_driver_path)
-            return webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=service, options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
         # --- 为360浏览器指定特定的ChromeDriver (支持Chrome 132) ---
         if browser_name == "360":
@@ -2137,12 +2290,18 @@ def init_browser(browser_name: str) -> webdriver.Remote:
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option("useAutomationExtension", False)
             service = ChromeService(executable_path=se_driver_path)
-            return webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=service, options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
         if browser_name == "CHROME":
-            return webdriver.Chrome(options=options)
+            driver = webdriver.Chrome(options=options)
+            enable_network_currency_capture(driver)
+            return driver
         elif browser_name == "EDGE":
-            return webdriver.Edge(options=options)
+            driver = webdriver.Edge(options=options)
+            enable_network_currency_capture(driver)
+            return driver
 
     elif browser_name == "FIREFOX":
         options = FirefoxOptions()
@@ -2159,6 +2318,48 @@ def init_browser(browser_name: str) -> webdriver.Remote:
 
     else:
         raise ValueError(f"未知的浏览器类型: {browser_name}")
+
+
+def extract_currency_from_network_logs(driver: webdriver.Remote) -> Optional[str]:
+    """从浏览器性能日志中提取请求头中的currency。"""
+    enable_network_currency_capture(driver)
+
+    for attempt in range(1, 4):
+        try:
+            logs = driver.get_log("performance")
+        except Exception as e:
+            logging.debug(f"[Browser] 浏览器不支持performance日志类型，跳过网络日志提取: {e}")
+            return None
+
+        if logs:
+            logging.info(f"[Browser] 第{attempt}次扫描performance日志，条数: {len(logs)}")
+
+        for entry in logs:
+            try:
+                message = json.loads(entry.get("message", "{}"))
+                payload = message.get("message", {})
+                method = payload.get("method")
+                params = payload.get("params", {})
+
+                if method == "Network.requestWillBeSent":
+                    headers = params.get("request", {}).get("headers", {})
+                elif method == "Network.requestWillBeSentExtraInfo":
+                    headers = params.get("headers", {})
+                else:
+                    continue
+
+                found_currency = extract_currency_from_mapping(headers)
+                if found_currency:
+                    matched_key, currency = found_currency
+                    logging.info(f"✅ 从网络日志提取currency: {currency} | method={method} | key={matched_key}")
+                    return currency
+            except Exception:
+                continue
+
+        if attempt < 3:
+            time.sleep(1)
+
+    return None
 
 
 # ==============================================================================
@@ -2264,17 +2465,8 @@ def run_automation(url: str, phone: str, tier_name: str):
         logging.info(f"[AUTH] SP授权URL: {auth_url}")
         logging.info(f"[AUTH] selling_partner_id: {selling_partner_id}")
 
-        # 4. 发送GET请求完成SP授权
-        try:
-            logging.info("[AUTH] 正在发送SP授权GET请求...")
-            response = requests.get(auth_url, timeout=30)
-
-            if response.status_code == 200:
-                logging.info(f"✅ SP授权请求成功 - 响应: {response.text[:100]}...")
-            else:
-                logging.warning(f"⚠️ SP授权请求返回状态码: {response.status_code} | 响应: {response.text[:200]}...")
-        except Exception as e:
-            logging.warning(f"⚠️ SP授权请求异常: {e}")
+        logging.info("[AUTH] 正在新窗口中打开SP授权URL...")
+        open_url_in_new_window(driver, auth_url, "SP授权页面")
 
         auto_fill_company = get_yes_no_choice("[流程] 是否自动填写公司信息?")
         handle_company_info(driver, auto_fill_company)

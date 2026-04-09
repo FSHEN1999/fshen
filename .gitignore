@@ -1,0 +1,9 @@
+.rag_mvp/
+*.sqlite3
+*.db
+__pycache__/
+*.py[cod]
+.env
+error_screenshot_*.png
+register_*.txt
+.idea.pre_sync_backup_*/

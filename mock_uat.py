@@ -235,6 +235,16 @@ class DatabaseConfig:
             "connect_timeout": 1500,
             "read_timeout": 15,
         },
+        "reg": {
+            "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+            "user": "dpu_reg",
+            "password": "r4asUYBX3R6LNdp",
+            "database": "dpu_seller_center",
+            "port": 3306,
+            "charset": "utf8mb4",
+            "connect_timeout": 1500,
+            "read_timeout": 15,
+        },
         "local": {
             "host": "localhost",
             "user": "root",
@@ -414,6 +424,7 @@ class DPUMockService:
             "dev": "https://dpu-gateway-dev.dowsure.com",
             "uat": "https://uat.api.expressfinance.business.hsbc.com",
             "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+            "reg": "https://dpu-gateway-reg.dowsure.com",
             "local": "http://192.168.11.3:8080"
         }
         base_url = base_url_dict[self.db_executor.env]
@@ -632,6 +643,13 @@ class DPUMockService:
         return journey_map[input_with_validation(prompt, lambda x: x in journey_map)]
 
     @classmethod
+    def get_currency_by_input(cls) -> str:
+        """获取用户选择的融资产品货币（CNY/USD）"""
+        currency_map = {"1": "CNY", "2": "USD"}
+        prompt = "请输入融资产品货币：1-CNY 2-USD \n"
+        return currency_map[input_with_validation(prompt, lambda x: x in currency_map)]
+
+    @classmethod
     def _create_offer_id(cls, journey: str, api_config: ApiConfig) -> Optional[str]:
         """创建offer_id（按流程生成对应额度，创建后自动访问redirect_url使offer_id生效）"""
         journey_amount = {"200K": 100000, "500K": 800000, "2000K": 6000000}
@@ -681,6 +699,10 @@ class DPUMockService:
         journey = cls.get_journey_by_input()
         log.info(f"开始注册新账号，流程: {journey}")
 
+        # 获取用户选择的货币
+        currency = cls.get_currency_by_input()
+        log.info(f"融资产品货币: {currency}")
+
         # 生成账号信息
         phone_number = ''.join(filter(str.isdigit, faker.phone_number()))
         email = f"{phone_number}y@163doushabao.com"
@@ -692,6 +714,7 @@ class DPUMockService:
             "dev": "https://dpu-gateway-dev.dowsure.com",
             "uat": "https://uat.api.expressfinance.business.hsbc.com",
             "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+            "reg": "https://dpu-gateway-reg.dowsure.com",
             "local": "http://192.168.11.3:8080"
         }
         base_url = base_url_dict[ENV]
@@ -722,9 +745,12 @@ class DPUMockService:
         # 验证码验证
         validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
         headers = {
-            "accept": "application/json, */*",
+            "accept": "application/json, text/plain, */*",
             "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/143.0.0.0 Safari/537.36"
+            "product-currency": currency,
+            "finance-product": "LINE_OF_CREDIT",
+            "funder-resource": "FUNDPARK",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36"
         }
         payload = {"areaCode": "+86", "code": "666666", "phone": phone_number}
         try:
@@ -753,7 +779,8 @@ class DPUMockService:
             "confirmPassword": "Aa11111111..",
             "isAcceptMarketing": True,
             "securityQuestionCode": "SEC_Q_004",
-            "securityAnswer": "test"
+            "securityAnswer": "test",
+            "preferFinanceProductCurrency": currency
         }
 
         try:
@@ -762,6 +789,14 @@ class DPUMockService:
             resp_register = requests.post(
                 api_config.register_url,
                 json=register_payload,
+                headers={
+                    "accept": "application/json, text/plain, */*",
+                    "content-type": "application/json",
+                    "product-currency": currency,
+                    "finance-product": "LINE_OF_CREDIT",
+                    "funder-resource": "FUNDPARK",
+                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36"
+                },
                 timeout=30
             )
             resp_register.raise_for_status()

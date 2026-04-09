@@ -63,6 +63,16 @@ DATABASE_CONFIG = {
         "connect_timeout": 1500,
         "read_timeout": 15,
     },
+    "reg": {
+        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "user": "dpu_reg",
+        "password": "r4asUYBX3R6LNdp",
+        "database": "dpu_seller_center",
+        "port": 3306,
+        "charset": "utf8mb4",
+        "connect_timeout": 1500,
+        "read_timeout": 15,
+    },
     "dev": {
         "host": "localhost",
         "user": "root",
