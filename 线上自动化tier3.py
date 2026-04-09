@@ -65,12 +65,20 @@ BASE_URL_DICT = {
     "local": "http://192.168.11.3:8080"
 }
 
-# 金额配置（统一金额配置）
-AMOUNT_CONFIG = {
-    "underwritten_amount": "800000",
-    "approved_amount": 500000.00,
-    "approved_amount_2nd": 800000.00,
-    "esign_amount": 800000.00
+# 金额配置（按currency映射TIER3流程金额）
+FLOW_AMOUNT_CONFIG = {
+    "USD": {
+        "underwritten_amount": "800000",
+        "approved_amount": 500000.00,
+        "approved_amount_2nd": 800000.00,
+        "esign_amount": 800000.00,
+    },
+    "CNY": {
+        "underwritten_amount": "2000000",
+        "approved_amount": 1500000.00,
+        "approved_amount_2nd": 2000000.00,
+        "esign_amount": 2000000.00,
+    },
 }
 
 # 数据库配置（参考mock_sit.py）
@@ -135,17 +143,9 @@ DEFAULT_TOKEN_DICT = {
     "local": ""
 }
 
-# 金额配置（统一金额配置）
-AMOUNT_CONFIG = {
-    "underwritten_amount": "800000",
-    "approved_amount": 500000.00,
-    "approved_amount_2nd": 800000.00,
-    "esign_amount": 800000.00
-}
-
 # 获取当前环境的基础URL和金额配置
 BASE_URL = BASE_URL_DICT.get(ENV, BASE_URL_DICT["uat"])
-CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
+CURRENT_AMOUNT_CONFIG = FLOW_AMOUNT_CONFIG["USD"]
 
 # 新增：浏览器配置字典 (统一管理)
 BROWSER_CONFIG = {
@@ -660,7 +660,7 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["underwritten_amount"]
+        amount = get_current_flow_amount_config()["underwritten_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -753,7 +753,7 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["approved_amount"]
+        amount = get_current_flow_amount_config()["approved_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -998,7 +998,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["esign_amount"]
+        amount = get_current_flow_amount_config()["esign_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -2255,7 +2255,7 @@ def handle_director_extra_info_page(driver: webdriver.Remote, phone: str):
             logging.info("步骤: 第二次审批请求")
             logging.info("=" * 50)
 
-            second_amount = CURRENT_AMOUNT_CONFIG["approved_amount_2nd"]
+            second_amount = get_current_flow_amount_config()["approved_amount_2nd"]
             logging.info(f"[API] 发送第二次审批请求（金额: {second_amount}）...")
 
             time_module.sleep(3)
@@ -2339,6 +2339,12 @@ CURRENCY_LOOKUP_KEYS = tuple(dict.fromkeys(key.strip().lower() for key in CURREN
 def has_valid_global_currency() -> bool:
     """判断当前全局货币是否有效。"""
     return _global_currency in SUPPORTED_CURRENCIES
+
+
+def get_current_flow_amount_config(currency: Optional[str] = None) -> Dict[str, Any]:
+    """根据当前currency返回TIER3流程金额配置，默认回退到USD。"""
+    normalized_currency = normalize_currency_value(currency or _global_currency) or "USD"
+    return FLOW_AMOUNT_CONFIG.get(normalized_currency, FLOW_AMOUNT_CONFIG["USD"])
 
 
 def normalize_currency_value(value: Any) -> Optional[str]:

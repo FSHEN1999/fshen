@@ -54,11 +54,20 @@ BASE_URL_DICT = {
     "local": "http://192.168.11.3:8080"
 }
 
-# 金额配置（统一金额配置）
-AMOUNT_CONFIG = {
-    "underwritten_amount": "500000",
-    "approved_amount": 500000.00,
-    "esign_amount": 500000.00
+# 金额配置（按currency映射流程金额）
+FLOW_AMOUNT_CONFIG = {
+    "USD": {
+        "underwritten_amount": "500000",
+        "approved_amount": 500000.00,
+        "esign_amount": 500000.00,
+        "direct_flow_amount": 2000.00,
+    },
+    "CNY": {
+        "underwritten_amount": "1500000",
+        "approved_amount": 1500000.00,
+        "esign_amount": 1500000.00,
+        "direct_flow_amount": 70000.00,
+    },
 }
 
 # 数据库配置
@@ -125,7 +134,7 @@ DEFAULT_TOKEN_DICT = {
 
 # 获取当前环境的基础URL和金额配置
 BASE_URL = BASE_URL_DICT.get(ENV, BASE_URL_DICT["uat"])
-CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
+CURRENT_AMOUNT_CONFIG = FLOW_AMOUNT_CONFIG["USD"]
 
 # 线下注册固定URL（根据环境切换）
 OFFLINE_SIGNUP_URL_DICT = {
@@ -478,6 +487,12 @@ def has_valid_global_currency() -> bool:
     return _global_currency in SUPPORTED_CURRENCIES
 
 
+def get_current_flow_amount_config(currency: Optional[str] = None) -> Dict[str, Any]:
+    """根据当前currency返回对应的流程金额配置，默认回退到USD。"""
+    normalized_currency = normalize_currency_value(currency or _global_currency) or "USD"
+    return FLOW_AMOUNT_CONFIG.get(normalized_currency, FLOW_AMOUNT_CONFIG["USD"])
+
+
 def normalize_currency_value(value: Any) -> Optional[str]:
     """将不同来源的currency值规范化为支持的货币代码。"""
     if isinstance(value, str):
@@ -599,7 +614,7 @@ def close_global_db():
 def send_underwritten_request(phone: str, amount: str = None) -> bool:
     """发送核保完成请求 (underwrittenLimit.completed)"""
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["underwritten_amount"]
+        amount = get_current_flow_amount_config()["underwritten_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -687,7 +702,7 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
 def send_approved_request(phone: str, amount: float = None) -> bool:
     """发送审批完成请求 (approvedoffer.completed)"""
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["approved_amount"]
+        amount = get_current_flow_amount_config()["approved_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -696,7 +711,7 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
         merchant_id = db.execute_sql(
             f"SELECT merchant_id FROM dpu_users WHERE phone_number = '{phone}' ORDER BY created_at DESC LIMIT 1;"
         )
-        preferred_currency = _global_currency  # 使用从浏览器提取的全局货币值
+        preferred_currency = _global_currency or "USD"  # 使用从浏览器提取的全局货币值，缺省USD
         application_unique_id = db.execute_sql(
             f"SELECT application_unique_id FROM dpu_application WHERE merchant_id = '{merchant_id}' ORDER BY created_at DESC LIMIT 1;"
         )
@@ -903,7 +918,7 @@ def send_psp_completed_request(phone: str) -> bool:
 def send_esign_request(phone: str, amount: float = None) -> bool:
     """发送电子签完成请求 (esign.completed)"""
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["esign_amount"]
+        amount = get_current_flow_amount_config()["esign_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -1177,8 +1192,10 @@ def poll_drawdown_status(phone: str, authorization_token: str = None, max_attemp
     return False
 
 
-def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> bool:
+def send_disbursement_completed_request(phone: str, amount: float = None) -> bool:
     """发送放款完成请求 (disbursement.completed)"""
+    if amount is None:
+        amount = get_current_flow_amount_config()["direct_flow_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -2574,22 +2591,26 @@ def run_offline_automation():
 
         # --- 步骤 11: 根据融资方案选择走不同流程 ---
         if submitted_success:
+            current_flow_amount_config = get_current_flow_amount_config()
+            direct_flow_amount = current_flow_amount_config["direct_flow_amount"]
+            unlock_flow_amount = current_flow_amount_config["approved_amount"]
+
             if need_bank_info:
                 # 选择了"去激活"：跳过核保/PSP → 直接审批→电子签→drawdown→放款
                 logging.info("\n" + "=" * 50)
                 logging.info("步骤 11: 发起审批→电子签→drawdown→放款 (去激活流程)")
                 logging.info("=" * 50)
 
-                # 1. 直接发起审批请求（跳过核保，amount=2000）
+                # 1. 直接发起审批请求（跳过核保，USD=2000 / CNY=70000）
                 time.sleep(3)
-                if send_approved_request(phone, amount=2000.00):
-                    logging.info("✅ 审批请求成功（amount=2000）！")
+                if send_approved_request(phone, amount=direct_flow_amount):
+                    logging.info(f"✅ 审批请求成功（amount={direct_flow_amount}）！")
 
-                    # 2. 直接发起电子签请求（跳过PSP流程，amount=2000）
+                    # 2. 直接发起电子签请求（跳过PSP流程，USD=2000 / CNY=70000）
                     time.sleep(5)
-                    logging.info("\n[2/4] 发送电子签完成请求（amount=2000）...")
-                    if send_esign_request(phone, amount=2000.00):
-                        logging.info("✅ 电子签请求成功（amount=2000）！")
+                    logging.info(f"\n[2/4] 发送电子签完成请求（amount={direct_flow_amount}）...")
+                    if send_esign_request(phone, amount=direct_flow_amount):
+                        logging.info(f"✅ 电子签请求成功（amount={direct_flow_amount}）！")
 
                         # 3. 轮询drawdown状态，等待SUBMITTED
                         time.sleep(5)
@@ -2597,11 +2618,11 @@ def run_offline_automation():
                         if drawdown_submitted:
                             logging.info("✅ drawdown状态已变为SUBMITTED！")
 
-                            # 4. 发送放款完成请求（amount=2000）
+                            # 4. 发送放款完成请求（USD=2000 / CNY=70000）
                             time.sleep(5)
-                            logging.info("\n[4/4] 发送放款完成请求（disbursement.completed, amount=2000）...")
-                            if send_disbursement_completed_request(phone, amount=2000.00):
-                                logging.info("✅ 放款请求成功（amount=2000）！")
+                            logging.info(f"\n[4/4] 发送放款完成请求（disbursement.completed, amount={direct_flow_amount}）...")
+                            if send_disbursement_completed_request(phone, amount=direct_flow_amount):
+                                logging.info(f"✅ 放款请求成功（amount={direct_flow_amount}）！")
                             else:
                                 logging.error("❌ 放款请求失败！")
                         else:
@@ -2616,8 +2637,9 @@ def run_offline_automation():
                     logging.error("❌ 审批请求失败！")
             else:
                 # 选择了"去解锁"：核保→审批→点击按钮→PSP→电子签
+                # USD=500000 / CNY=1500000
                 logging.info("\n" + "=" * 50)
-                logging.info("步骤 11: 发起核保→审批→点击按钮→PSP→电子签 (去解锁流程)")
+                logging.info(f"步骤 11: 发起核保→审批→点击按钮→PSP→电子签 (去解锁流程, amount={unlock_flow_amount})")
                 logging.info("=" * 50)
 
                 # 1. 核保请求

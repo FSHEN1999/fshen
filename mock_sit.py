@@ -27,7 +27,7 @@ from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod/reg）
-ENV = "sit"
+ENV = "reg"
 
 # 脚本所在目录（用于统一文件路径，确保从任何目录执行都能找到文件）
 SCRIPT_DIR = Path(__file__).parent.absolute()

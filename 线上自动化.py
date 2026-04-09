@@ -63,11 +63,20 @@ BASE_URL_DICT = {
     "local": "http://192.168.11.3:8080"
 }
 
-# 金额配置（统一金额配置）
-AMOUNT_CONFIG = {
-    "underwritten_amount": "500000",
-    "approved_amount": 500000.00,
-    "esign_amount": 500000.00
+# 金额配置（按currency映射流程金额）
+FLOW_AMOUNT_CONFIG = {
+    "USD": {
+        "underwritten_amount": "500000",
+        "approved_amount": 500000.00,
+        "esign_amount": 500000.00,
+        "direct_flow_amount": 2000.00,
+    },
+    "CNY": {
+        "underwritten_amount": "1500000",
+        "approved_amount": 1500000.00,
+        "esign_amount": 1500000.00,
+        "direct_flow_amount": 70000.00,
+    },
 }
 
 # 数据库配置（参考mock_sit.py）
@@ -134,7 +143,7 @@ DEFAULT_TOKEN_DICT = {
 
 # 获取当前环境的基础URL和金额配置
 BASE_URL = BASE_URL_DICT.get(ENV, BASE_URL_DICT["uat"])
-CURRENT_AMOUNT_CONFIG = AMOUNT_CONFIG
+CURRENT_AMOUNT_CONFIG = FLOW_AMOUNT_CONFIG["USD"]
 
 # 新增：浏览器配置字典 (统一管理)
 BROWSER_CONFIG = {
@@ -636,7 +645,7 @@ def send_underwritten_request(phone: str, amount: str = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["underwritten_amount"]
+        amount = get_current_flow_amount_config()["underwritten_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -729,7 +738,7 @@ def send_approved_request(phone: str, amount: float = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["approved_amount"]
+        amount = get_current_flow_amount_config()["approved_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -974,7 +983,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
         bool: 请求是否成功
     """
     if amount is None:
-        amount = CURRENT_AMOUNT_CONFIG["esign_amount"]
+        amount = get_current_flow_amount_config()["esign_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -1035,7 +1044,7 @@ def send_esign_request(phone: str, amount: float = None) -> bool:
         return False
 
 
-def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> bool:
+def send_disbursement_completed_request(phone: str, amount: float = None) -> bool:
     """
     发送放款完成请求 (disbursement.completed)
 
@@ -1046,6 +1055,8 @@ def send_disbursement_completed_request(phone: str, amount: float = 2000.00) -> 
     Returns:
         bool: 请求是否成功
     """
+    if amount is None:
+        amount = get_current_flow_amount_config()["direct_flow_amount"]
     webhook_url = f"{BASE_URL}/dpu-openapi/webhook-notifications"
 
     try:
@@ -2012,6 +2023,7 @@ def handle_financing_choice(driver: webdriver.Remote) -> bool:
 # ==============================================================================
 _global_db: Optional[DatabaseExecutor] = None
 _global_currency: Optional[str] = None  # 全局存储注册流程中识别到的融资产品货币
+_global_tier_name: Optional[str] = None  # 当前注册流程的tier，用于控制金额映射
 
 SUPPORTED_CURRENCIES = {"CNY", "USD"}
 CURRENCY_KEY_CANDIDATES = (
@@ -2031,6 +2043,16 @@ CURRENCY_LOOKUP_KEYS = tuple(dict.fromkeys(key.strip().lower() for key in CURREN
 def has_valid_global_currency() -> bool:
     """判断当前全局货币是否有效。"""
     return _global_currency in SUPPORTED_CURRENCIES
+
+
+def get_current_flow_amount_config(currency: Optional[str] = None, tier_name: Optional[str] = None) -> Dict[str, Any]:
+    """根据当前currency和tier返回流程金额配置；TIER3保持现状，不接入CNY金额映射。"""
+    effective_tier_name = (tier_name or _global_tier_name or "").upper()
+    if effective_tier_name == "TIER3":
+        return FLOW_AMOUNT_CONFIG["USD"]
+
+    normalized_currency = normalize_currency_value(currency or _global_currency) or "USD"
+    return FLOW_AMOUNT_CONFIG.get(normalized_currency, FLOW_AMOUNT_CONFIG["USD"])
 
 
 def normalize_currency_value(value: Any) -> Optional[str]:
@@ -2367,8 +2389,11 @@ def extract_currency_from_network_logs(driver: webdriver.Remote) -> Optional[str
 # ==============================================================================
 def run_automation(url: str, phone: str, tier_name: str):
     """自动化注册流程的主控制器。"""
+    global _global_tier_name
     driver = None
     try:
+        _global_tier_name = tier_name
+
         # --- 步骤 2: 初始化浏览器 (优化后的选择逻辑) ---
         logging.info("\n" + "=" * 50)
         logging.info("步骤 2/8: 初始化浏览器")
@@ -2520,22 +2545,26 @@ def run_automation(url: str, phone: str, tier_name: str):
 
         # 如果获取到SUBMITTED状态，根据need_bank_info走不同流程
         if submitted_success:
+            current_flow_amount_config = get_current_flow_amount_config(tier_name=tier_name)
+            direct_flow_amount = current_flow_amount_config["direct_flow_amount"]
+            unlock_flow_amount = current_flow_amount_config["approved_amount"]
+
             # need_bank_info=True表示选择了"去激活"或TIER1，走新流程（跳过核保/PSP）
             if need_bank_info:
                 logging.info("\n" + "=" * 50)
-                logging.info("步骤 9/9: 发起审批→电子签→drawdown轮询→放款（amount=2000）")
+                logging.info(f"步骤 9/9: 发起审批→电子签→drawdown轮询→放款（amount={direct_flow_amount}）")
                 logging.info("=" * 50)
 
-                # 1. 直接发起审批请求（跳过核保，amount=2000）
+                # 1. 直接发起审批请求（TIER3保持现状；非TIER3时 USD=2000 / CNY=70000）
                 time.sleep(3)
-                if send_approved_request(phone, amount=2000.00):
-                    logging.info("✅ 审批请求成功（amount=2000）！")
+                if send_approved_request(phone, amount=direct_flow_amount):
+                    logging.info(f"✅ 审批请求成功（amount={direct_flow_amount}）！")
 
-                    # 2. 直接发起电子签请求（跳过PSP流程，amount=2000）
+                    # 2. 直接发起电子签请求（跳过PSP流程）
                     time.sleep(5)
-                    logging.info("\n[2/4] 发送电子签完成请求（amount=2000）...")
-                    if send_esign_request(phone, amount=2000.00):
-                        logging.info("✅ 电子签请求成功（amount=2000）！")
+                    logging.info(f"\n[2/4] 发送电子签完成请求（amount={direct_flow_amount}）...")
+                    if send_esign_request(phone, amount=direct_flow_amount):
+                        logging.info(f"✅ 电子签请求成功（amount={direct_flow_amount}）！")
 
                         # 3. 轮询drawdown状态，等待SUBMITTED
                         time.sleep(5)
@@ -2543,11 +2572,11 @@ def run_automation(url: str, phone: str, tier_name: str):
                         if drawdown_submitted:
                             logging.info("✅ drawdown状态已变为SUBMITTED！")
 
-                            # 4. 发送放款完成请求（amount=2000）
+                            # 4. 发送放款完成请求
                             time.sleep(5)
-                            logging.info("\n[4/4] 发送放款完成请求（disbursement.completed, amount=2000）...")
-                            if send_disbursement_completed_request(phone, amount=2000.00):
-                                logging.info("✅ 放款请求成功（amount=2000）！")
+                            logging.info(f"\n[4/4] 发送放款完成请求（disbursement.completed, amount={direct_flow_amount}）...")
+                            if send_disbursement_completed_request(phone, amount=direct_flow_amount):
+                                logging.info(f"✅ 放款请求成功（amount={direct_flow_amount}）！")
                             else:
                                 logging.error("❌ 放款请求失败！")
                         else:
@@ -2563,7 +2592,7 @@ def run_automation(url: str, phone: str, tier_name: str):
             else:
                 # need_bank_info=False表示选择了"去解锁"，走原流程（核保→审批→点击按钮→PSP→电子签）
                 logging.info("\n" + "=" * 50)
-                logging.info("步骤 9/9: 发起核保→审批→点击按钮→PSP→电子签")
+                logging.info(f"步骤 9/9: 发起核保→审批→点击按钮→PSP→电子签（amount={unlock_flow_amount}）")
                 logging.info("=" * 50)
 
                 # 1. 核保请求
