@@ -1,0 +1,434 @@
+{
+  "validated_at": "2026-04-25 20:08:31",
+  "scenario_file": "D:/data/project/dpu/自动化/scenario_1.ms",
+  "scenario_name": "线下FP-USD-500k",
+  "base_url": "https://dpu-gateway-reg.dowsure.com",
+  "result": "PASS",
+  "phone": "19106226872",
+  "merchant_id": "47b2ed220c8f40b0900800cf94b26496",
+  "platform_offer_id": "amzn1.lending.offer.us.t8hCHX289RpDAvmi61afWYSTESTOFFER",
+  "dpu_limit_application_id": "EFAL17771188309534238",
+  "dpu_application_id": "EFA17771188197256616",
+  "lender_approved_offer_id": "lender-EFA17771188197256616",
+  "steps": [
+    {
+      "step": "step 4 send registration sms",
+      "phone": "19106226872",
+      "verificationCode": "112134"
+    },
+    {
+      "step": "step 5 validate sms code"
+    },
+    {
+      "step": "step 6 signup",
+      "token_prefix": "tu5Ze3gDb6S5"
+    },
+    {
+      "step": "step 7 generate sp auth url",
+      "state": "35ab34e8-3edf-4f73-ac3a-b6cf13d2b676"
+    },
+    {
+      "step": "step 8 sp auth",
+      "selling_partner_id": "C7AE2E7FD5742E17030490ED454AEC71"
+    },
+    {
+      "step": "step 9 sp updateOffer",
+      "platform_offer_id": "amzn1.lending.offer.us.t8hCHX289RpDAvmi61afWYSTESTOFFER"
+    },
+    {
+      "step": "step 10 3PL redirect GET"
+    },
+    {
+      "step": "step 11 3PL redirect POST"
+    },
+    {
+      "step": "step 12"
+    },
+    {
+      "step": "step 13"
+    },
+    {
+      "step": "step 14 file scan result",
+      "label": "director1_front",
+      "file_url": "uploads/default/default/default/file_20260402062831_fc58bdd81df3.jpg",
+      "scan_status": "PENDING",
+      "file_scan_status_count": 0
+    },
+    {
+      "step": "step 15 file scan result",
+      "label": "director1_back",
+      "file_url": "uploads/default/default/default/file_20260402063050_c40c747f1286.jpg",
+      "scan_status": "PENDING",
+      "file_scan_status_count": 0
+    },
+    {
+      "step": "step 16"
+    },
+    {
+      "step": "VIRUS_SCAN dependency ready",
+      "application_id": "EFA17771188197256616",
+      "total": 2,
+      "affected": 2
+    },
+    {
+      "step": "step 17"
+    },
+    {
+      "step": "step 18"
+    },
+    {
+      "step": "step 19"
+    },
+    {
+      "step": "step 20"
+    },
+    {
+      "step": "step 21"
+    },
+    {
+      "step": "step 22"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 1,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 2,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 3,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 4,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 5,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 6,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 7,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 8,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 9,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 10,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 11,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 12,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 13,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 14,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 15,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 16,
+      "status": "NEW"
+    },
+    {
+      "step": "poll credit offer status",
+      "attempt": 17,
+      "status": "SUBMITTED"
+    },
+    {
+      "step": "credit offer reached SUBMITTED",
+      "attempts": "17"
+    },
+    {
+      "step": "underwritten webhook disabled",
+      "existing_event_count": 0
+    },
+    {
+      "step": "step 27 approved-offer webhook",
+      "eventId": "63644585-ec34-4550-bb63-586d62d387f7"
+    },
+    {
+      "step": "step 28 psp-start webhook",
+      "eventId": "4fdf5555-0294-4667-a6a1-8133ef78dd22"
+    },
+    {
+      "step": "step 29 psp-completed webhook",
+      "eventId": "6f9d3589-f86a-4b2d-ae9a-6da55267d99a"
+    },
+    {
+      "step": "step 30 esign webhook",
+      "eventId": "b069f136-ba27-45f1-9909-f2cefc169998"
+    }
+  ],
+  "file_scan_results": [
+    {
+      "label": "director1_front",
+      "file_url": "uploads/default/default/default/file_20260402062831_fc58bdd81df3.jpg",
+      "scan_status": "PENDING",
+      "file_scan_status_count": 0
+    },
+    {
+      "label": "director1_back",
+      "file_url": "uploads/default/default/default/file_20260402063050_c40c747f1286.jpg",
+      "scan_status": "PENDING",
+      "file_scan_status_count": 0
+    }
+  ],
+  "request_body_monitor": [
+    {
+      "step": 26,
+      "path": "/dpu-openapi/webhook-notifications",
+      "eventType": "underwrittenLimit.completed",
+      "status": "DISABLED_AUTO_GENERATED_EVENT",
+      "reason": "manual underwritten webhook is disabled because reg creates underwrittenLimit.completed during the scheduled tasks",
+      "checks": {
+        "existing_underwritten_event_count": 0,
+        "skip_duplicate_underwritten": true
+      }
+    },
+    {
+      "step": 27,
+      "path": "/dpu-openapi/webhook-notifications",
+      "eventType": "approvedoffer.completed",
+      "eventId": "63644585-ec34-4550-bb63-586d62d387f7",
+      "originalRequestId": "req_63644585ec344550bb63586d62d387f7",
+      "checks": {
+        "event_type": true,
+        "event_id_present": true,
+        "event_id_unique": true,
+        "merchant_id": true,
+        "no_unresolved_variables": true,
+        "event_id_uuid": true,
+        "application_id": true,
+        "lender_approved_offer_id": true,
+        "original_request_id_dynamic": true,
+        "approved_amount": true,
+        "currency": true
+      },
+      "unresolved_values": [],
+      "actual_body": {
+        "data": {
+          "eventType": "approvedoffer.completed",
+          "eventId": "63644585-ec34-4550-bb63-586d62d387f7",
+          "eventMessage": "Application approval process completed successfully",
+          "enquiryUrl": "https://api.lender.com/enquiry/12345",
+          "datetime": "2026-04-25T12:08:26Z",
+          "details": {
+            "merchantId": "47b2ed220c8f40b0900800cf94b26496",
+            "dpuApplicationId": "EFA17771188197256616",
+            "originalRequestId": "req_63644585ec344550bb63586d62d387f7",
+            "status": "APPROVED",
+            "failureReason": null,
+            "lenderApprovedOfferId": "lender-EFA17771188197256616",
+            "offer": {
+              "rate": {
+                "chargeBases": "Float",
+                "baseRateType": "SOFR",
+                "baseRate": "0.05",
+                "marginRate": "0.02",
+                "fixedRate": "0.07"
+              },
+              "term": 120,
+              "termUnit": "Days",
+              "mintenor": 3,
+              "maxtenor": 24,
+              "offerEndDate": "2026-07-24",
+              "offerStartDate": "2026-04-25",
+              "approvedLimit": {
+                "currency": "USD",
+                "amount": "500000"
+              },
+              "warterMark": {
+                "currency": "USD",
+                "amount": 0.0
+              },
+              "signedLimit": {
+                "currency": "USD",
+                "amount": 0.0
+              },
+              "feeOrCharge": {
+                "type": "PROCESSING_FEE",
+                "feeOrChargeDate": "2023-10-16",
+                "netAmount": {
+                  "currency": "USD",
+                  "amount": 0.0
+                }
+              }
+            }
+          }
+        }
+      },
+      "response_status_code": 200,
+      "response_body": "{\"data\":{}}"
+    },
+    {
+      "step": 28,
+      "path": "/dpu-openapi/webhook-notifications",
+      "eventType": "psp.verification.started",
+      "eventId": "4fdf5555-0294-4667-a6a1-8133ef78dd22",
+      "originalRequestId": null,
+      "checks": {
+        "event_type": true,
+        "event_id_present": true,
+        "event_id_unique": true,
+        "merchant_id": true,
+        "no_unresolved_variables": true,
+        "event_id_uuid": true,
+        "merchant_account_id": true,
+        "lender_approved_offer_id": true,
+        "result": true
+      },
+      "unresolved_values": [],
+      "actual_body": {
+        "data": {
+          "eventType": "psp.verification.started",
+          "eventId": "4fdf5555-0294-4667-a6a1-8133ef78dd22",
+          "eventMessage": "psp verification started event",
+          "enquiryUrl": "https://api.example.com/enquiry/123",
+          "datetime": "2026-04-25T12:08:27Z",
+          "details": {
+            "merchantId": "47b2ed220c8f40b0900800cf94b26496",
+            "lastUpdatedOn": "2026-04-25 20:08:27",
+            "lastUpdatedBy": "system",
+            "applicationId": "EFA17590311621044381",
+            "pspId": "pspId123457",
+            "pspName": "AirWallex",
+            "merchantAccountId": "C7AE2E7FD5742E17030490ED454AEC71",
+            "lenderApprovedOfferId": "lender-EFA17771188197256616",
+            "result": "PROCESSING"
+          }
+        }
+      },
+      "response_status_code": 200,
+      "response_body": "{\"data\":{}}"
+    },
+    {
+      "step": 29,
+      "path": "/dpu-openapi/webhook-notifications",
+      "eventType": "psp.verification.completed",
+      "eventId": "6f9d3589-f86a-4b2d-ae9a-6da55267d99a",
+      "originalRequestId": null,
+      "checks": {
+        "event_type": true,
+        "event_id_present": true,
+        "event_id_unique": true,
+        "merchant_id": true,
+        "no_unresolved_variables": true,
+        "event_id_uuid": true,
+        "merchant_account_id": true,
+        "lender_approved_offer_id": true,
+        "result": true
+      },
+      "unresolved_values": [],
+      "actual_body": {
+        "data": {
+          "eventType": "psp.verification.completed",
+          "eventId": "6f9d3589-f86a-4b2d-ae9a-6da55267d99a",
+          "eventMessage": "psp verification completed event",
+          "enquiryUrl": "https://api.example.com/enquiry/123",
+          "datetime": "2026-04-25T12:08:28Z",
+          "details": {
+            "merchantId": "47b2ed220c8f40b0900800cf94b26496",
+            "lastUpdatedOn": "2026-04-25 20:08:28",
+            "lastUpdatedBy": "system",
+            "applicationId": "EFA17590311621044381",
+            "pspId": "pspId123457",
+            "pspName": "AirWallex",
+            "merchantAccountId": "C7AE2E7FD5742E17030490ED454AEC71",
+            "lenderApprovedOfferId": "lender-EFA17771188197256616",
+            "result": "SUCCESS"
+          }
+        }
+      },
+      "response_status_code": 200,
+      "response_body": "{\"data\":{}}"
+    },
+    {
+      "step": 30,
+      "path": "/dpu-openapi/webhook-notifications",
+      "eventType": "esign.completed",
+      "eventId": "b069f136-ba27-45f1-9909-f2cefc169998",
+      "originalRequestId": null,
+      "checks": {
+        "event_type": true,
+        "event_id_present": true,
+        "event_id_unique": true,
+        "merchant_id": true,
+        "no_unresolved_variables": true,
+        "event_id_uuid": true,
+        "lender_approved_offer_id": true,
+        "signed_amount": true,
+        "currency": true,
+        "result": true
+      },
+      "unresolved_values": [],
+      "actual_body": {
+        "data": {
+          "eventType": "esign.completed",
+          "eventId": "b069f136-ba27-45f1-9909-f2cefc169998",
+          "eventMessage": "esign completed event",
+          "enquiryUrl": "https://api.example.com/enquiry/123",
+          "datetime": "2026-04-25T12:08:29Z",
+          "details": {
+            "merchantId": "47b2ed220c8f40b0900800cf94b26496",
+            "lastUpdatedOn": "2026-04-25 20:08:29",
+            "lastUpdatedBy": "system",
+            "lenderApprovedOfferId": "lender-EFA17771188197256616",
+            "result": "SUCCESS",
+            "signedLimit": {
+              "amount": "500000",
+              "currency": "USD"
+            }
+          }
+        }
+      },
+      "response_status_code": 200,
+      "response_body": "{\"data\":{}}"
+    }
+  ],
+  "final_credit_offer_row": [
+    "lender-EFA17771188197256616",
+    "ACCEPTED",
+    500000.0,
+    "SUCCESS"
+  ],
+  "lender_event_count": 4
+}
