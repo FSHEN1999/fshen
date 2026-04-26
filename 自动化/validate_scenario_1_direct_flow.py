@@ -676,6 +676,15 @@ def has_debug_response_logger(blob, sort_no):
 
 def validate_scene_assertions(data):
     missing = []
+    invalid_refs = []
+    for step in data["scenarioStepList"]:
+        if step.get("enable") and step.get("refType") == "COPY" and not step.get("resourceId"):
+            invalid_refs.append(
+                f"sort {step.get('sort')} {step.get('name')}: COPY step has empty resourceId"
+            )
+    if invalid_refs:
+        raise StepError(f"scenario step reference check failed: {invalid_refs}")
+
     for sort_no in sorted(BUSINESS_ASSERTION_STEPS):
         blob = get_blob(data, sort_no)
         if not has_json_path_assertion(blob, "$.code", "200"):

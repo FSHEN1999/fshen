@@ -77,5 +77,6 @@
 ## 改动摘要
 
 - `scenario_1.ms`：补齐 FP-USD 500k 链路需要的动态变量、SQL 前置提取、webhook 请求体、HTTP 200/`data={}` 断言，以及 approved-offer/PSP/eSign 后半段链路。
+- `scenario_1.ms`：`file-scan-result-front/back` 为场景内自定义 HTTP 步骤，需保持 `CUSTOM_REQUEST` + `DIRECT` + `resourceId=null`，不能以 `COPY` + 空 `resourceId` 运行，否则 MeterSphere `/api/scenario/run` 会在运行前校验阶段报 400。
 - `validate_scenario_1_direct_flow.py`：提供可重复的直连验证脚本，覆盖注册、SP/3PL、任务推进、SUBMITTED 轮询、webhook 请求体断言、最终 DB 断言，并将结果写入 JSON。
 - `scenario_1_validation_result.json`：保存本次 PASS 的完整证据，包括步骤记录、webhook 请求体、响应、最终 DB 行。
