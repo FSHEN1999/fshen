@@ -1,0 +1,87 @@
+{
+  "validated_at": "2026-04-24 01:33:54",
+  "scenario_file": "D:\\data\\project\\dpu\\自动化\\scenario_2_fp_usd_2k.ms",
+  "base_url": "https://uat.api.expressfinance.business.hsbc.com",
+  "result": "PASS",
+  "structure_validation": {
+    "scenario_name": "线下FP-USD-2k",
+    "step_total": 28,
+    "required_steps": [
+      "验证码调用验证生成一次token",
+      "选择FUNDPARK流程",
+      "approved-offer",
+      "esign",
+      "disbursement-completed",
+      "轮询credit offer状态",
+      "轮询drawdown状态"
+    ],
+    "checks": {
+      "sms_sql_query": true,
+      "sms_code_variable": true,
+      "approved_default_2000": true,
+      "esign_default_2000": true,
+      "disbursement_sql_loan": true,
+      "disbursement_event": true
+    }
+  },
+  "live_uat_validation": {
+    "phone": "17695220889",
+    "email": "17695220889@163.com",
+    "steps": [
+      {
+        "step": "db sms query",
+        "phone": "17695220889",
+        "verification_code": "634807"
+      },
+      {
+        "step": "signup",
+        "token_prefix": "AcQCCSQ189lK"
+      },
+      {
+        "step": "generate 3pl offer",
+        "offer_id": "amzn1.lending.offer.us.pw6icktequqcgzigtk3xt2TESTOFFER"
+      }
+    ],
+    "application_status": {
+      "status": "SUBMITTED",
+      "applicationFlow": "drawdownDetails",
+      "applicationUniqueId": "EFA17769656389097383"
+    },
+    "process_status": {
+      "status": "drawdownDetails",
+      "applicationId": "EFA17769656389097383"
+    },
+    "active_shop_count": 1,
+    "marketing_quota": {
+      "preApprovedLimit": 2000,
+      "preAssementLimit": 500000,
+      "maxEligibleLimit": 500000,
+      "currency": "USD",
+      "tier": "L1",
+      "rate": 12.0,
+      "limitedRate": 0.0,
+      "timePeriod": "7",
+      "timeUnit": "D"
+    },
+    "product_tier": {
+      "tier": "L1",
+      "description": "2K-200K",
+      "currentLimit": 500000
+    },
+    "drawdown_status": {
+      "status": "INIT",
+      "drawdownLimit": {
+        "amount": 0,
+        "currency": "USD"
+      }
+    },
+    "webhook_probe": {
+      "merchant_id": "91a03e7dcd864f94999cc92e069b626a",
+      "limit_application_row": null,
+      "credit_offer_row": null,
+      "drawdown_row": null,
+      "status": "SKIPPED",
+      "reason": "UAT pure API path did not produce dpu_limit_application / dpu_credit_offer / dpu_drawdown rows, so live webhook replay was not executable in this environment."
+    }
+  }
+}

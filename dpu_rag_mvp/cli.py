@@ -5,7 +5,7 @@ import json
 import sys
 from dataclasses import asdict
 
-from .core import automation_catalog, build_index, get_status, search, suggest_automation
+from .core import automation_catalog, build_index, get_status, search, suggest_automation, topic_portals
 
 
 def cmd_build(_: argparse.Namespace) -> int:
@@ -20,7 +20,16 @@ def cmd_status(_: argparse.Namespace) -> int:
 
 
 def cmd_search(args: argparse.Namespace) -> int:
-    results = [asdict(item) for item in search(args.query, limit=args.limit, kind=args.kind)]
+    results = [
+        asdict(item)
+        for item in search(
+            args.query,
+            limit=args.limit,
+            kind=args.kind,
+            rerank=not args.no_rerank,
+            candidate_limit=args.candidate_limit,
+        )
+    ]
     print(json.dumps(results, indent=2, ensure_ascii=False))
     return 0
 
@@ -33,6 +42,12 @@ def cmd_catalog(args: argparse.Namespace) -> int:
 
 def cmd_suggest(args: argparse.Namespace) -> int:
     results = [asdict(item) for item in suggest_automation(args.goal, limit=args.limit)]
+    print(json.dumps(results, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_topics(_: argparse.Namespace) -> int:
+    results = [asdict(item) for item in topic_portals()]
     print(json.dumps(results, indent=2, ensure_ascii=False))
     return 0
 
@@ -51,6 +66,17 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=int, default=8)
     search_parser.add_argument("--kind", choices=("automation", "doc", "code", "config"))
+    search_parser.add_argument(
+        "--candidate-limit",
+        type=int,
+        default=80,
+        help="Number of broad first-pass candidates to rerank before returning results",
+    )
+    search_parser.add_argument(
+        "--no-rerank",
+        action="store_true",
+        help="Return the broad lexical ranking without the usefulness reranker",
+    )
     search_parser.set_defaults(func=cmd_search)
 
     catalog_parser = subparsers.add_parser("catalog", help="List automation-aware files")
@@ -61,6 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     suggest_parser.add_argument("goal")
     suggest_parser.add_argument("--limit", type=int, default=8)
     suggest_parser.set_defaults(func=cmd_suggest)
+
+    topics_parser = subparsers.add_parser("topics", help="List generated DPU topic portals")
+    topics_parser.set_defaults(func=cmd_topics)
 
     return parser
 

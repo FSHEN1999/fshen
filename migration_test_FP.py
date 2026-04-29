@@ -7,7 +7,6 @@ import string
 import csv
 import pymysql
 import secrets
-from pymysql.constants import CLIENT
 
 # ================= 配置区域 =================
 # 建议将配置项提取出来，方便修改
@@ -18,7 +17,7 @@ DB_CONFIG = {
     "database": "dpu_seller_center",
     "port": 3306,
     "charset": "utf8mb4",
-    "connect_timeout": 1500,
+    "connect_timeout": 15,
     "read_timeout": 15,
 }
 
@@ -29,7 +28,7 @@ log = logging.getLogger(__name__)
 # ================= 数据库操作类 =================
 class ExecuteSql:
     def __init__(self):
-        self.conn = pymysql.connect(**DB_CONFIG, autocommit=True, client_flag=CLIENT.INTERACTIVE)
+        self.conn = pymysql.connect(**DB_CONFIG, autocommit=True)
         self.cursor = self.conn.cursor()
 
     def __enter__(self):

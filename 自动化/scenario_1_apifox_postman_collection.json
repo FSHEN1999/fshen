@@ -1,0 +1,3137 @@
+{
+  "info": {
+    "_postman_id": "afb9d8df-903b-4ea0-b6c6-3798ab601c23",
+    "name": "线下FP-USD-500k - Apifox Import",
+    "description": "Converted from MeterSphere scenario_1.ms for Apifox/Postman import. Import this file in Apifox using the Postman format.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "04 发送注册短信",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-user/auth/verification-codes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "verification-codes"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391239. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"areaCode\": \"+86\",\n  \"code\": \"SIGNUP_VERIFICATION\",\n  \"phone\": \"{{phone}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "const phone = getVar('phone') || randomPhone();",
+              "setVar('phone', phone);",
+              "setVar('phoneNumber', phone);",
+              "setVar('email', getVar('email') || (phone + '@163.com'));",
+              "setVar('preferredCurrency', getVar('preferredCurrency') || 'USD');",
+              "setVar('approvedAmount', getVar('approvedAmount') || '500000');",
+              "setVar('signedAmount', getVar('signedAmount') || '500000');",
+              "setVar('underwrittenAmount', getVar('underwrittenAmount') || '500000');",
+              "setVar('credit_offer_status', 'INIT');",
+              "setVar('poll_count', '0');",
+              "console.log('[scenario_1] generated phone=' + phone);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});",
+              "",
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "const phone = getVar('phone') || getVar('phoneNumber');",
+              "if (phone) {",
+              "  setVar('phone', phone);",
+              "  setVar('phoneNumber', phone);",
+              "}",
+              "console.log('[scenario_1] Step 04 done. If step 05 fails, query SMS code from DB and set verificationCode.');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 验证码调用验证生成一次token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-user/auth/validateSmsCode-sign",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "validateSmsCode-sign"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391240. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"areaCode\": \"+86\",\n  \"code\": \"{{verificationCode}}\",\n  \"phone\": \"{{phone}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "if (!getVar('verificationCode')) {",
+              "  throw new Error('Missing verificationCode. Query dpu_sms_record by phone after step 04, then set verificationCode.');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 用户注册",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-user/auth/signup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "signup"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391241. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"areaCode\": \"+86\",\n  \"code\": \"{{verificationCode}}\",\n  \"password\": \"Aa11111111..\",\n  \"confirmPassword\": \"Aa11111111..\",\n  \"securityQuestionCode\": \"SEC_Q_001\",\n  \"securityAnswer\": \"dsb\",\n  \"email\": \"{{email}}\",\n  \"offerId\": \"\",\n  \"isAcceptMarketing\": true,\n  \"isAcceptMarketing2\": true,\n  \"sourcePage\": \"aboutUs\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});",
+              "",
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "const json = pm.response.json();",
+              "if (json && json.data && json.data.token) {",
+              "  setVar('token', json.data.token);",
+              "}",
+              "ensureVars(['token'], 'Signup response did not return data.token.');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 生成state做sp",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/shop-authorization/v2/sp-auth-url",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "shop-authorization",
+            "v2",
+            "sp-auth-url"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391243. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"redirectUrl\": \"https://expressfinance-dpu-reg.dowsure.com/redirect-loading?state={{state}}\",\n  \"sceneCode\": \"SHOP_BIND\",\n  \"sourceCode\": \"FUNDPARK\",\n  \"state\": \"{{state}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('state', getVar('state') || uuidv4());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 进行SP授权",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-auth/amazon-sp/auth?mws_auth_token=1235&selling_partner_id={{selling_partner_id}}&spapi_oauth_code=123123&state={{state}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-auth",
+            "amazon-sp",
+            "auth"
+          ],
+          "query": [
+            {
+              "key": "mws_auth_token",
+              "value": "1235",
+              "description": ""
+            },
+            {
+              "key": "selling_partner_id",
+              "value": "{{selling_partner_id}}",
+              "description": ""
+            },
+            {
+              "key": "spapi_oauth_code",
+              "value": "123123",
+              "description": ""
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": ""
+            }
+          ]
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391244. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('selling_partner_id', getVar('selling_partner_id') || randomHex32());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 sp-updateOffer(成功)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-auth/amazon-sp/updateOffer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-auth",
+            "amazon-sp",
+            "updateOffer"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391245. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotencyKey\": \"{{idempotency_key}}\",\n  \"offerId\": \"{{platform_offer_id}}\",\n  \"reason\": \"An offer already exists for the seller for the same partner product combination\",\n  \"sendStatus\": \"SUCCESS\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "ensureVars(",
+              "  ['idempotency_key', 'platform_offer_id'],",
+              "  'After step 08, query dpu_manual_offer by selling_partner_id and set idempotency_key/platform_offer_id.'",
+              ");",
+              "setVar('platformOfferId', getVar('platformOfferId') || getVar('platform_offer_id'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 亚马逊3PL授权",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/amazon/redirect?offerId={{platformOfferId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "amazon",
+            "redirect"
+          ],
+          "query": [
+            {
+              "key": "offerId",
+              "value": "{{platformOfferId}}",
+              "description": ""
+            }
+          ]
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391246. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "ensureVars(['platformOfferId'], 'Set platformOfferId from dpu_manual_offer.platform_offer_id.');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 3PL AUTH授权",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/amazon/redirect",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "amazon",
+            "redirect"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391238. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"authToken\": \"mock\",\n  \"expireOn\": \"null\",\n  \"keyId\": \"null\",\n  \"offerId\": \"{{platform_offer_id}}\",\n  \"relayPage\": 1,\n  \"returnUrl\": \"null\",\n  \"signature\": \"null\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('platform_offer_id', getVar('platform_offer_id') || getVar('platformOfferId'));",
+              "ensureVars(['platform_offer_id'], 'Set platform_offer_id from dpu_manual_offer.platform_offer_id.');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 创建申请单",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/fundpark-application/create",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "fundpark-application",
+            "create"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391247. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tierCode\": \"2\",\n  \"tierSnapshotValue\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});",
+              "",
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "const json = pm.response.json();",
+              "if (json && json.data) {",
+              "  setVar('dpuApplicationId', json.data);",
+              "}",
+              "console.log('[scenario_1] dpuApplicationId=' + getVar('dpuApplicationId'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 邓白氏提交企业信息",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/fundpark-application/business-info",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "fundpark-application",
+            "business-info"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391248. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clear\": true,\n  \"data\": {\n    \"bizDetail\": {\n      \"cnName\": \"中文企业名\",\n      \"enName\": \"English\",\n      \"regNo\": \"10000001\"\n    },\n    \"bizInfo\": {\n      \"fundSources\": [\n        \"bizOperations\"\n      ],\n      \"fundingCountry\": \"Hong Kong\",\n      \"industry\": \"Furniture\",\n      \"initWealth\": [\n        \"savings\"\n      ],\n      \"mainProducts\": \"Home Improvement\",\n      \"ongoingWealth\": [\n        \"operationProfit\"\n      ],\n      \"topBuyers\": [\n        \"United States Of America\",\n        \"Canada\",\n        \"Mexico\"\n      ],\n      \"topSuppliers\": [\n        \"China\"\n      ]\n    }\n  },\n  \"isDraft\": false,\n  \"step\": \"2\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 file-scan-result-front",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-file/files/upload/getFileScanResult?fileUrl={{director1_front_file_url}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-file",
+            "files",
+            "upload",
+            "getFileScanResult"
+          ],
+          "query": [
+            {
+              "key": "fileUrl",
+              "value": "{{director1_front_file_url}}",
+              "description": ""
+            }
+          ]
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063392001. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('director1_id', getVar('director1_id') || uuidv4());",
+              "setVar('director1_front_doc_name', getVar('director1_front_doc_name') || '20251123-190026.jpg');",
+              "setVar('director1_back_doc_name', getVar('director1_back_doc_name') || '20251123-190026.jpg');",
+              "setVar('director1_front_file_url', getVar('director1_front_file_url') || 'uploads/default/default/default/file_20260402062831_fc58bdd81df3.jpg');",
+              "setVar('director1_back_file_url', getVar('director1_back_file_url') || 'uploads/default/default/default/file_20260402063050_c40c747f1286.jpg');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 file-scan-result-back",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-file/files/upload/getFileScanResult?fileUrl={{director1_back_file_url}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-file",
+            "files",
+            "upload",
+            "getFileScanResult"
+          ],
+          "query": [
+            {
+              "key": "fileUrl",
+              "value": "{{director1_back_file_url}}",
+              "description": ""
+            }
+          ]
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063392002. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 邓白氏提交股东信息",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/fundpark-application/director-info",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "fundpark-application",
+            "director-info"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391249. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"persons\": [\n      {\n        \"addStatus\": \"API\",\n        \"id\": \"{{director1_id}}\",\n        \"position\": \"DIRECTOR_SHAREHOLDER_UBO\",\n        \"nameCn\": \"刘芷兰\",\n        \"nameEn\": \"LAUTSZ LAN\",\n        \"dateOfBirth\": \"01/04/2026\",\n        \"nationality\": \"China\",\n        \"idDocumentType\": \"PRC_RESIDENT_ID_CARD\",\n\n        \"frontDocName\": \"{{director1_front_doc_name}}\",\n        \"backDocName\": \"{{director1_back_doc_name}}\",\n        \"idDocumentFrontUrl\": \"{{director1_front_file_url}}\",\n        \"idDocumentBackUrl\": \"{{director1_back_file_url}}\",\n        \"idFrontFlag\": true,\n        \"idBackFlag\": true,\n\n        \"mobileNumber\": {\n          \"countryCode\": \"+86\",\n          \"number\": \"17829290101\"\n        },\n        \"mobileNumber.number\": \"17829290101\",\n        \"emailAddress\": \"number@q.com\",\n        \"percentageOfShares\": 40,\n        \"equityRatio\": 40,\n\n        \"adressLine\": \"\",\n        \"secAdressLine\": \"\",\n        \"city\": \"\",\n        \"countryAndRegion\": \"\",\n        \"postalCode\": \"\"\n      }\n    ]\n  },\n  \"isDraft\": false,\n  \"step\": \"2\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('director1_id', getVar('director1_id') || uuidv4());",
+              "setVar('director1_front_doc_name', getVar('director1_front_doc_name') || '20251123-190026.jpg');",
+              "setVar('director1_back_doc_name', getVar('director1_back_doc_name') || '20251123-190026.jpg');",
+              "setVar('director1_front_file_url', getVar('director1_front_file_url') || 'uploads/default/default/default/file_20260402062831_fc58bdd81df3.jpg');",
+              "setVar('director1_back_file_url', getVar('director1_back_file_url') || 'uploads/default/default/default/file_20260402063050_c40c747f1286.jpg');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 选择offer额度-500k",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/fundpark-application/cache-higher-limit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "fundpark-application",
+            "cache-higher-limit"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391250. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"limitSelection\": 500000}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 激活offer额度报价",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/credit-offer/create",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "credit-offer",
+            "create"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391252. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 关联SP和3PL店铺",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/mock/link-sp-3pl-shops?phone={{phone}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "mock",
+            "link-sp-3pl-shops"
+          ],
+          "query": [
+            {
+              "key": "phone",
+              "value": "{{phone}}",
+              "description": ""
+            }
+          ]
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391253. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 手动触发FP sanction任务",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/test/scheduled-tasks/hsbcSanctionTask",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "test",
+            "scheduled-tasks",
+            "hsbcSanctionTask"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391256. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 手动触发FP首次信用模型任务",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/test/scheduled-tasks/first-credit-model",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "test",
+            "scheduled-tasks",
+            "first-credit-model"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391254. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 手动触发FP首次申请启动任务",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/test/scheduled-tasks/first-application-start",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "test",
+            "scheduled-tasks",
+            "first-application-start"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391255. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24.1 轮询SUBMITTED",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/credit-offer/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "credit-offer",
+            "status"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391234. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('poll_count', getVar('poll_count') || '0');",
+              "setVar('credit_offer_status', getVar('credit_offer_status') || 'INIT');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.code).to.eql(200);",
+              "});",
+              "",
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "const json = pm.response.json();",
+              "const status = json && json.data ? json.data.status : '';",
+              "setVar('credit_offer_status', status || '');",
+              "const count = parseInt(getVar('poll_count') || '0', 10) + 1;",
+              "setVar('poll_count', String(count));",
+              "console.log('[scenario_1] poll status=' + status + ', count=' + count);",
+              "if (status !== 'SUBMITTED' && count < 30 && typeof postman !== 'undefined' && postman.setNextRequest) {",
+              "  postman.setNextRequest(pm.info.requestName);",
+              "}",
+              "if (status !== 'SUBMITTED' && count >= 30) {",
+              "  throw new Error('credit_offer_status did not reach SUBMITTED within 30 polls, current=' + status);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 approved-offer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-openapi/webhook-notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-openapi",
+            "webhook-notifications"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391258. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"eventType\": \"approvedoffer.completed\",\n    \"eventId\": \"{{eventId}}\",\n    \"eventMessage\": \"Application approval process completed successfully\",\n    \"enquiryUrl\": \"https://api.lender.com/enquiry/12345\",\n    \"datetime\": \"{{datetime_utc}}\",\n    \"details\": {\n      \"merchantId\": \"{{merchantId}}\",\n      \"dpuApplicationId\": \"{{dpuApplicationId}}\",\n      \"originalRequestId\": \"{{approvedOriginalRequestId}}\",\n      \"status\": \"APPROVED\",\n      \"failureReason\": null,\n      \"lenderApprovedOfferId\": \"{{lenderApprovedOfferId}}\",\n      \"offer\": {\n        \"rate\": {\n          \"chargeBases\": \"{{chargeBases}}\",\n          \"baseRateType\": \"SOFR\",\n          \"baseRate\": \"0.05\",\n          \"marginRate\": \"0.02\",\n          \"fixedRate\": \"0.07\"\n        },\n        \"term\": 120,\n        \"termUnit\": \"Days\",\n        \"mintenor\": 3,\n        \"maxtenor\": 24,\n        \"offerEndDate\": \"{{offerEndDate}}\",\n        \"offerStartDate\": \"{{offerStartDate}}\",\n        \"approvedLimit\": {\n          \"currency\": \"{{preferredCurrency}}\",\n          \"amount\": \"{{approvedAmount}}\"\n        },\n        \"warterMark\": {\n          \"currency\": \"{{preferredCurrency}}\",\n          \"amount\": 0.0\n        },\n        \"signedLimit\": {\n          \"currency\": \"{{preferredCurrency}}\",\n          \"amount\": 0.0\n        },\n        \"feeOrCharge\": {\n          \"type\": \"PROCESSING_FEE\",\n          \"feeOrChargeDate\": \"2023-10-16\",\n          \"netAmount\": {\n            \"currency\": \"{{preferredCurrency}}\",\n            \"amount\": 0.0\n          }\n        }\n      }\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "ensureVars(",
+              "  ['merchantId'],",
+              "  'Before approved-offer, query dpu_users by phone and set merchantId. Optional: set preferredCurrency from the same row.'",
+              ");",
+              "setVar('preferredCurrency', getVar('preferredCurrency') || 'USD');",
+              "ensureVars(['dpuApplicationId'], 'Set dpuApplicationId from step 12 response data or query dpu_application by merchantId.');",
+              "setVar('dpuMerchantAccountId', getVar('dpuMerchantAccountId') || getVar('selling_partner_id'));",
+              "setVar('lenderApprovedOfferId', getVar('lenderApprovedOfferId') || ('lender-' + getVar('dpuApplicationId')));",
+              "setVar('eventId', uuidv4());",
+              "setVar('datetime_utc', nowUtcNoMillis());",
+              "setVar('lastUpdatedOn', nowLocalText());",
+              "setVar('approvedOriginalRequestId', 'req_' + getVar('eventId').replace(/-/g, ''));",
+              "setVar('offerStartDate', dateText(0));",
+              "setVar('offerEndDate', dateText(90));",
+              "setVar('approvedAmount', getVar('approvedAmount') || '500000');",
+              "setVar('chargeBases', getVar('preferredCurrency') === 'CNY' ? 'Fixed' : 'Float');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.data).to.deep.eql({});",
+              "});",
+              "",
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('lenderApprovedOfferId', getVar('lenderApprovedOfferId') || ('lender-' + getVar('dpuApplicationId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28 psp-start",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-openapi/webhook-notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-openapi",
+            "webhook-notifications"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391259. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"eventType\": \"psp.verification.started\",\n    \"eventId\": \"{{eventId}}\",\n    \"eventMessage\": \"psp verification started event\",\n    \"enquiryUrl\": \"https://api.example.com/enquiry/123\",\n    \"datetime\": \"{{datetime_utc}}\",\n    \"details\": {\n      \"merchantId\": \"{{merchantId}}\",\n      \"lastUpdatedOn\": \"{{lastUpdatedOn}}\",\n      \"lastUpdatedBy\": \"system\",\n      \"applicationId\": \"EFA17590311621044381\",\n      \"pspId\": \"pspId123457\",\n      \"pspName\": \"AirWallex\",\n      \"merchantAccountId\": \"{{dpuMerchantAccountId}}\",\n      \"lenderApprovedOfferId\": \"{{lenderApprovedOfferId}}\",\n      \"result\": \"PROCESSING\"\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('lenderApprovedOfferId', getVar('lenderApprovedOfferId') || ('lender-' + getVar('dpuApplicationId')));",
+              "setVar('dpuMerchantAccountId', getVar('dpuMerchantAccountId') || getVar('selling_partner_id'));",
+              "ensureVars(['merchantId', 'dpuMerchantAccountId', 'lenderApprovedOfferId'], 'Set merchant/account/offer IDs before PSP started webhook.');",
+              "setVar('eventId', uuidv4());",
+              "setVar('datetime_utc', nowUtcNoMillis());",
+              "setVar('lastUpdatedOn', nowLocalText());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.data).to.deep.eql({});",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29 psp-completed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-openapi/webhook-notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-openapi",
+            "webhook-notifications"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391260. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"eventType\": \"psp.verification.completed\",\n    \"eventId\": \"{{eventId}}\",\n    \"eventMessage\": \"psp verification completed event\",\n    \"enquiryUrl\": \"https://api.example.com/enquiry/123\",\n    \"datetime\": \"{{datetime_utc}}\",\n    \"details\": {\n      \"merchantId\": \"{{merchantId}}\",\n      \"lastUpdatedOn\": \"{{lastUpdatedOn}}\",\n      \"lastUpdatedBy\": \"system\",\n      \"applicationId\": \"EFA17590311621044381\",\n      \"pspId\": \"pspId123457\",\n      \"pspName\": \"AirWallex\",\n      \"merchantAccountId\": \"{{dpuMerchantAccountId}}\",\n      \"lenderApprovedOfferId\": \"{{lenderApprovedOfferId}}\",\n      \"result\": \"SUCCESS\"\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('lenderApprovedOfferId', getVar('lenderApprovedOfferId') || ('lender-' + getVar('dpuApplicationId')));",
+              "setVar('dpuMerchantAccountId', getVar('dpuMerchantAccountId') || getVar('selling_partner_id'));",
+              "ensureVars(['merchantId', 'dpuMerchantAccountId', 'lenderApprovedOfferId'], 'Set merchant/account/offer IDs before PSP completed webhook.');",
+              "setVar('eventId', uuidv4());",
+              "setVar('datetime_utc', nowUtcNoMillis());",
+              "setVar('lastUpdatedOn', nowLocalText());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.data).to.deep.eql({});",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30 esign",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": ""
+          },
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "description": ""
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT",
+            "description": ""
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK",
+            "description": ""
+          },
+          {
+            "key": "product-currency",
+            "value": "USD",
+            "description": ""
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/dpu-openapi/webhook-notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-openapi",
+            "webhook-notifications"
+          ],
+          "query": []
+        },
+        "description": "Converted from MeterSphere scenario_1.ms step id 5407673063391261. MeterSphere SQL/script processors are not executable in Postman/Apifox and must be recreated as Apifox pre/post scripts if needed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"eventType\": \"esign.completed\",\n    \"eventId\": \"{{eventId}}\",\n    \"eventMessage\": \"esign completed event\",\n    \"enquiryUrl\": \"https://api.example.com/enquiry/123\",\n    \"datetime\": \"{{datetime_utc}}\",\n    \"details\": {\n      \"merchantId\": \"{{merchantId}}\",\n      \"lastUpdatedOn\": \"{{lastUpdatedOn}}\",\n      \"lastUpdatedBy\": \"system\",\n      \"lenderApprovedOfferId\": \"{{lenderApprovedOfferId}}\",\n      \"result\": \"SUCCESS\",\n      \"signedLimit\": {\n        \"amount\": \"{{signedAmount}}\",\n        \"currency\": \"{{preferredCurrency}}\"\n      }\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function setVar(key, value) {",
+              "  const text = value === undefined || value === null ? '' : String(value);",
+              "  if (pm.environment && pm.environment.set) pm.environment.set(key, text);",
+              "  if (pm.collectionVariables && pm.collectionVariables.set) pm.collectionVariables.set(key, text);",
+              "}",
+              "",
+              "function getVar(key) {",
+              "  if (pm.environment && pm.environment.get && pm.environment.get(key)) return pm.environment.get(key);",
+              "  if (pm.collectionVariables && pm.collectionVariables.get && pm.collectionVariables.get(key)) return pm.collectionVariables.get(key);",
+              "  if (pm.variables && pm.variables.get && pm.variables.get(key)) return pm.variables.get(key);",
+              "  return '';",
+              "}",
+              "",
+              "function uuidv4() {",
+              "  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();",
+              "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {",
+              "    const r = Math.random() * 16 | 0;",
+              "    const v = c === 'x' ? r : (r & 0x3 | 0x8);",
+              "    return v.toString(16);",
+              "  });",
+              "}",
+              "",
+              "function randomHex32() {",
+              "  return (uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')).slice(0, 32).toUpperCase();",
+              "}",
+              "",
+              "function randomPhone() {",
+              "  const prefixes = ['130','131','132','133','135','136','137','138','139','150','151','152','155','156','157','158','159','166','171','172','173','175','176','177','178','180','181','182','183','184','185','186','187','188','189','191','193','195','196','198','199'];",
+              "  const suffix = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');",
+              "  return prefixes[Math.floor(Math.random() * prefixes.length)] + suffix;",
+              "}",
+              "",
+              "function nowUtcNoMillis() {",
+              "  return new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+              "}",
+              "",
+              "function nowLocalText() {",
+              "  const d = new Date();",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());",
+              "}",
+              "",
+              "function dateText(offsetDays) {",
+              "  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);",
+              "  const pad = n => String(n).padStart(2, '0');",
+              "  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+              "}",
+              "",
+              "function ensureVars(keys, hint) {",
+              "  const missing = keys.filter(k => !getVar(k));",
+              "  if (missing.length > 0) {",
+              "    throw new Error('Missing variables: ' + missing.join(', ') + '. ' + hint);",
+              "  }",
+              "}",
+              "",
+              "",
+              "setVar('lenderApprovedOfferId', getVar('lenderApprovedOfferId') || ('lender-' + getVar('dpuApplicationId')));",
+              "ensureVars(['merchantId', 'lenderApprovedOfferId'], 'Set merchantId and lenderApprovedOfferId before eSign webhook.');",
+              "setVar('preferredCurrency', getVar('preferredCurrency') || 'USD');",
+              "setVar('signedAmount', getVar('signedAmount') || '500000');",
+              "setVar('eventId', uuidv4());",
+              "setVar('datetime_utc', nowUtcNoMillis());",
+              "setVar('lastUpdatedOn', nowLocalText());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('MeterSphere JSON assertions', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.data).to.deep.eql({});",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dpu-gateway-reg.dowsure.com",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phone",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phoneNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verificationCode",
+      "value": "666666",
+      "type": "string"
+    },
+    {
+      "key": "state",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "selling_partner_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "idempotency_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "platform_offer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "platformOfferId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "merchantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "preferredCurrency",
+      "value": "USD",
+      "type": "string"
+    },
+    {
+      "key": "dpuLimitApplicationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dpuApplicationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dpuMerchantAccountId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lenderApprovedOfferId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "datetime_utc",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastUpdatedOn",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "approvedAmount",
+      "value": "500000",
+      "type": "string"
+    },
+    {
+      "key": "signedAmount",
+      "value": "500000",
+      "type": "string"
+    },
+    {
+      "key": "underwrittenAmount",
+      "value": "500000",
+      "type": "string"
+    },
+    {
+      "key": "director1_front_file_url",
+      "value": "uploads/default/default/default/file_20260402062831_fc58bdd81df3.jpg",
+      "type": "string"
+    },
+    {
+      "key": "director1_back_file_url",
+      "value": "uploads/default/default/default/file_20260402063050_c40c747f1286.jpg",
+      "type": "string"
+    },
+    {
+      "key": "approvedOriginalRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chargeBases",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "director1_back_doc_name",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "director1_front_doc_name",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "director1_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "offerEndDate",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "offerStartDate",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

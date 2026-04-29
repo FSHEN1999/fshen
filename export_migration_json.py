@@ -7,7 +7,6 @@
 import logging
 import json
 import pymysql
-from pymysql.constants import CLIENT
 from typing import Optional, Dict, List, Any
 
 # ================= 配置区域 =================
@@ -23,7 +22,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "uat": {
@@ -33,7 +32,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "preprod": {
@@ -43,18 +42,16 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "reg": {
-        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "host": "18.162.145.173",
         "user": "dpu_reg",
         "password": "r4asUYBX3R6LNdp",
         "database": "dpu_seller_center",
-        "port": 3306,
-        "charset": "utf8mb4",
-        "connect_timeout": 1500,
-        "read_timeout": 15,
+        "port": 3307,
+        "charset": "utf8mb4"
     },
     "dev": {
         "host": "localhost",
@@ -63,7 +60,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
 }
@@ -86,7 +83,7 @@ class DatabaseExecutor:
 
     def connect(self):
         """建立数据库连接"""
-        self.conn = pymysql.connect(**DATABASE_CONFIG[self.env], autocommit=True, client_flag=CLIENT.INTERACTIVE)
+        self.conn = pymysql.connect(**DATABASE_CONFIG[self.env], autocommit=True)
         self.cursor = self.conn.cursor()
         return self
 

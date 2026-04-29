@@ -359,3 +359,8 @@ https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.l
 500K
 13485981723
 https://dpu-gateway-sit.dowsure.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.4vx4aq7f9qo8wpkfyc241wTESTOFFER
+
+500K
+14549468463
+线下
+200K,18887355242,https://sit.api.expressfinance.business.hsbc.com/dpu-merchant/amazon/redirect?offerId=amzn1.lending.offer.us.zqrlvhvcgyhdtkleas6rckTESTOFFER

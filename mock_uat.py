@@ -2,9 +2,10 @@
 """
 DPU状态模拟工具
 功能：支持账号注册、SP授权、核保/审批/PSP/电子签/放款/还款等状态模拟，支持多环境切换和多店铺场景
-环境支持：sit/local/dev/uat/preprod
+环境支持：sit/local/dev/uat/preprod/reg
 核心特性：自动重连数据库、输入验证、日志颜色区分、统一请求处理
 """
+import json
 import logging
 import os
 import socket
@@ -25,7 +26,7 @@ from pymysql.constants import CLIENT
 from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
-# 环境配置（支持：sit/local/dev/uat/preprod）
+# 环境配置（支持：sit/local/dev/uat/preprod/reg）
 ENV = "preprod"
 
 # 脚本所在目录（用于统一文件路径，确保从任何目录执行都能找到文件）
@@ -139,11 +140,13 @@ class SanctionStatus(Enum):
 
 class ReturnedFailureReason(Enum):
     """审批退回失败原因枚举"""
-    INCORRECT_BRN = "不正确 BRN"
-    FAILED_TO_OBTAIN_CUSTOMER_ID = "未能获取客户 ID 号码"
+    INCORRECT_BRN = "不正确BRN"
+    FAILED_TO_OBTAIN_CUSTOMER_ID = "未能获取客户ID号码"
     ID_MISMATCH_WITH_CR_RECORD = "ID 号码与 CR 记录不相符"
     FAILED_COMPANY_STRUCTURE_VERIFICATION = "未能通过公司结构校验"
     REQUIRES_MANUAL_AML_VERIFICATION = "需要人工处理反洗钱验证"
+    INCORRECT_UNIFIED_SOCIAL_CREDIT_CODE = "不正确统一社会信用代码"
+    ID_MISMATCH_WITH_COMPANY_REGISTRATION = "ID号码与公司登记资料不相符"
 
 
 class DPUStatus(Enum):
@@ -202,7 +205,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "dev": {
@@ -212,7 +215,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "uat": {
@@ -222,7 +225,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "preprod": {
@@ -232,18 +235,16 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "reg": {
-            "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+            "host": "18.162.145.173",
             "user": "dpu_reg",
             "password": "r4asUYBX3R6LNdp",
             "database": "dpu_seller_center",
-            "port": 3306,
-            "charset": "utf8mb4",
-            "connect_timeout": 1500,
-            "read_timeout": 15,
+            "port": 3307,
+            "charset": "utf8mb4"
         },
         "local": {
             "host": "localhost",
@@ -252,7 +253,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         }
     }
@@ -295,32 +296,24 @@ class DatabaseExecutor:
         self.env = env
 
     def connect(self) -> None:
-        """建立数据库连接（绑定本地物理网卡IP绕过VPN）"""
-        # 获取本地物理网卡IP
-        local_ip = get_local_physical_ip()
+        """建立数据库连接"""
         connect_params = self.config.copy()
 
-        if local_ip:
-            connect_params['bind_address'] = local_ip
-
         try:
-            # 清除代理环境变量
+            # 清除代理环境变量（防止代理干扰数据库连接）
             old_proxies = {}
             for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
                 if os.environ.get(proxy_key):
                     old_proxies[proxy_key] = os.environ[proxy_key]
                     del os.environ[proxy_key]
 
+            # 连接数据库（简化参数，删除不稳定的bind_address和INTERACTIVE标志）
             self.conn = pymysql.connect(
                 **connect_params,
-                autocommit=True,
-                client_flag=CLIENT.INTERACTIVE
+                autocommit=True
             )
             self.cursor = self.conn.cursor()
-            if local_ip:
-                log.info(f"[{self.env}] 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
-            else:
-                log.info(f"[{self.env}] 数据库连接成功（系统自动路由）")
+            log.info(f"[{self.env}] 数据库连接成功")
         except Exception as e:
             log.error(f"[{self.env}] 数据库连接失败: {e}")
             raise
@@ -389,6 +382,17 @@ class DatabaseExecutor:
 
         return self._execute_with_retry(_query, sql, retry)
 
+    def execute_query_all(self, sql: str, retry: int = 3) -> list:
+        """执行查询并返回所有记录（列表格式）"""
+
+        def _query_all(sql: str):
+            self.cursor.execute(sql)
+            columns = [desc[0] for desc in self.cursor.description]
+            results = self.cursor.fetchall()
+            return [dict(zip(columns, row)) for row in results] if results else []
+
+        return self._execute_with_retry(_query_all, sql, retry)
+
     def __enter__(self):
         """上下文管理器进入（支持with语句）"""
         self.connect()
@@ -408,11 +412,14 @@ class DPUMockService:
     """DPU状态模拟服务（封装所有业务操作，支持单例共享多店铺状态）"""
     generated_selling_partner_id: Optional[str] = None  # 多店铺共享SP绑定ID
     cached_lender_repayment_id: Optional[str] = None  # 缓存的还款ID，确保连续还款操作ID一致
+    hsbc_psp_pending_account_id_by_merchant: Dict[str, str] = {}  # HSBC PSP流程中待完成的merchantAccountId
+    hsbc_psp_completed_account_ids_in_session: set[str] = set()  # 当前会话中已完成的merchantAccountId
 
     def __init__(self, phone_number: str, db_executor: DatabaseExecutor):
         self.phone_number = phone_number
         self.db_executor = db_executor
         self.merchant_id = self.get_merchant_id()
+        self.preferred_currency = self.get_preferred_currency()
         self.seller_id: Optional[str] = None
         self.api_config = self._init_api_config()  # 初始化API配置
 
@@ -462,6 +469,16 @@ class DPUMockService:
         """
         return self.db_executor.execute_sql(sql)
 
+    def get_preferred_currency(self) -> str:
+        """根据merchant_id查询用户偏好货币"""
+        sql = f"""
+            SELECT prefer_finance_product_currency FROM dpu_users 
+            WHERE merchant_id = '{self.merchant_id}' 
+            LIMIT 1
+        """
+        currency = self.db_executor.execute_sql(sql)
+        return currency or "USD"  # 默认USD如果为空
+
     def get_platform_offer_id(self, seller_id: str) -> Optional[str]:
         """根据seller_id查询platform_offer_id"""
         sql = f"""
@@ -505,8 +522,8 @@ class DPUMockService:
     def application_unique_id(self) -> Optional[str]:
         """获取application_unique_id"""
         sql = f"""
-            SELECT application_unique_id FROM dpu_application 
-            WHERE merchant_id = '{self.merchant_id}' 
+            SELECT application_unique_id FROM dpu_application
+            WHERE merchant_id = '{self.merchant_id}'
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
@@ -515,6 +532,20 @@ class DPUMockService:
     def lender_approved_offer_id(self) -> str:
         """生成lender_approved_offer_id"""
         return f"lender-{self.application_unique_id}" if self.application_unique_id else "lender-default"
+
+    @property
+    def credit_offer_lender_approved_offer_id(self) -> Optional[str]:
+        """从dpu_credit_offer查询已落库的lender_approved_offer_id"""
+        if not self.merchant_id or not self.application_unique_id:
+            return None
+
+        sql = f"""
+            SELECT lender_approved_offer_id FROM dpu_credit_offer
+            WHERE merchant_id = '{self.merchant_id}'
+              AND application_unique_id = '{self.application_unique_id}'
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_sql(sql)
 
     @property
     def dpu_loan_id(self) -> Optional[str]:
@@ -545,13 +576,27 @@ class DPUMockService:
     def dpu_auth_token_seller_id(self) -> Optional[str]:
         """获取SP授权的seller_id"""
         sql = f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{self.merchant_id}' 
-            AND authorization_party = 'SP' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
             AND authorization_id IS NOT NULL
             ORDER BY created_at DESC LIMIT 1
         """
         return self.db_executor.execute_sql(sql)
+
+    @property
+    def latest_sp_auth_token_info(self) -> Optional[Dict[str, Any]]:
+        """获取最新SP授权记录中的merchant_id和authorization_id"""
+        sql = f"""
+            SELECT merchant_id, authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
+            AND authorization_id IS NOT NULL
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_query(sql)
 
     def _get_or_create_lender_repayment_id(self) -> str:
         """获取或创建还款ID（确保连续操作ID一致）"""
@@ -574,17 +619,23 @@ class DPUMockService:
     def _send_webhook_request(self, request_body: Dict[str, Any]) -> bool:
         """发送webhook请求（统一日志和异常处理）"""
         try:
+            # 记录完整请求体（慎重：可能包含敏感信息）
+            log.info(f"Webhook请求体: {request_body}")
             response = requests.post(
                 self.api_config.webhook_url,
                 json=request_body,
                 timeout=30
             )
+            # 记录完整响应体
+            log.info(f"Webhook响应状态: {response.status_code}，响应体: {response.text}")
             response.raise_for_status()
-            log.info(f"Webhook请求成功，响应: {response.text[:100]}...")
+            log.info(f"Webhook请求成功，响应: {response.text}")
             return True
         except requests.exceptions.RequestException as e:
             # ========== 优化点1：增强Webhook请求失败日志 ==========
             error_detail = f"Webhook请求失败: {str(e)}"
+            error_detail += f"\n  - 请求URL: {self.api_config.webhook_url}"
+            error_detail += f"\n  - 请求体: {request_body}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 error_detail += f"\n  - 响应头: {dict(e.response.headers)}"
@@ -597,7 +648,7 @@ class DPUMockService:
                     error_detail += f"\n  - 完整响应: {resp_json}"
                 except:
                     # 非JSON响应直接输出文本
-                    error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
+                    error_detail += f"\n  - 响应内容: {e.response.text}"
             log.error(error_detail)
             return False
 
@@ -609,14 +660,32 @@ class DPUMockService:
     ) -> Optional[Dict]:
         """通用请求方法（支持GET/POST，统一异常处理）"""
         try:
+            # 记录完整请求信息
+            log.info(f"HTTP {method.upper()} 请求 URL: {url}")
+            if 'json' in kwargs:
+                log.info(f"HTTP 请求JSON: {kwargs['json']}")
+            if 'params' in kwargs:
+                log.info(f"HTTP 请求Params: {kwargs['params']}")
+            if 'data' in kwargs:
+                log.info(f"HTTP 请求Data: {kwargs['data']}")
+
             response = requests.request(method.upper(), url, timeout=30, **kwargs)
+
+            # 记录完整响应体
+            log.info(f"HTTP 响应状态: {response.status_code}，响应体: {response.text}")
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
             # ========== 优化点2：增强通用请求失败日志 ==========
             error_detail = f"请求{url}失败: {str(e)}"
+            error_detail += f"\n  - 请求方法: {method.upper()}"
+            if 'json' in kwargs:
+                error_detail += f"\n  - 请求JSON: {kwargs.get('json')}"
+            if 'params' in kwargs:
+                error_detail += f"\n  - 请求Params: {kwargs.get('params')}"
+            if 'data' in kwargs:
+                error_detail += f"\n  - 请求Data: {kwargs.get('data')}"
             if hasattr(e, 'response') and e.response is not None:
-                error_detail += f"\n  - 请求方法: {method.upper()}"
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 error_detail += f"\n  - 响应头: {dict(e.response.headers)}"
                 try:
@@ -628,9 +697,9 @@ class DPUMockService:
                     error_detail += f"\n  - Message: {resp_json.get('message', 'N/A')}"
                     error_detail += f"\n  - Detail: {resp_json.get('detail', 'N/A')}"
                     error_detail += f"\n  - 完整响应JSON: {resp_json}"
-                except:
+                except Exception:
                     # 非JSON响应直接输出文本
-                    error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
+                    error_detail += f"\n  - 响应内容: {e.response.text}"
             log.error(error_detail)
             return None
 
@@ -694,10 +763,21 @@ class DPUMockService:
         return offer_id
 
     @classmethod
-    def register_new_account(cls) -> str:
-        """注册新账号（自动生成手机号、邮箱，返回注册成功的手机号）"""
-        journey = cls.get_journey_by_input()
-        log.info(f"开始注册新账号，流程: {journey}")
+    def register_new_account(cls, offline: bool = False) -> str:
+        """注册新账号（自动生成手机号、邮箱，返回注册成功的手机号）
+
+        offline=True 时，
+        - 跳过 1.create_offer_id
+        - 跳过 2.redirect 激活
+        - 直接从 3.validateSmsCode 开始
+        - 注册接口 offerId 传空字符串
+        """
+        if offline:
+            journey = "500K"  # 线下模式默认500K流程
+            log.info(f"[线下模式] 开始注册新账号，流程: {journey}，跳过 offer_id 创建/激活")
+        else:
+            journey = cls.get_journey_by_input()
+            log.info(f"开始注册新账号，流程: {journey}")
 
         # 获取用户选择的货币
         currency = cls.get_currency_by_input()
@@ -733,14 +813,19 @@ class DPUMockService:
             link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
             create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
             webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
+            update_offer_url=f"{base_url}/dpu-auth/amazon-sp/updateOffer",
             txt_path=str(SCRIPT_DIR / f"register_{ENV}.txt")
         )
 
         # 创建offer_id（失败重试）
-        offer_id = cls._create_offer_id(journey, api_config)
-        if not offer_id:
-            log.error("创建offer_id失败，重新注册...")
-            return cls.register_new_account()
+        if offline:
+            offer_id = ""
+            log.info("[线下模式] 已跳过offer_id创建与激活，offer_id置空")
+        else:
+            offer_id = cls._create_offer_id(journey, api_config)
+            if not offer_id:
+                log.error("创建offer_id失败，重新注册...")
+                return cls.register_new_account(offline=False)
 
         # 验证码验证
         validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
@@ -784,8 +869,12 @@ class DPUMockService:
         }
 
         try:
-            redirect_url = f"{api_config.redirect_url}?offerId={offer_id}"
-            requests.get(redirect_url, timeout=30)
+            if not offline:
+                redirect_url = f"{api_config.redirect_url}?offerId={offer_id}"
+                requests.get(redirect_url, timeout=30)
+            else:
+                redirect_url = api_config.redirect_url
+
             resp_register = requests.post(
                 api_config.register_url,
                 json=register_payload,
@@ -803,7 +892,10 @@ class DPUMockService:
             token = resp_register.json().get("data", {}).get("token", "未获取到token")
             print(f"✅ 注册成功！手机号: {phone_number} | Token: {token}")
             with open(api_config.txt_path, 'a', encoding='utf-8') as f:
-                f.write(f"\n{journey}\n{phone_number}\n{redirect_url}\n")
+                if offline:
+                    f.write(f"\n{journey}\n{phone_number}\n线下\n")
+                else:
+                    f.write(f"\n{journey}\n{phone_number}\n{redirect_url}\n")
             return phone_number
         except requests.exceptions.RequestException as e:
             # ========== 优化点5：增强注册失败日志 ==========
@@ -848,8 +940,64 @@ class DPUMockService:
     def mock_link_sp_3pl_shop(self) -> None:
         """模拟关联SP和3PL店铺"""
         log.info("开始关联SP和3PL店铺...")
-        result = self._send_request(self.api_config.link_sap_3pl_url, params={"phone": self.phone_number})
-        log.info("关联成功" if (result and result.get("code") == 200) else "关联失败")
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【SP-3PL关联】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.link_sap_3pl_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Params:")
+        log.info(f"  phone: {self.phone_number}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.link_sap_3pl_url,
+                params={"phone": self.phone_number},
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【SP-3PL关联】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                result = response.json()
+                if result and result.get("code") == 200:
+                    log.info("SP-3PL关联成功")
+                else:
+                    log.error(f"SP-3PL关联失败: {result}")
+            else:
+                log.error(f"SP-3PL关联失败，状态码: {response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【SP-3PL关联】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def _build_common_webhook_data(
             self,
@@ -901,17 +1049,72 @@ class DPUMockService:
                 "status": underwritten_status,
                 "credit": {
                     "marginRate": "2.5",
-                    "chargeBases": "Fixed",
+                    "chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float",
                     "baseRate": "3.5",
                     "baseRateType": "FIXED",
                     "creditLimit": {
-                        "currency": "CNY",
-                        "underwrittenAmount": {"currency": "CNY", "amount": underwritten_amount}
+                        "currency": self.preferred_currency,
+                        "underwrittenAmount": {"currency": self.preferred_currency, "amount": underwritten_amount}
                     }
                 }
             }
         )
-        self._send_webhook_request(data)
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【核保状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【核保状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"核保状态更新成功 | 状态={underwritten_status} | 额度={underwritten_amount}")
+            else:
+                log.error(f"核保状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【核保状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def _select_failure_reason(self, reason_enum: Enum) -> str:
         """通用失败原因选择器（复用选择逻辑）"""
@@ -957,7 +1160,7 @@ class DPUMockService:
                     "lenderApprovedOfferId": self.lender_approved_offer_id,
                     "offer": {
                         "rate": {
-                            "chargeBases": "Float",
+                            "chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float",
                             "baseRateType": "SOFR",
                             "baseRate": "0.05",
                             "marginRate": "0.02",
@@ -969,19 +1172,74 @@ class DPUMockService:
                         "maxtenor": 24,
                         "offerEndDate": calculate_future_date(90),
                         "offerStartDate": get_current_time("%Y-%m-%d"),
-                        "approvedLimit": {"currency": "USD", "amount": approved_amount},
-                        "warterMark": {"currency": "USD", "amount": 0.00},
-                        "signedLimit": {"currency": "USD", "amount": 0.00},
+                        "approvedLimit": {"currency": self.preferred_currency, "amount": approved_amount},
+                        "warterMark": {"currency": self.preferred_currency, "amount": 0.00},
+                        "signedLimit": {"currency": self.preferred_currency, "amount": 0.00},
                         "feeOrCharge": {
                             "type": "PROCESSING_FEE",
                             "feeOrChargeDate": "2023-10-16",
-                            "netAmount": {"currency": "USD", "amount": 0.00}
+                            "netAmount": {"currency": self.preferred_currency, "amount": 0.00}
                         }
                     }
                 }
             }
         }
-        self._send_webhook_request(request_body)
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【审批状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(request_body, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=request_body,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【审批状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"审批状态更新成功 | 状态={approved_status} | 额度={approved_amount}")
+            else:
+                log.error(f"审批状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【审批状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def mock_esign_status(self) -> None:
         """模拟电子签状态更新"""
@@ -996,17 +1254,79 @@ class DPUMockService:
             error_msg="请输入1或2！"
         )
         esign_status = DPUStatus.SUCCESS.value if status_input == "1" else DPUStatus.FAIL.value
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
 
         data = self._build_common_webhook_data(
             "esign.completed",
             esign_status,
             {
-                "lenderApprovedOfferId": self.lender_approved_offer_id,
+                "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
                 "result": esign_status,
-                "signedLimit": {"amount": signed_amount, "currency": "USD"}
+                "signedLimit": {"amount": signed_amount, "currency": self.preferred_currency}
             }
         )
-        self._send_webhook_request(data)
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【电子签状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【电子签状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"电子签状态更新成功 | 状态={esign_status} | 签约额度={signed_amount}")
+            else:
+                log.error(f"电子签状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【电子签状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def mock_drawdown_status(self) -> None:
         """模拟放款状态更新"""
@@ -1029,6 +1349,13 @@ class DPUMockService:
             prompt = "请选择放款失败原因：\n" + "\n".join(
                 [f"{k}-{item.value[0]}({item.value[1]})" for k, item in enumerate(DrawdownFailureReason, 1)]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
 
         current_date = get_current_time("%Y-%m-%d")
         request_body = {
@@ -1040,7 +1367,7 @@ class DPUMockService:
                 "datetime": get_utc_time(),
                 "details": {
                     "merchantId": self.merchant_id or "de04dcca3dee4461a581e8ffed19612e",
-                    "lenderApprovedOfferId": self.lender_approved_offer_id,
+                    "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
                     "dpuLoanId": self.dpu_loan_id or "EFL17613857845725084",
                     "lenderLoanId": self.lender_loan_id or "lender-EFL17613857845725084",
                     "originalRequestId": "e37b91d056114e48a466b433934e2068",
@@ -1052,8 +1379,8 @@ class DPUMockService:
                     "lastUpdatedOn": get_current_time(),
                     "lastUpdatedBy": "system",
                     "disbursement": {
-                        "loanAmount": {"currency": "USD", "amount": f"{float(drawdown_amount):.2f}"},
-                        "rate": {"chargeBases": "Float", "baseRateType": "SOFR", "baseRate": "10.00",
+                        "loanAmount": {"currency": self.preferred_currency, "amount": f"{float(drawdown_amount):.2f}"},
+                        "rate": {"chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float", "baseRateType": "SOFR", "baseRate": "10.00",
                                  "marginRate": "0.00"},
                         "term": "90",
                         "termUnit": "Days",
@@ -1062,13 +1389,68 @@ class DPUMockService:
                     },
                     "repayment": {
                         "expectedRepaymentDate": calculate_future_date(90),
-                        "expectedRepaymentAmount": {"currency": "USD", "amount": f"{float(drawdown_amount):.2f}"},
+                        "expectedRepaymentAmount": {"currency": self.preferred_currency, "amount": f"{float(drawdown_amount):.2f}"},
                         "repaymentTerm": "90"
                     }
                 }
             }
         }
-        self._send_webhook_request(request_body)
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【放款状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(request_body, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=request_body,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【放款状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"放款状态更新成功 | 状态={drawdown_status} | 金额={drawdown_amount}")
+            else:
+                log.error(f"放款状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【放款状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     # 功能5已注释：创建PSP授权记录
     # def mock_create_psp_record(self) -> None:
@@ -1094,19 +1476,95 @@ class DPUMockService:
             status_map = {"1": DPUStatus.SUCCESS.value, "2": DPUStatus.FAIL.value, "3": DPUStatus.INITIAL.value}
 
         status_input = input_with_validation(prompt=status_prompt, validator=lambda x: x in status_map)
+        psp_status = status_map[status_input]
+
+        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=not is_start)
+        if not sp_auth_info:
+            return
+        merchant_account_id = sp_auth_info["authorization_id"]
+        credit_offer_lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+        if not credit_offer_lender_approved_offer_id:
+            log.error(
+                f"未查询到dpu_credit_offer.lender_approved_offer_id | merchant_id={self.merchant_id} "
+                f"| application_unique_id={self.application_unique_id}"
+            )
+            return
+
         data = self._build_common_webhook_data(
             event_type,
-            status_map[status_input],
+            psp_status,
             {
                 "applicationId": "EFA17590311621044381",
                 "pspId": "pspId123457",
                 "pspName": "AirWallex",
-                "merchantAccountId": self.dpu_auth_token_seller_id,
-                "lenderApprovedOfferId": self.lender_approved_offer_id,
-                "result": status_map[status_input]
+                "merchantAccountId": merchant_account_id,
+                "lenderApprovedOfferId": credit_offer_lender_approved_offer_id,
+                "result": psp_status
             }
         )
-        self._send_webhook_request(data)
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info(f"【PSP{'开始' if is_start else '完成'}状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info(f"\n【PSP{'开始' if is_start else '完成'}状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                if is_start:
+                    self.hsbc_psp_pending_account_id_by_merchant[self.merchant_id] = merchant_account_id
+                else:
+                    self.hsbc_psp_completed_account_ids_in_session.add(merchant_account_id)
+                    self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+                log.info(
+                    f"PSP{'开始' if is_start else '完成'}状态更新成功 | 状态={psp_status} | merchantAccountId={merchant_account_id}"
+                )
+            else:
+                log.error(f"PSP{'开始' if is_start else '完成'}状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error(f"\n【PSP{'开始' if is_start else '完成'}状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def mock_psp_start_status(self) -> None:
         """模拟PSP开始状态"""
@@ -1115,6 +1573,222 @@ class DPUMockService:
     def mock_psp_completed_status(self) -> None:
         """模拟PSP完成状态"""
         self._mock_psp_status(is_start=False)
+
+    def _get_hsbc_psp_completed_account_ids(self) -> set[str]:
+        """获取已完成的HSBC PSP merchantAccountId"""
+        sql = f"""
+            SELECT JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.merchantAccountId')) AS merchant_account_id
+            FROM dpu_lender_event
+            WHERE merchant_id = '{self.merchant_id}'
+            AND event_type = 'psp.verification.completed'
+            AND JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.merchantAccountId')) IS NOT NULL
+            ORDER BY received_at DESC
+        """
+        rows = self.db_executor.execute_query_all(sql)
+        completed_account_ids = {
+            row["merchant_account_id"]
+            for row in rows
+            if row.get("merchant_account_id") and not str(row["merchant_account_id"]).startswith("{{")
+        }
+        completed_account_ids.update(self.hsbc_psp_completed_account_ids_in_session)
+        return completed_account_ids
+
+    def _select_hsbc_psp_auth_token_info(self, for_completed: bool = False) -> Optional[Dict[str, Any]]:
+        """选择HSBC PSP通知要使用的SP授权记录"""
+        sql = f"""
+            SELECT merchant_id, authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND status = 'ACTIVE'
+            AND authorization_id IS NOT NULL
+            ORDER BY created_at DESC
+        """
+        sp_auth_infos = self.db_executor.execute_query_all(sql)
+        if not sp_auth_infos:
+            log.error(f"未查询到SP授权记录，merchant_id: {self.merchant_id}")
+            return None
+
+        completed_account_ids = self._get_hsbc_psp_completed_account_ids()
+        pending_account_id = self.hsbc_psp_pending_account_id_by_merchant.get(self.merchant_id)
+        if pending_account_id in completed_account_ids:
+            self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+            pending_account_id = None
+
+        selected_info = None
+        if for_completed and pending_account_id:
+            selected_info = next(
+                (item for item in sp_auth_infos if item["authorization_id"] == pending_account_id),
+                None
+            )
+
+        if not selected_info:
+            selected_info = next(
+                (item for item in sp_auth_infos if item["authorization_id"] not in completed_account_ids),
+                None
+            )
+
+        if not selected_info:
+            log.error(
+                f"未查询到可用的未完成SP授权记录，merchant_id: {self.merchant_id} | 已完成数量={len(completed_account_ids)}"
+            )
+            return None
+
+        return selected_info
+
+    def _get_hsbc_psp_notification_context(self, for_completed: bool = False) -> Optional[Dict[str, str]]:
+        """获取HSBC版PSP通知所需的上下文"""
+        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=for_completed)
+        if not sp_auth_info:
+            return None
+
+        merchant_id = sp_auth_info["merchant_id"]
+        merchant_account_id = sp_auth_info["authorization_id"]
+        limit_application_unique_id = self.dpu_limit_application_id
+
+        if not limit_application_unique_id:
+            limit_application_unique_id = input_with_validation(
+                prompt="未查询到limitApplicationUniqueId，请输入：\n",
+                validator=lambda x: bool(x.strip()),
+                error_msg="limitApplicationUniqueId不能为空！"
+            )
+
+        return {
+            "merchant_id": merchant_id,
+            "merchant_account_id": merchant_account_id,
+            "limit_application_unique_id": limit_application_unique_id
+        }
+
+    def _send_hsbc_psp_notification(
+            self,
+            event_type: str,
+            result: str,
+            failure_reason: Optional[str],
+            title: str,
+            for_completed: bool = False
+    ) -> None:
+        """发送HSBC版PSP通知"""
+        context = self._get_hsbc_psp_notification_context(for_completed=for_completed)
+        if not context:
+            return
+
+        payload = {
+            "eventType": event_type,
+            "eventReceiver": "DPU",
+            "eventData": {
+                "merchantId": context["merchant_id"],
+                "merchantAccountId": context["merchant_account_id"],
+                "limitApplicationUniqueId": context["limit_application_unique_id"],
+                "pspName": "Payoneer",
+                "pspId": "PSP_12345",
+                "result": result,
+                "failureReason": failure_reason,
+                "lastUpdatedOn": get_current_time("%Y-%m-%dT%H:%M:%S"),
+                "lastUpdatedBy": "HSBC_SYSTEM"
+            }
+        }
+
+        host_header = self.api_config.base_url.replace("https://", "").replace("http://", "")
+        headers = {
+            "X-Internal-Request": "true",
+            "Authorization": "Bearer",
+            "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "Host": host_header,
+            "Connection": "keep-alive",
+            "Cookie": "Cookie_1=value"
+        }
+        url = f"{self.api_config.base_url}/dpu-openapi/notification/system-events"
+
+        log.info("=" * 60)
+        log.info(f"【{title}】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            log.info(f"\n【{title}】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                if for_completed:
+                    self.hsbc_psp_completed_account_ids_in_session.add(context["merchant_account_id"])
+                    self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
+                else:
+                    self.hsbc_psp_pending_account_id_by_merchant[self.merchant_id] = context["merchant_account_id"]
+                log.info(
+                    f"{title}通知发送成功 | merchantId={context['merchant_id']} | merchantAccountId={context['merchant_account_id']}"
+                )
+            else:
+                log.error(f"{title}通知发送失败 | 状态码={response.status_code}")
+        except requests.exceptions.RequestException as e:
+            log.error(f"\n【{title}】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except Exception:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def mock_psp_start_status_hsbc(self) -> None:
+        """发送HSBC版PSP开始通知"""
+        log.info("开始处理PSP开始（HSBC）...")
+        self._send_hsbc_psp_notification(
+            event_type="psp.verification.started",
+            result="PROCESSING",
+            failure_reason=None,
+            title="PSP开始（HSBC）",
+            for_completed=False
+        )
+
+    def mock_psp_completed_status_hsbc(self) -> None:
+        """发送HSBC版PSP完成通知"""
+        log.info("开始处理PSP完成（HSBC）...")
+
+        status_map = {
+            "1": "SUCCESS",
+            "2": "FAIL"
+        }
+        status_input = input_with_validation(
+            prompt="请输入result：\n1-SUCCESS  2-FAIL\n",
+            validator=lambda x: x in status_map,
+            error_msg="请输入1或2！"
+        )
+        result = status_map[status_input]
+        failure_reason = None if result == "SUCCESS" else "Bank account verification failed"
+
+        self._send_hsbc_psp_notification(
+            event_type="psp.verification.completed",
+            result=result,
+            failure_reason=failure_reason,
+            title="PSP完成（HSBC）",
+            for_completed=True
+        )
 
     def mock_multi_shop_binding(self) -> None:
         """SP店铺绑定（多店铺第一步）"""
@@ -1130,7 +1804,18 @@ class DPUMockService:
         }
         full_auth_url = f"{self.api_config.multi_shop_sp_auth_url}?{urlencode(params)}"
 
-        log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
+        log.info("=" * 60)
+        log.info("【多店铺-SP绑定】")
+        log.info("=" * 60)
+
+        # 发送请求（静默执行）
+        requests.get(
+            self.api_config.multi_shop_sp_auth_url,
+            params=params,
+            timeout=30
+        )
+
+        log.info(f"【多店铺】SP绑定成功 | SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】SP授权URL：{full_auth_url}")
 
     def mock_multi_shop_3pl_redirect(self) -> None:
@@ -1145,9 +1830,22 @@ class DPUMockService:
             return
 
         full_redirect_url = f"{self.api_config.redirect_url}?offerId={platform_offer_id}"
+
+        log.info("=" * 60)
+        log.info("【多店铺-3PL重定向】")
+        log.info("=" * 60)
+
+        # 发送请求（静默执行）
+        requests.get(
+            self.api_config.redirect_url,
+            params={"offerId": platform_offer_id},
+            timeout=30
+        )
+
         log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
         log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
+        log.info("=" * 60)
 
     def mock_sp_status_update(self) -> None:
         """SP状态更新（调用 updateOffer 接口）"""
@@ -1172,6 +1870,7 @@ class DPUMockService:
         platform_offer_id_sql = f"""
             SELECT platform_offer_id FROM dpu_seller_center.dpu_manual_offer
             WHERE platform_seller_id = '{platform_seller_id}'
+            ORDER BY created_at DESC LIMIT 1
         """
 
         idempotency_key = self.db_executor.execute_sql(idempotency_key_sql)
@@ -1180,10 +1879,6 @@ class DPUMockService:
         if not idempotency_key:
             log.error(f"未查询到 idempotency_key，platform_seller_id: {platform_seller_id}")
             return
-        if not platform_offer_id:
-            log.error(f"未查询到 platform_offer_id，platform_seller_id: {platform_seller_id}")
-            return
-
         log.info(f"查询成功 | idempotency_key: {idempotency_key} | platform_offer_id: {platform_offer_id}")
 
         # 选择状态
@@ -1209,13 +1904,31 @@ class DPUMockService:
             prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
 
+        if send_status == "SUCCESS" and not platform_offer_id:
+            log.error(f"SUCCESS 场景需要 platform_offer_id，platform_seller_id: {platform_seller_id}")
+            return
+
+        payload_offer_id = platform_offer_id if send_status == "SUCCESS" else ""
+
         # 构建请求体
         payload = {
             "idempotencyKey": idempotency_key,
             "sendStatus": send_status,
-            "offerId": platform_offer_id,
+            "offerId": payload_offer_id,
             "reason": failure_reason
         }
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【SP状态更新】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.update_offer_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
 
         # 发送请求
         try:
@@ -1225,20 +1938,42 @@ class DPUMockService:
                 headers={"Content-Type": "application/json"},
                 timeout=30
             )
-            response.raise_for_status()
-            log.info(f"SP状态更新成功 | 响应: {response.text[:200]}...")
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【SP状态更新】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"SP状态更新成功 | 状态={send_status} | platform_offer_id={platform_offer_id}")
+            else:
+                log.error(f"SP状态更新失败 | 状态码={response.status_code}")
+
         except requests.exceptions.RequestException as e:
-            error_detail = f"SP状态更新失败: {str(e)}"
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【SP状态更新】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
             if hasattr(e, 'response') and e.response is not None:
-                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
                 try:
                     resp_json = e.response.json()
-                    error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
-                    error_detail += f"\n  - Status: {resp_json.get('status', 'N/A')}"
-                    error_detail += f"\n  - Message: {resp_json.get('message', 'N/A')}"
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
                 except:
-                    error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
-            log.error(error_detail)
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def mock_repayment_start_status(self) -> None:
         """模拟还款开始状态通知（固定状态为Start，无需选择状态）"""
@@ -1285,18 +2020,71 @@ class DPUMockService:
                     "failureReason": failure_reason,
                     "fundSource": "BankTransfer",
                     "paidOn": get_current_time(),
-                    "totalPaidAmount": {"currency": "USD", "amount": total_amount},
-                    "principalPaidAmount": {"currency": "USD", "amount": principal_amount},
-                    "interestPaidAmount": {"currency": "USD", "amount": interest_amount},
-                    "feePaidAmount": {"currency": "USD", "amount": 0.00},
-                    "outstandingAmount": {"currency": "USD", "amount": outstanding_amount}
+                    "totalPaidAmount": {"currency": self.preferred_currency, "amount": total_amount},
+                    "principalPaidAmount": {"currency": self.preferred_currency, "amount": principal_amount},
+                    "interestPaidAmount": {"currency": self.preferred_currency, "amount": interest_amount},
+                    "feePaidAmount": {"currency": self.preferred_currency, "amount": 0.00},
+                    "outstandingAmount": {"currency": self.preferred_currency, "amount": outstanding_amount}
                 }
             }
         )
 
-        log.info(
-            f"还款开始请求发送 | 状态={repayment_status} | 还款ID={lender_repayment_id} | 总金额={total_amount} USD")
-        self._send_webhook_request(data)
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【还款开始】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【还款开始】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(
+                    f"还款开始请求发送成功 | 状态={repayment_status} | 还款ID={lender_repayment_id} | 总金额={total_amount} USD")
+            else:
+                log.error(f"还款开始请求发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【还款开始】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
     def mock_repayment_status(self) -> None:
         """模拟还款状态通知（执行完自动清空还款ID缓存）"""
@@ -1364,20 +2152,218 @@ class DPUMockService:
                     "failureReason": failure_reason,
                     "fundSource": "BankTransfer",
                     "paidOn": get_current_time(),
-                    "totalPaidAmount": {"currency": "USD", "amount": total_amount},
-                    "principalPaidAmount": {"currency": "USD", "amount": principal_amount},
-                    "interestPaidAmount": {"currency": "USD", "amount": interest_amount},
-                    "feePaidAmount": {"currency": "USD", "amount": 0.00},
-                    "outstandingAmount": {"currency": "USD", "amount": outstanding_amount}
+                    "totalPaidAmount": {"currency": self.preferred_currency, "amount": total_amount},
+                    "principalPaidAmount": {"currency": self.preferred_currency, "amount": principal_amount},
+                    "interestPaidAmount": {"currency": self.preferred_currency, "amount": interest_amount},
+                    "feePaidAmount": {"currency": self.preferred_currency, "amount": 0.00},
+                    "outstandingAmount": {"currency": self.preferred_currency, "amount": outstanding_amount}
                 }
             }
         )
 
-        log.info(f"还款请求发送 | 状态={repayment_status} | 还款ID={lender_repayment_id} | 总金额={total_amount} USD")
-        self._send_webhook_request(data)
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【还款】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        log.info(f"  Content-Type: application/json")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
 
-        # 核心修改：执行完还款操作后自动清空缓存
-        self.clear_lender_repayment_id()
+        # 发送请求
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                timeout=30
+            )
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【还款】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"还款请求发送成功 | 状态={repayment_status} | 还款ID={lender_repayment_id} | 总金额={total_amount} USD")
+                # 核心修改：执行完还款操作后自动清空缓存
+                self.clear_lender_repayment_id()
+                log.info("还款ID缓存已清空")
+            else:
+                log.error(f"还款请求发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【还款】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def mock_system_event_notification(self):
+        """发送系统事件通知（调用HSBC API）"""
+        log.info("开始发送系统事件通知")
+
+        # 选择eventType
+        event_type_map = {
+            "1": "EXCEPTION-APPLICATION-CREATION",
+            "2": "INDICATIVE-OFFER",
+            "3": "IN-PROCESS",
+            "4": "ERROR",
+            "5": "ETB-customer"
+        }
+        event_type_choice = input_with_validation(
+            prompt="请选择eventType：\n1 - EXCEPTION-APPLICATION-CREATION（贷款申请创建异常）\n2 - INDICATIVE-OFFER（指示性报价，如贷款预审批报价）\n3 - IN-PROCESS（业务处理中，如申请正在审核）\n4 - ERROR（通用错误事件）\n5 - ETB-customer（ETB）\n",
+            validator=lambda x: x in ("1", "2", "3", "4", "5")
+        )
+        event_type = event_type_map[event_type_choice]
+
+        # 获取 applicationUniqueId（优先从已有数据查询，若不存在则提示输入）
+        application_unique_id = self.application_unique_id
+        if not application_unique_id:
+            application_unique_id = input("未检测到applicationUniqueId，请输入applicationUniqueId：\n").strip()
+
+        # 从数据库获取 applicationId
+        application_id_sql = (
+            "SELECT fund_application_id FROM dpu_seller_center.dpu_lender_shop_data_transmission "
+            f"WHERE application_unique_id = '{application_unique_id}' LIMIT 1"
+        )
+        application_id = self.db_executor.execute_sql(application_id_sql)
+        if not application_id:
+            log.warning(
+                f"未在dpu_lender_shop_data_transmission找到applicationId，application_unique_id={application_unique_id}。"
+                "将使用默认值。"
+            )
+            application_id = "PLPUAT000000652489"
+
+        # 从数据库获取 third_party_customer_id (merchant_id)
+        third_party_customer_id_sql = (
+            "SELECT merchant_id FROM dpu_seller_center.dpu_lender_shop_data_transmission "
+            f"WHERE application_unique_id = '{application_unique_id}' LIMIT 1"
+        )
+        third_party_customer_id = self.db_executor.execute_sql(third_party_customer_id_sql)
+        if not third_party_customer_id:
+            log.warning(
+                f"未在dpu_lender_shop_data_transmission找到merchant_id，application_unique_id={application_unique_id}。"
+                "将使用默认值。"
+            )
+            third_party_customer_id = "67379738b310487393c3947188e8a204"
+
+        event_time = get_current_time()
+
+        # EXCEPTION-APPLICATION-CREATION 需要指定 errorCode（1-B-6003 或 2-B-6005）
+        error_code = ""
+        if event_type == "EXCEPTION-APPLICATION-CREATION":
+            error_code_map = {"1": "B-6003", "2": "B-6005"}
+            error_code_choice = input_with_validation(
+                prompt="请选择 errorCode：\n1 - B-6003\n2 - B-6005\n",
+                validator=lambda x: x in ("1", "2")
+            )
+            error_code = error_code_map[error_code_choice]
+
+        error_message = ""
+
+        # 构建payload
+        payload = {
+            "applicationUniqueId": application_unique_id,
+            "eventType": event_type,
+            "eventReceiver": "dpu",
+            "eventData": {
+                "thirdPartyCustomerId": third_party_customer_id,
+                "applicationId": application_id,
+                "eventTime": event_time,
+                "errorCode": error_code,
+                "errorMessage": error_message
+            }
+        }
+
+        # ========== 增强日志：打印完整请求内容 ==========
+        log.info("=" * 60)
+        log.info("【系统事件通知】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.base_url}/dpu-openapi/notification/system-events")
+        log.info(f"请求方法: POST")
+        log.info(f"请求Headers:")
+        headers = {
+            "Authorization": "JWS eyJ2ZXIiOiIxLjAiLCJraWQiOiJCQzAwMDAxMTA2NyIsInR5cCI6IkpXVCIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJCQzAwMDAxMTA2NyIsImF1ZCI6IkdCQS1FQ09NTSIsInBheWxvYWRfaGFzaF9hbGciOiJTSEEtMjU2IiwicGF5bG9hZF9oYXNoIjoiOWFkNjQyZmM4MGY1YmJkZTYwZDFhMmI1ZjJmMTJkNjY4OTJiZGQ4MGVlMzc4ODUzOTE4NTA2MmJkNjFjMzg5YyIsImlhdCI6MTc2OTA3NjQ4OCwianRpIjoiYjQ1OWJjMWYtZWNkZi00Mjc4LWIwMjMtNTQ2YzM4Y2ZmNWRhIn0.ULI-b7nl8E1n4JXjCR7jAOY1maoUlL5_kBex-FHITCfVa7VPRPPKRiU4RZhFlGVdRS1sJzGmlce4Gn0nidbWUISI7JzN-94N3GxMuMinVoLi6U_3SIH1a3Ykx4LdSACRL7DC2Jw1kcjKqgzaO-30TnR4iR1JtwcUPqcmSII8CxoYDFrrMh-Hqwq16fvj92VcgkMQB_TPu0ZezwBus01YLetiA4wCkCk-1Jq4K5E8EImHzDUISAiHyDovQo79t37bTX18ir0q1MvSqIgCDyMcb7-13REKXDjAE6AJKxprwE6RsrDULc0texMPra2j1PUdIfGGggsBjz0dlHDuaHXyCw",
+            "X-HSBC-Request-Correlation-Id": "581772f3-8791-4466-98bf-bd5f13a6daff",
+            "X-HSBC-E2E-Trust-Token": "5C2413B10CA3B23A",
+            "X-HSBC-Request-Idempotency-Key": "8f5a23ce-a3d2-4b46-98f3-cac50b542abd",
+            "X-HSBC-PROFILEID": "DPUSIT-B2B-P-2025-ACTIVE",
+            "Accept": "*/*",
+            "Funder-Resource": "HSBC",
+            "Content-Type": "application/json"
+        }
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info(f"请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        # 发送请求
+        url = f"{self.api_config.base_url}/dpu-openapi/notification/system-events"
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            # ========== 增强日志：打印完整响应内容 ==========
+            log.info("\n【系统事件通知】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info(f"响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(
+                    f"系统事件通知发送成功 | eventType={event_type} | applicationUniqueId={application_unique_id}"
+                )
+            else:
+                log.error(
+                    f"系统事件通知发送失败 | 状态码={response.status_code} | applicationUniqueId={application_unique_id}"
+                )
+        except requests.exceptions.RequestException as e:
+            # ========== 增强日志：打印异常详细信息 ==========
+            log.error("\n【系统事件通知】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error(f"响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
 
 
 # ============================ 辅助函数（精简逻辑，提升可读性）============================
@@ -1394,9 +2380,10 @@ def check_is_registered(phone_number: str, db_executor: DatabaseExecutor) -> boo
 
         # 校验3PL授权
         offer_id = db_executor.execute_sql(f"""
-            SELECT authorization_id FROM dpu_auth_token 
-            WHERE merchant_id = '{merchant_id}' 
-            AND authorization_party = '3PL' 
+            SELECT authorization_id FROM dpu_auth_token
+            WHERE merchant_id = '{merchant_id}'
+            AND authorization_party = '3PL'
+            AND status = 'ACTIVE'
             ORDER BY created_at DESC LIMIT 1
         """)
         if offer_id:
@@ -1419,13 +2406,15 @@ def main():
     with DatabaseExecutor() as db_executor:
         # 选择操作类型
         register_choice = input_with_validation(
-            prompt="请选择操作：1-注册新账号 2-使用现有账号 \n",
-            validator=lambda x: x in ("1", "2")
+            prompt="请选择操作：0-注册新账号（线下） 1-注册新账号 2-使用现有账号 \n",
+            validator=lambda x: x in ("0", "1", "2")
         )
 
         # 处理注册/登录
         if register_choice == "1":
-            phone_number = DPUMockService.register_new_account()
+            phone_number = DPUMockService.register_new_account(offline=False)
+        elif register_choice == "0":
+            phone_number = DPUMockService.register_new_account(offline=True)
         else:
             phone_number = input_with_validation(
                 prompt="请输入手机号：\n",
@@ -1433,16 +2422,28 @@ def main():
                 error_msg="请输入有效的已注册手机号（8位或11位数字）！"
             )
 
+        # 查询并打印用户信息
+        user_info = db_executor.execute_query(
+            f"SELECT merchant_id, prefer_finance_product_currency FROM dpu_users WHERE phone_number = '{phone_number}' LIMIT 1"
+        )
+        if user_info:
+            log.info(f"📱 手机号: {phone_number}")
+            log.info(f"🆔 Merchant ID: {user_info['merchant_id']}")
+            log.info(f"💰 偏好融资产品货币: {user_info['prefer_finance_product_currency']}")
+        else:
+            log.warning(f"⚠️ 未找到手机号 {phone_number} 的用户信息")
+
         # 初始化服务
         mock_service = DPUMockService(phone_number, db_executor)
 
-        # 主菜单配置（结构化管理，便于维护）- 移除了1(spapi授权)、5(创建psp记录)、14(清空缓存)选项
+        # 主菜单配置（结构化管理，便于维护）
         menu = """
 请输入要执行的操作：
 1 - link-sp-3pl关联      2 - 核保(underwritten)    3 - 审批(approved)
 4 - psp开始(psp_start)   5 - psp完成(psp_completed)  6 - 电子签(esign)
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
 10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
+13 - 系统事件通知       14 - psp开始（hsbc）      15 - psp完成（hsbc）
 q - 退出
 """
         operation_map = {
@@ -1457,7 +2458,10 @@ q - 退出
             "9": mock_service.mock_repayment_status,
             "10": mock_service.mock_multi_shop_binding,
             "11": mock_service.mock_sp_status_update,
-            "12": mock_service.mock_multi_shop_3pl_redirect
+            "12": mock_service.mock_multi_shop_3pl_redirect,
+            "13": mock_service.mock_system_event_notification,
+            "14": mock_service.mock_psp_start_status_hsbc,
+            "15": mock_service.mock_psp_completed_status_hsbc
         }
 
         # 菜单循环

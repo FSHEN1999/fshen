@@ -11,6 +11,8 @@ def _default_project_root() -> Path:
 PROJECT_ROOT = Path(os.environ.get("LOCAL_RAG_HOME", _default_project_root())).resolve()
 DATA_DIR = PROJECT_ROOT / ".rag_mvp"
 DB_PATH = Path(os.environ.get("LOCAL_RAG_DB", DATA_DIR / "rag.db")).resolve()
+TOPIC_PORTAL_DIRNAME = "dpu_topic_portals"
+TOPIC_PORTAL_DIR = PROJECT_ROOT / TOPIC_PORTAL_DIRNAME
 
 INDEX_EXTENSIONS = {
     ".py",
@@ -31,14 +33,17 @@ EXCLUDED_DIRS = {
     ".idea",
     ".claude",
     ".rag_mvp",
+    "node_modules",
+    ".vite",
 }
 MAX_TEXT_FILE_BYTES = 1_500_000
 CHUNK_SIZE = 1400
 CHUNK_OVERLAP = 200
 AUTOMATION_NAME_HINTS = (
-    "自动化",
     "mock",
+    "mockapi",
     "migration_test",
+    "migration",
     "offerid",
     "rollback",
     "register",
@@ -47,5 +52,7 @@ AUTOMATION_NAME_HINTS = (
     "psp",
     "drawdown",
     "repayment",
+    "metersphere",
+    "webhook",
+    "locator",
 )
-

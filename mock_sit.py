@@ -140,11 +140,13 @@ class SanctionStatus(Enum):
 
 class ReturnedFailureReason(Enum):
     """审批退回失败原因枚举"""
-    INCORRECT_BRN = "不正确 BRN"
-    FAILED_TO_OBTAIN_CUSTOMER_ID = "未能获取客户 ID 号码"
+    INCORRECT_BRN = "不正确BRN"
+    FAILED_TO_OBTAIN_CUSTOMER_ID = "未能获取客户ID号码"
     ID_MISMATCH_WITH_CR_RECORD = "ID 号码与 CR 记录不相符"
     FAILED_COMPANY_STRUCTURE_VERIFICATION = "未能通过公司结构校验"
     REQUIRES_MANUAL_AML_VERIFICATION = "需要人工处理反洗钱验证"
+    INCORRECT_UNIFIED_SOCIAL_CREDIT_CODE = "不正确统一社会信用代码"
+    ID_MISMATCH_WITH_COMPANY_REGISTRATION = "ID号码与公司登记资料不相符"
 
 
 class DPUStatus(Enum):
@@ -203,7 +205,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "dev": {
@@ -213,7 +215,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "uat": {
@@ -223,7 +225,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "preprod": {
@@ -233,18 +235,16 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         },
         "reg": {
-            "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+            "host": "18.162.145.173",
             "user": "dpu_reg",
             "password": "r4asUYBX3R6LNdp",
             "database": "dpu_seller_center",
-            "port": 3306,
-            "charset": "utf8mb4",
-            "connect_timeout": 1500,
-            "read_timeout": 15,
+            "port": 3307,
+            "charset": "utf8mb4"
         },
         "local": {
             "host": "localhost",
@@ -253,7 +253,7 @@ class DatabaseConfig:
             "database": "dpu_seller_center",
             "port": 3306,
             "charset": "utf8mb4",
-            "connect_timeout": 1500,
+            "connect_timeout": 15,
             "read_timeout": 15,
         }
     }
@@ -296,32 +296,24 @@ class DatabaseExecutor:
         self.env = env
 
     def connect(self) -> None:
-        """建立数据库连接（绑定本地物理网卡IP绕过VPN）"""
-        # 获取本地物理网卡IP
-        local_ip = get_local_physical_ip()
+        """建立数据库连接"""
         connect_params = self.config.copy()
 
-        if local_ip:
-            connect_params['bind_address'] = local_ip
-
         try:
-            # 清除代理环境变量
+            # 清除代理环境变量（防止代理干扰数据库连接）
             old_proxies = {}
             for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
                 if os.environ.get(proxy_key):
                     old_proxies[proxy_key] = os.environ[proxy_key]
                     del os.environ[proxy_key]
 
+            # 连接数据库（简化参数，删除不稳定的bind_address和INTERACTIVE标志）
             self.conn = pymysql.connect(
                 **connect_params,
-                autocommit=True,
-                client_flag=CLIENT.INTERACTIVE
+                autocommit=True
             )
             self.cursor = self.conn.cursor()
-            if local_ip:
-                log.info(f"[{self.env}] 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
-            else:
-                log.info(f"[{self.env}] 数据库连接成功（系统自动路由）")
+            log.info(f"[{self.env}] 数据库连接成功")
         except Exception as e:
             log.error(f"[{self.env}] 数据库连接失败: {e}")
             raise
@@ -722,14 +714,14 @@ class DPUMockService:
     @classmethod
     def get_currency_by_input(cls) -> str:
         """获取用户选择的融资产品货币（CNY/USD）"""
-        currency_map = {"1": "CNY", "2": "USD"}
-        prompt = "请输入融资产品货币：1-CNY 2-USD \n"
+        currency_map = {"1": "USD", "2": "CNY"}
+        prompt = "请输入融资产品货币：1-USD 2-CNY \n"
         return currency_map[input_with_validation(prompt, lambda x: x in currency_map)]
 
     @classmethod
-    def _create_offer_id(cls, journey: str, api_config: ApiConfig) -> Optional[str]:
+    def _create_offer_id(cls, journey: str, currency: str, api_config: ApiConfig) -> Optional[str]:
         """创建offer_id（按流程生成对应额度，创建后自动访问redirect_url使offer_id生效）"""
-        journey_amount = {"200K": 100000, "500K": 800000, "2000K": 6000000}
+        journey_amount = {"200K": 15000, "500K": 1666666, "2000K": 1666667}
         yearly_amount = journey_amount.get(journey.upper())
         if not yearly_amount:
             log.error(f"不支持的流程: {journey}")
@@ -738,7 +730,7 @@ class DPUMockService:
         # 创建offer_id
         resp = requests.post(
             api_config.create_offerid_url,
-            json={"yearlyRepaymentAmount": yearly_amount},
+            json={"yearlyRepaymentAmount": yearly_amount, "currency": currency},
             timeout=30
         )
         offer_id = resp.json().get("data", {}).get("amazon3plOfferId") if resp.ok else None
@@ -747,6 +739,7 @@ class DPUMockService:
         if offer_id:
             redirect_url = f"{api_config.redirect_url}?offerId={offer_id}"
             try:
+                log.info(f"正在访问重定向URL: {redirect_url}")
                 # GET请求激活
                 requests.get(redirect_url, timeout=30)
                 # POST请求二次确认
@@ -780,16 +773,16 @@ class DPUMockService:
         - 直接从 3.validateSmsCode 开始
         - 注册接口 offerId 传空字符串
         """
+        # 获取用户选择的货币
+        currency = cls.get_currency_by_input()
+        log.info(f"融资产品货币: {currency}")
+
         if offline:
             journey = "500K"  # 线下模式默认500K流程
             log.info(f"[线下模式] 开始注册新账号，流程: {journey}，跳过 offer_id 创建/激活")
         else:
             journey = cls.get_journey_by_input()
             log.info(f"开始注册新账号，流程: {journey}")
-
-        # 获取用户选择的货币
-        currency = cls.get_currency_by_input()
-        log.info(f"融资产品货币: {currency}")
 
         # 生成账号信息
         phone_number = ''.join(filter(str.isdigit, faker.phone_number()))
@@ -830,7 +823,7 @@ class DPUMockService:
             offer_id = ""
             log.info("[线下模式] 已跳过offer_id创建与激活，offer_id置空")
         else:
-            offer_id = cls._create_offer_id(journey, api_config)
+            offer_id = cls._create_offer_id(journey, currency, api_config)
             if not offer_id:
                 log.error("创建offer_id失败，重新注册...")
                 return cls.register_new_account(offline=False)
@@ -1057,7 +1050,7 @@ class DPUMockService:
                 "status": underwritten_status,
                 "credit": {
                     "marginRate": "2.5",
-                    "chargeBases": "Fixed",
+                    "chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float",
                     "baseRate": "3.5",
                     "baseRateType": "FIXED",
                     "creditLimit": {
@@ -1168,7 +1161,7 @@ class DPUMockService:
                     "lenderApprovedOfferId": self.lender_approved_offer_id,
                     "offer": {
                         "rate": {
-                            "chargeBases": "Float",
+                            "chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float",
                             "baseRateType": "SOFR",
                             "baseRate": "0.05",
                             "marginRate": "0.02",
@@ -1388,7 +1381,7 @@ class DPUMockService:
                     "lastUpdatedBy": "system",
                     "disbursement": {
                         "loanAmount": {"currency": self.preferred_currency, "amount": f"{float(drawdown_amount):.2f}"},
-                        "rate": {"chargeBases": "Float", "baseRateType": "SOFR", "baseRate": "10.00",
+                        "rate": {"chargeBases": "Fixed" if self.preferred_currency == "CNY" else "Float", "baseRateType": "SOFR", "baseRate": "10.00",
                                  "marginRate": "0.00"},
                         "term": "90",
                         "termUnit": "Days",

@@ -2,7 +2,7 @@
 """
 迁移测试脚本 - 支持 JSON 格式导入
 使用方法：python migration_test_FP_json.py <file_path>
-支持 .json 和 .csv 格式文件
+支持 .json �?.csv 格式文件
 """
 import logging
 import time
@@ -13,7 +13,6 @@ import csv
 import json
 import pymysql
 import secrets
-from pymysql.constants import CLIENT
 from datetime import datetime, timedelta
 
 # ================= 配置区域 =================
@@ -29,7 +28,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "uat": {
@@ -39,7 +38,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "preprod": {
@@ -49,18 +48,16 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "reg": {
-        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "host": "18.162.145.173",
         "user": "dpu_reg",
         "password": "r4asUYBX3R6LNdp",
         "database": "dpu_seller_center",
-        "port": 3306,
-        "charset": "utf8mb4",
-        "connect_timeout": 1500,
-        "read_timeout": 15,
+        "port": 3307,
+        "charset": "utf8mb4"
     },
     "dev": {
         "host": "localhost",
@@ -69,22 +66,22 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
 }
 
-# 初始化日志
+# 初始化日�?
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 log.info(f"当前环境: {ENV}")
-log.info(f"数据库主机: {DATABASE_CONFIG[ENV]['host']}")
+log.info(f"数据库主�? {DATABASE_CONFIG[ENV]['host']}")
 
 # ================= 数据库操作类 =================
 class ExecuteSql:
     def __init__(self, env=ENV):
         self.env = env
-        self.conn = pymysql.connect(**DATABASE_CONFIG[env], autocommit=True, client_flag=CLIENT.INTERACTIVE)
+        self.conn = pymysql.connect(**DATABASE_CONFIG[env], autocommit=True)
         self.cursor = self.conn.cursor()
 
     def __enter__(self):
@@ -129,7 +126,7 @@ def check_and_execute(executor, sql, step_name):
     log.info(f"执行: {step_name}")
     res = executor.execute_sql(sql)
     if not res['success']:
-        log.error(f"{step_name} 失败，终止当前行处理。错误: {res['error']}")
+        log.error(f"{step_name} 失败，终止当前行处理。错�? {res['error']}")
         raise Exception(f"SQL Failed: {step_name}")
     log.info(f"{step_name} 成功")
     return res
@@ -137,15 +134,15 @@ def check_and_execute(executor, sql, step_name):
 
 def build_insert_sql(table, fields, ignore=False):
     """
-    构建 INSERT INTO ... SET 格式的SQL语句，字段名和值在同一行显示
+    构建 INSERT INTO ... SET 格式的SQL语句，字段名和值在同一行显�?
 
     参数:
         table: 表名
-        fields: 字典，键为字段名，值为字段值
+        fields: 字典，键为字段名，值为字段�?
         ignore: 是否使用 INSERT IGNORE
 
     返回:
-        SQL字符串
+        SQL字符�?
     """
     ignore_str = "IGNORE " if ignore else ""
     set_clauses = []
@@ -153,10 +150,10 @@ def build_insert_sql(table, fields, ignore=False):
         if value is None:
             set_clauses.append(f"    `{field}` = NULL")
         elif isinstance(value, str) and value.startswith("X'") and value.endswith("'"):
-            # 十六进制值
+            # 十六进制�?
             set_clauses.append(f"    `{field}` = {value}")
         elif isinstance(value, (int, float)):
-            # 数字值不需要引号
+            # 数字值不需要引�?
             set_clauses.append(f"    `{field}` = {value}")
         else:
             # 字符串值需要转义和引号
@@ -170,14 +167,14 @@ def build_insert_sql(table, fields, ignore=False):
 def run_application(file_path):
     log.info(f"\n=== 开始执行run_application ===")
     try:
-        # 判断文件类型，支持 CSV 和 JSON
+        # 判断文件类型，支�?CSV �?JSON
         if file_path.endswith('.json'):
             with open(file_path, 'r', encoding='utf-8') as jsonfile:
                 data_list = json.load(jsonfile)
                 if not isinstance(data_list, list):
                     data_list = [data_list]  # 如果是单个对象，转为列表
         else:
-            # 兼容原有的 CSV 格式
+            # 兼容原有�?CSV 格式
             with open(file_path, 'r', newline='', encoding='gbk') as csvfile:
                 reader = csv.DictReader(csvfile)
                 data_list = list(reader)
@@ -188,7 +185,7 @@ def run_application(file_path):
 
             for row_idx, data in enumerate(data_list):
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                log.info(f"\n{'='*20} 正在处理第 {row_idx+1} 条数据 {'='*20}")
+                log.info(f"\n{'='*20} 正在处理�?{row_idx+1} 条数�?{'='*20}")
 
                 # ================== 数据提取 ==================
                 if isinstance(data, dict) and 'brn' in data:
@@ -244,7 +241,7 @@ def run_application(file_path):
                     drawdowns = data.get('drawdowns', [])
 
                 else:
-                    # CSV 格式数据提取（保持原有逻辑）
+                    # CSV 格式数据提取（保持原有逻辑�?
                     phone_number = data.get('phone_number')
                     business_registration_number = data.get('business_registration_number')
                     company_registration_date = data.get('Company Registration Date')
@@ -257,7 +254,7 @@ def run_application(file_path):
                     Director_1_cn_Name = data.get('Director_1_CN_Name')
                     Director_1_birth_date = data.get('Director_1_Birthday')
 
-                    # 股东信息（CSV 格式）
+                    # 股东信息（CSV 格式�?
                     shareholders = []
                     for i in range(1, 4):
                         cn_name = data.get(f'Shareholder_{i}_cn_Name')
@@ -295,7 +292,7 @@ def run_application(file_path):
                     lender_company_id = data.get('lender_company_id', '')
                     lender_approved_offer_id = data.get('lender_approved_offer_id', '')
 
-                    # Drawdown 信息（CSV 格式）
+                    # Drawdown 信息（CSV 格式�?
                     drawdowns = []
                     for i in range(1, 4):
                         amount = data.get(f'drawdown_amount_{i}', '0')
@@ -316,7 +313,7 @@ def run_application(file_path):
                                 })
                             drawdowns.append(drawdown_data)
 
-                # 确保股东至少有3个（不足则补空）
+                # 确保股东至少�?个（不足则补空）
                 while len(shareholders) < 3:
                     shareholders.append({
                         'full_name_cn': '',
@@ -360,39 +357,39 @@ def run_application(file_path):
                 # 查询用户
                 res1 = check_and_execute(executor, f"SELECT merchant_id FROM dpu_users WHERE phone_number='{phone_number}'", "Step 1: 查询用户")
                 if not res1['data']:
-                    log.warning(f"未找到手机号为 {phone_number} 的用户，跳过此行")
+                    log.warning(f"未找到手机号�?{phone_number} 的用户，跳过此行")
                     continue
                 merchant_id = res1['data'][0][0]
-                log.info(f"Step 1: merchant_id 为 {merchant_id}")
+                log.info(f"Step 1: merchant_id �?{merchant_id}")
 
                 # 查询 AMZ Token
                 res01 = check_and_execute(executor, f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_id='{amazon_seller_id}'", "Step 2: 查询AMZ Token")
                 if not res01['data']:
-                    log.warning(f"未找到AMZ Seller ID 为 {amazon_seller_id} 的AMZ Token，跳过此行")
+                    log.warning(f"未找到AMZ Seller ID �?{amazon_seller_id} 的AMZ Token，跳过此�?)
                     continue
                 merchant_account_id = res01['data'][0][0]
-                log.info(f"Step 2: merchant_account_id 为 {merchant_account_id}")
+                log.info(f"Step 2: merchant_account_id �?{merchant_account_id}")
 
-                # ==================== Step 4-5：3PL 更新 ====================
+                # ==================== Step 4-5�?PL 更新 ====================
                 res_3pl_token = executor.execute_sql(
                     f"SELECT merchant_account_id FROM dpu_auth_token WHERE authorization_party='3PL' AND merchant_id='{merchant_id}'"
                 )
                 if res_3pl_token['data']:
                     original_3pl_merchant_account_id = res_3pl_token['data'][0][0]
                     log.info(f"3PL 当前 merchant_account_id: {original_3pl_merchant_account_id}")
-                    # 检查是否已经是正确的 merchant_account_id，如果是则跳过更新
+                    # 检查是否已经是正确�?merchant_account_id，如果是则跳过更�?
                     if original_3pl_merchant_account_id == merchant_account_id:
                         log.info("Step 4-5: 3PL merchant_account_id 已是正确值，跳过更新")
                     else:
                         check_and_execute(executor, f"UPDATE dpu_auth_token SET merchant_account_id='{merchant_account_id}' WHERE authorization_party='3PL' and merchant_id='{merchant_id}'",
-                                          "Step 4：更新dpu_auth_token中3PL的merchant_account_id")
+                                          "Step 4：更新dpu_auth_token�?PL的merchant_account_id")
                         check_and_execute(executor, f"update dpu_shops set merchant_account_id='{merchant_account_id}' WHERE emarketplace_data_type='3PL'and merchant_id='{merchant_id}'",
-                                          "Step 5：更新dpu_shops中3PL的merchant_account_id")
+                                          "Step 5：更新dpu_shops�?PL的merchant_account_id")
                 else:
-                    log.info("Step 4-5: 未找到 3PL 记录，跳过更新")
+                    log.info("Step 4-5: 未找�?3PL 记录，跳过更�?)
 
-                # ==================== Step 6：插入 PSP 记录 ====================
-                # 检查 psp_id 是否为 null，如果为 null 则跳过
+                # ==================== Step 6：插�?PSP 记录 ====================
+                # 检�?psp_id 是否�?null，如果为 null 则跳�?
                 if psp_id:
                     sql_psp = build_insert_sql('dpu_auth_token', {
                         'authorization_id': psp_id,
@@ -411,9 +408,9 @@ def run_application(file_path):
                     })
                     check_and_execute(executor, sql_psp, "Step 6: 向dpu_auth_token插入PSP记录")
                 else:
-                    log.info("Step 6: psp_id 为 null，跳过 PSP 记录插入")
+                    log.info("Step 6: psp_id �?null，跳�?PSP 记录插入")
 
-                # ==================== Step 7：更新 Merchant Account Limit ====================
+                # ==================== Step 7：更�?Merchant Account Limit ====================
                 sql_mal = f"""UPDATE `dpu_merchant_account_limit`
                             SET
                             `created_at` = '{current_time}',
@@ -436,17 +433,17 @@ def run_application(file_path):
                 if res_app['data']:
                     application_id = res_app['data'][0][0]
                     application_unique_id = res_app['data'][0][1]
-                    log.info(f"Step 8: 查询到 application_id={application_id}, application_unique_id={application_unique_id}")
+                    log.info(f"Step 8: 查询�?application_id={application_id}, application_unique_id={application_unique_id}")
                 else:
-                    log.warning(f"Step 8: 未找到 Application 记录")
+                    log.warning(f"Step 8: 未找�?Application 记录")
 
-                # ==================== Step 9：插入/更新 Entity（需要在更新 Application 之前执行） ====================
+                # ==================== Step 9：插�?更新 Entity（需要在更新 Application 之前执行�?====================
                 res_entity = executor.execute_sql(f"SELECT id, submission_count FROM dpu_entity WHERE merchant_id='{merchant_id}'")
                 if not res_entity['data']:
                     # 不存在则插入
-                    log.info(f"Step 9: 未找到 Entity 记录，插入新记录")
+                    log.info(f"Step 9: 未找�?Entity 记录，插入新记录")
 
-                    # 检查表是否有 extend_json 字段（兼容不同环境）
+                    # 检查表是否�?extend_json 字段（兼容不同环境）
                     res_columns = executor.execute_sql("SHOW COLUMNS FROM dpu_entity LIKE 'extend_json'")
                     has_extend_json = bool(res_columns['data'])
 
@@ -496,12 +493,12 @@ def run_application(file_path):
                     sql_entity = build_insert_sql('dpu_entity', entity_fields)
                     check_and_execute(executor, sql_entity, "Step 9.1: 插入Entity")
                 else:
-                    # 存在则更新
+                    # 存在则更�?
                     existing_entity_id = res_entity['data'][0][0]  # 获取已存在的 entity id
                     existing_submission_count = res_entity['data'][0][1]  # 获取当前 submission_count
                     ids['entity_id'] = existing_entity_id  # 使用已存在的 entity id
-                    log.info(f"Step 9: 查询到 entity_id={existing_entity_id}，更新记录")
-                    # 处理 submission_count 为 None 的情况
+                    log.info(f"Step 9: 查询�?entity_id={existing_entity_id}，更新记�?)
+                    # 处理 submission_count �?None 的情�?
                     new_submission_count = (existing_submission_count or 0) + 1
                     sql_entity_update = f"""UPDATE `dpu_entity`
                                     SET `business_registration_number` = '{escape_sql(business_registration_number)}',
@@ -514,11 +511,11 @@ def run_application(file_path):
                                     WHERE `merchant_id` = '{merchant_id}'"""
                     check_and_execute(executor, sql_entity_update, "Step 9.2: 更新Entity")
 
-                # ==================== Step 11-15：股东信息和身份证文档 ====================
+                # ==================== Step 11-15：股东信息和身份证文�?====================
                 # Step 11-13：查询并插入股东信息
                 res_nature_person = executor.execute_sql(f"SELECT * FROM dpu_nature_person WHERE merchant_id='{merchant_id}'")
                 if res_nature_person['data']:
-                    log.info("Step 11-13: dpu_nature_person 表中已有数据，跳过插入股东信息")
+                    log.info("Step 11-13: dpu_nature_person 表中已有数据，跳过插入股东信�?)
                 else:
                     # 插入股东信息（动态处理）
                     for idx, shareholder in enumerate(shareholders[:3]):
@@ -546,14 +543,14 @@ def run_application(file_path):
                             'created_by': 'SYSTEM',
                             'updated_by': 'SYSTEM',
                         })
-                        check_and_execute(executor, sql_dpu_nature_person, f"Step {11+idx}: 插入Shareholder第{idx+1}条记录")
+                        check_and_execute(executor, sql_dpu_nature_person, f"Step {11+idx}: 插入Shareholder第{idx+1}条记�?)
 
-                # Step 14-15：查询并插入身份证文档
+                # Step 14-15：查询并插入身份证文�?
                 res_person_documents = executor.execute_sql(f"SELECT * FROM dpu_nature_person_documents WHERE merchant_id='{merchant_id}'")
                 if res_person_documents['data']:
                     log.info("Step 14-15: dpu_nature_person_documents 表中已有数据，跳过插入身份证文档")
                 else:
-                    # 插入第1个股东的身份证文档（正面）
+                    # 插入�?个股东的身份证文档（正面�?
                     if shareholders[0].get('full_name_en') or shareholders[0].get('full_name_cn'):
                         sql_dpu_nature_person_documents_front = build_insert_sql('dpu_nature_person_documents', {
                             'id': ids['doc_front'],
@@ -572,7 +569,7 @@ def run_application(file_path):
                         })
                         check_and_execute(executor, sql_dpu_nature_person_documents_front, "Step 14: 插入dpu_nature_person_documents (正面)")
 
-                        # 插入第1个股东的身份证文档（背面）
+                        # 插入�?个股东的身份证文档（背面�?
                         sql_dpu_nature_person_documents_back = build_insert_sql('dpu_nature_person_documents', {
                             'id': ids['doc_back'],
                             'merchant_id': merchant_id,
@@ -590,11 +587,11 @@ def run_application(file_path):
                         })
                         check_and_execute(executor, sql_dpu_nature_person_documents_back, "Step 15: 插入dpu_nature_person_documents (背面)")
 
-                # ==================== Step 16：更新 Application（在 Entity 处理之后执行，确保使用正确的 entity_id） ====================
+                # ==================== Step 16：更�?Application（在 Entity 处理之后执行，确保使用正确的 entity_id�?====================
                 if res_app['data']:
-                    check_and_execute(executor, f"UPDATE dpu_application SET entity_id = '{ids['entity_id']}', application_status = 'APPROVED' WHERE merchant_id='{merchant_id}'", "Step 16：更新Application状态")
+                    check_and_execute(executor, f"UPDATE dpu_application SET entity_id = '{ids['entity_id']}', application_status = 'APPROVED' WHERE merchant_id='{merchant_id}'", "Step 16：更新Application状�?)
 
-                # 更新 dpu_merchants_limit（underwritten_limit 对齐取 approved_limit 的值）
+                # 更新 dpu_merchants_limit（underwritten_limit 对齐�?approved_limit 的值）
                 sql_dpu_merchants_limit = f"""UPDATE `dpu_merchants_limit`
                                                             SET
                                                             `activated_limit` = '{activate_limit}',
@@ -626,10 +623,10 @@ def run_application(file_path):
                                                              WHERE `merchant_id` = '{merchant_id}';"""
                 check_and_execute(executor, sql_dpu_merchants_limit, "Step 17：更新dpu_merchants_limit")
 
-                # Step 18：查询 dpu_bank_account，决定 UPDATE 或 INSERT
+                # Step 18：查�?dpu_bank_account，决�?UPDATE �?INSERT
                 res_bank_account = executor.execute_sql(f"SELECT * FROM dpu_bank_account WHERE merchant_id='{merchant_id}'")
                 if res_bank_account['data']:
-                    # 存在记录，执行 UPDATE
+                    # 存在记录，执�?UPDATE
                     sql_dpu_bank_account = f"""UPDATE `dpu_bank_account`
                         SET `bank_account_name` = '{escape_sql(Bank_account_Name)}',
                             `bank_account_number` = '{escape_sql(Bank_account_Number)}',
@@ -667,8 +664,8 @@ def run_application(file_path):
                     })
                     check_and_execute(executor, sql_dpu_bank_account, "Step 18：插入dpu_bank_account")
 
-                # ==================== Step 19-22：插入/更新 notify_event_dependency ====================
-                # 定义 notify_event_dependency 的数据配置
+                # ==================== Step 19-22：插�?更新 notify_event_dependency ====================
+                # 定义 notify_event_dependency 的数据配�?
                 notify_dependency_configs = [
                     {
                         'name': 'Step 19',
@@ -706,7 +703,7 @@ def run_application(file_path):
                         f"SELECT * FROM dpu_notify_event_dependency WHERE biz_id='{application_unique_id}' AND event_type='{config['event_type']}' AND dependency_type='{config['dependency_type']}'"
                     )
                     if res['data']:
-                        # 存在记录，执行 UPDATE
+                        # 存在记录，执�?UPDATE
                         sql = f"""UPDATE `dpu_notify_event_dependency`
                             SET `dependency_status` = 'READY',
                                 `dependency_value` = 'READY',
@@ -732,8 +729,8 @@ def run_application(file_path):
                         })
                         check_and_execute(executor, sql, f"{config['name']}：插入dpu_notify_event_dependency ({config['dependency_type']})")
 
-                # ==================== Step 23-24：插入/更新 notify_event ====================
-                # 定义 notify_event 的数据配置
+                # ==================== Step 23-24：插�?更新 notify_event ====================
+                # 定义 notify_event 的数据配�?
                 notify_event_configs = [
                     {
                         'name': 'Step 23',
@@ -753,7 +750,7 @@ def run_application(file_path):
                         f"SELECT * FROM dpu_notify_event WHERE biz_id='{application_unique_id}' AND event_type='{config['event_type']}'"
                     )
                     if res['data']:
-                        # 存在记录，执行 UPDATE
+                        # 存在记录，执�?UPDATE
                         sql = f"""UPDATE `dpu_notify_event`
                             SET `notify_status` = 'SUCCESS',
                                 `retry_count` = 0,
@@ -776,10 +773,10 @@ def run_application(file_path):
                         })
                         check_and_execute(executor, sql, f"{config['name']}：插入dpu_notify_event ({config['event_type']})")
 
-                # Step 25：查询 dpu_credit_offer，决定 UPDATE 或 INSERT
+                # Step 25：查�?dpu_credit_offer，决�?UPDATE �?INSERT
                 res_credit_offer = executor.execute_sql(f"SELECT * FROM dpu_credit_offer WHERE merchant_id='{merchant_id}'")
                 if res_credit_offer['data']:
-                    # 存在记录，执行 UPDATE
+                    # 存在记录，执�?UPDATE
                     sql_dpu_credit_offer = f"""UPDATE `dpu_credit_offer`
                         SET `application_id` = '{application_id}',
                             `application_unique_id` = '{application_unique_id}',
@@ -833,10 +830,10 @@ def run_application(file_path):
                     })
                     check_and_execute(executor, sql_dpu_credit_offer, "Step 25：插入dpu_credit_offer")
 
-                # Step 26：查询 dpu_limit_application，决定 UPDATE 或 INSERT
+                # Step 26：查�?dpu_limit_application，决�?UPDATE �?INSERT
                 res_limit_application = executor.execute_sql(f"SELECT * FROM dpu_limit_application WHERE merchant_id='{merchant_id}'")
                 if res_limit_application['data']:
-                    # 存在记录，执行 UPDATE
+                    # 存在记录，执�?UPDATE
                     sql_dpu_limit_application = f"""UPDATE `dpu_limit_application`
                         SET `currency` = 'USD',
                             `lender_code` = 'FUNDPARK',
@@ -869,10 +866,10 @@ def run_application(file_path):
                     })
                     check_and_execute(executor, sql_dpu_limit_application, "Step 26：插入dpu_limit_application")
 
-                # Step 27：查询 dpu_limit_application_account，决定 UPDATE 或 INSERT
+                # Step 27：查�?dpu_limit_application_account，决�?UPDATE �?INSERT
                 res_limit_application_account = executor.execute_sql(f"SELECT * FROM dpu_limit_application_account WHERE merchant_id='{merchant_id}'")
                 if res_limit_application_account['data']:
-                    # 存在记录，执行 UPDATE
+                    # 存在记录，执�?UPDATE
                     sql_dpu_limit_application_account = f"""UPDATE `dpu_limit_application_account`
                         SET `activated_limit` = '{approvedLimit}',
                             `approved_limit` = '{approvedLimit}',
@@ -922,7 +919,7 @@ def run_application(file_path):
                     if not drawdown_amount or str(drawdown_amount).strip() == '' or str(drawdown_amount).strip() == '0':
                         continue
 
-                    # 计算还款总额（在插入 drawdown 之前计算）
+                    # 计算还款总额（在插入 drawdown 之前计算�?
                     repayments = dd.get('repayments', [])
                     total_repayment = sum(float(r.get('repayment_principal', 0)) for r in repayments)
                     outstanding_amount = float(drawdown_amount) - total_repayment
@@ -934,7 +931,7 @@ def run_application(file_path):
                         drawdown_start_datetime = f"{raw_start_datetime} 00:00:00"
                     else:
                         drawdown_start_datetime = raw_start_datetime
-                    # 计算 new_repayment_date = drawdown_start_datetime + 90天
+                    # 计算 new_repayment_date = drawdown_start_datetime + 90�?
                     start_date_obj = datetime.strptime(drawdown_start_datetime, '%Y-%m-%d %H:%M:%S')
                     new_repayment_date = (start_date_obj + timedelta(days=90)).strftime('%Y-%m-%d')
                     # 计算总利率：baseRate + marginRate
@@ -1055,7 +1052,7 @@ def run_application(file_path):
                 # 更新最终可用额度和使用额度
                 # utilization_limit = 每笔 drawdown 的未偿还本金之和
                 if drawdowns:
-                    # 重新计算所有 drawdown 的 outstanding_amount 总和
+                    # 重新计算所�?drawdown �?outstanding_amount 总和
                     total_utilization = 0
                     for dd in drawdowns:
                         drawdown_amount = float(dd.get('drawdown_amount', 0))
@@ -1084,10 +1081,10 @@ def run_application(file_path):
                                 target.available_limit = source.available_limit,
                                 target.available_limit_update_at = source.available_limit_update_at
                             WHERE target.merchant_id = '{merchant_id}'"""
-                    check_and_execute(executor, sql_alignment_final, "Step 37: 同步dpu_merchant_account_limit最终额度")
+                    check_and_execute(executor, sql_alignment_final, "Step 37: 同步dpu_merchant_account_limit最终额�?)
 
     except Exception as e:
-        log.error(f"处理数据时出错: {e}")
+        log.error(f"处理数据时出�? {e}")
         raise
 
 
@@ -1099,3 +1096,4 @@ if __name__ == '__main__':
     else:
         file_path = sys.argv[1]
     run_application(file_path)
+

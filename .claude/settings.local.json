@@ -61,7 +61,10 @@
       "Read(//c/Users/PC/**)",
       "Bash(pip install:*)",
       "Bash(npm start)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(python3 -c ' *)",
+      "Bash(wsl *)",
+      "Bash(wsl -e *)"
     ],
     "additionalDirectories": [
       "d:\\data\\project\\test\\nlp-text-analyzer"

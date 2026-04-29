@@ -1,0 +1,18 @@
+{
+  "environment": "sit",
+  "scenario": "scenario_1 (FP-USD-500k)",
+  "phone_number": "16073511049",
+  "merchant_id": "7c9af51239b347dd8d20bd9529b7eda6",
+  "application_unique_id": "EFA17773630200878404",
+  "merchant_account_id": "a0b0aa9fe7c5431cb86bc800fb995827",
+  "steps_completed": [
+    "1. approvedoffer.completed",
+    "2. psp.verification.started",
+    "3. psp.verification.completed",
+    "4. esign.completed [OK]"
+  ],
+  "final_status": {
+    "credit_offer_status": "ACCEPTED",
+    "application_status": "APPROVED"
+  }
+}

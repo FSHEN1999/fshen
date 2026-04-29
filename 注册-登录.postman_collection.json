@@ -1,0 +1,597 @@
+{
+  "info": {
+    "_postman_id": "b45fbff6-45f8-4331-96c8-1e0c2b91e763",
+    "name": "注册/登录",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49695671",
+    "_collection_link": "https://go.postman.co/collection/49695671-b45fbff6-45f8-4331-96c8-1e0c2b91e763?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "accept",
+            "value": "application/json, text/plain, */*"
+          },
+          {
+            "key": "accept-encoding",
+            "value": "gzip, deflate, br, zstd"
+          },
+          {
+            "key": "accept-language",
+            "value": "zh-Hans"
+          },
+          {
+            "key": "content-type",
+            "value": "application/json"
+          },
+          {
+            "key": "origin",
+            "value": "https://expressfinance-uat.business.hsbc.com"
+          },
+          {
+            "key": "priority",
+            "value": "u=1, i"
+          },
+          {
+            "key": "referer",
+            "value": "https://expressfinance-uat.business.hsbc.com/"
+          },
+          {
+            "key": "sec-ch-ua",
+            "value": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\""
+          },
+          {
+            "key": "sec-ch-ua-mobile",
+            "value": "?0"
+          },
+          {
+            "key": "sec-ch-ua-platform",
+            "value": "\"Windows\""
+          },
+          {
+            "key": "sec-fetch-dest",
+            "value": "empty"
+          },
+          {
+            "key": "sec-fetch-mode",
+            "value": "cors"
+          },
+          {
+            "key": "sec-fetch-site",
+            "value": "same-site"
+          },
+          {
+            "key": "user-agent",
+            "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"13545345345\",\n  \"areaCode\": \"+86\",\n  \"code\": \"666666\",\n  \"email\": \"13545345345@11.dasd\",\n  \"offerId\": \"amzn1.lending.offer.us.19r0is50j1us3bz816gz1iTESTOFFER\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/dpu-user/auth/signup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "signup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "登录接口",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": ":authority",
+            "value": "uat.api.expressfinance.business.hsbc.com"
+          },
+          {
+            "key": ":method",
+            "value": "POST"
+          },
+          {
+            "key": ":path",
+            "value": "/dpu-user/auth/login"
+          },
+          {
+            "key": ":scheme",
+            "value": "https"
+          },
+          {
+            "key": "accept",
+            "value": "application/json, text/plain, */*"
+          },
+          {
+            "key": "accept-encoding",
+            "value": "gzip, deflate, br, zstd"
+          },
+          {
+            "key": "accept-language",
+            "value": "zh-Hans"
+          },
+          {
+            "key": "content-type",
+            "value": "application/json"
+          },
+          {
+            "key": "origin",
+            "value": "https://expressfinance-uat.business.hsbc.com"
+          },
+          {
+            "key": "priority",
+            "value": "u=1, i"
+          },
+          {
+            "key": "referer",
+            "value": "https://expressfinance-uat.business.hsbc.com/"
+          },
+          {
+            "key": "sec-ch-ua",
+            "value": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\""
+          },
+          {
+            "key": "sec-ch-ua-mobile",
+            "value": "?0"
+          },
+          {
+            "key": "sec-ch-ua-platform",
+            "value": "\"Windows\""
+          },
+          {
+            "key": "sec-fetch-dest",
+            "value": "empty"
+          },
+          {
+            "key": "sec-fetch-mode",
+            "value": "cors"
+          },
+          {
+            "key": "sec-fetch-site",
+            "value": "same-site"
+          },
+          {
+            "key": "user-agent",
+            "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"13545345345\",\n  \"areaCode\": \"+86\",\n  \"code\": \"666666\",\n  \"forceLogin\": false,\n  \"offerId\": \"amzn1.lending.offer.us.19r0is50j1us3bz816gz1iTESTOFFER\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/dpu-user/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "查询店铺授权状态",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "gZ0swzq3LY4DiPBWWxi0PYnt05m0Fxcl32e5c0r4YFks4k6gwoUbrjw8ya1iQt3Y",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json, text/plain, */*"
+          },
+          {
+            "key": "Accept-Encoding",
+            "value": "gzip, deflate, br, zstd"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "zh-Hant"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer gZ0swzq3LY4DiPBWWxi0PYnt05m0Fxcl32e5c0r4YFks4k6gwoUbrjw8ya1iQt3Y"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "https://expressfinance-uat.business.hsbc.com"
+          },
+          {
+            "key": "Priority",
+            "value": "u=1, i"
+          },
+          {
+            "key": "Referer",
+            "value": "https://expressfinance-uat.business.hsbc.com/"
+          },
+          {
+            "key": "Sec-Ch-Ua",
+            "value": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\""
+          },
+          {
+            "key": "Sec-Ch-Ua-Mobile",
+            "value": "?0"
+          },
+          {
+            "key": "Sec-Ch-Ua-Platform",
+            "value": "\"Windows\""
+          },
+          {
+            "key": "Sec-Fetch-Dest",
+            "value": "empty"
+          },
+          {
+            "key": "Sec-Fetch-Mode",
+            "value": "cors"
+          },
+          {
+            "key": "Sec-Fetch-Site",
+            "value": "same-site"
+          },
+          {
+            "key": "User-Agent",
+            "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+          },
+          {
+            "key": "X-Hsbc-Countrycode",
+            "value": "ISO 3166-1 alpha-2"
+          },
+          {
+            "key": "X-Hsbc-Request-Correlation-Id",
+            "value": ""
+          },
+          {
+            "key": "X-Hsbc-Request-Idempotency-Key",
+            "value": ""
+          },
+          {
+            "key": "X-Refresh-Token",
+            "value": "gZ0swzq3LY4DiPBWWxi0PYnt05m0Fxcl32e5c0r4YFks4k6gwoUbrjw8ya1iQt3Y"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchantId\": \"YOUR_MERCHANT_ID\",\n  \"shopId\": \"YOUR_SHOP_ID\",\n  \"platformType\": \"AMAZON\",\n  \"applicationId\": \"amzn1.sp.solution.b1414140-7f0d-47fc-98ea-ac88fe2df281\",\n  \"state\": \"28af2e95-6077-41ca-b5b9-a8b8ac6959e4\",\n  \"version\": \"beta\",\n  \"firstAuth\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/dpu-merchant/shop-authorization/sp/check-status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "dpu-merchant",
+            "shop-authorization",
+            "sp",
+            "check-status"
+          ]
+        },
+        "description": "查询 Amazon 店铺的授权状态，返回授权状态（AUTHORIZED/UNAUTHORIZED）和授权链接\n必填字段说明：\n- firstAuth：布尔值（true=首次授权，false=非首次授权），不可为null"
+      },
+      "response": [
+        {
+          "name": "查询成功（未授权）",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantId\": \"YOUR_MERCHANT_ID\",\n  \"shopId\": \"YOUR_SHOP_ID\",\n  \"platformType\": \"AMAZON\",\n  \"applicationId\": \"amzn1.sp.solution.b1414140-7f0d-47fc-98ea-ac88fe2df281\",\n  \"state\": \"28af2e95-6077-41ca-b5b9-a8b8ac6959e4\",\n  \"version\": \"beta\",\n  \"firstAuth\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/shop-authorization/sp/check-status",
+              "protocol": "https",
+              "host": [
+                "uat",
+                "api",
+                "expressfinance",
+                "business",
+                "hsbc",
+                "com"
+              ],
+              "path": [
+                "dpu-merchant",
+                "shop-authorization",
+                "sp",
+                "check-status"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"code\": 200,\n    \"message\": \"successful\",\n    \"timeStamp\": \"2025-12-11T05:53:04.011982118Z\",\n    \"data\": {\n        \"authStatus\": \"UNAUTHORIZED\",\n        \"authorizationUrl\": \"https://sellercentral.amazon.com/apps/authorize/consent?application_id=amzn1.sp.solution.b1414140-7f0d-47fc-98ea-ac88fe2df281&version=beta&state=28af2e95-6077-41ca-b5b9-a8b8ac6959e4\"\n    },\n    \"traceId\": \"1d2325a5b1754627a4dc5152ffa82cdf\",\n    \"isSuccess\": true\n}"
+        },
+        {
+          "name": "参数错误（firstAuth为null）",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantId\": \"YOUR_MERCHANT_ID\",\n  \"shopId\": \"YOUR_SHOP_ID\",\n  \"platformType\": \"AMAZON\",\n  \"applicationId\": \"amzn1.sp.solution.b1414140-7f0d-47fc-98ea-ac88fe2df281\",\n  \"state\": \"28af2e95-6077-41ca-b5b9-a8b8ac6959e4\",\n  \"version\": \"beta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://uat.api.expressfinance.business.hsbc.com/dpu-merchant/shop-authorization/sp/check-status",
+              "protocol": "https",
+              "host": [
+                "uat",
+                "api",
+                "expressfinance",
+                "business",
+                "hsbc",
+                "com"
+              ],
+              "path": [
+                "dpu-merchant",
+                "shop-authorization",
+                "sp",
+                "check-status"
+              ]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"type\": \"https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1\",\n    \"title\": \"/shop-authorization/sp/check-status\",\n    \"status\": 400,\n    \"detail\": \"Cannot invoke \\\"java.lang.Boolean.booleanValue()\\\" because the return value of \\\"com.dpu.merchant.api.model.SpAuthCheckParam.getFirstAuth()\\\" is null\",\n    \"instance\": \"/shop-authorization/sp/check-status\",\n    \"errorDateTime\": \"2025-12-11T06:04:04.146555042Z\",\n    \"traceId\": \"5dae35ce48804958b105e2b738a468a6\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "https://dpu-gateway-reg.dowsure.com/dpu-user/auth/verification-codes",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "accept",
+            "value": "application/json, text/plain, */*"
+          },
+          {
+            "key": "accept-language",
+            "value": "en"
+          },
+          {
+            "key": "content-type",
+            "value": "application/json"
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT"
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK"
+          },
+          {
+            "key": "origin",
+            "value": "https://expressfinance-dpu-reg.dowsure.com"
+          },
+          {
+            "key": "priority",
+            "value": "u=1, i"
+          },
+          {
+            "key": "product-currency",
+            "value": "USD"
+          },
+          {
+            "key": "referer",
+            "value": "https://expressfinance-dpu-reg.dowsure.com/"
+          },
+          {
+            "key": "sec-ch-ua",
+            "value": "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\""
+          },
+          {
+            "key": "sec-ch-ua-mobile",
+            "value": "?0"
+          },
+          {
+            "key": "sec-ch-ua-platform",
+            "value": "\"Windows\""
+          },
+          {
+            "key": "sec-fetch-dest",
+            "value": "empty"
+          },
+          {
+            "key": "sec-fetch-mode",
+            "value": "cors"
+          },
+          {
+            "key": "sec-fetch-site",
+            "value": "same-site"
+          },
+          {
+            "key": "user-agent",
+            "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"19151287988\",\"areaCode\":\"+86\",\"code\":\"SIGNUP_VERIFICATION\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://dpu-gateway-reg.dowsure.com/dpu-user/auth/verification-codes",
+          "protocol": "https",
+          "host": [
+            "dpu-gateway-reg",
+            "dowsure",
+            "com"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "verification-codes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "https://dpu-gateway-reg.dowsure.com/dpu-user/auth/verification-codes Copy",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "accept",
+            "value": "application/json, text/plain, */*"
+          },
+          {
+            "key": "accept-language",
+            "value": "en"
+          },
+          {
+            "key": "content-type",
+            "value": "application/json"
+          },
+          {
+            "key": "finance-product",
+            "value": "LINE_OF_CREDIT"
+          },
+          {
+            "key": "funder-resource",
+            "value": "FUNDPARK"
+          },
+          {
+            "key": "origin",
+            "value": "https://expressfinance-dpu-reg.dowsure.com"
+          },
+          {
+            "key": "priority",
+            "value": "u=1, i"
+          },
+          {
+            "key": "product-currency",
+            "value": "USD"
+          },
+          {
+            "key": "referer",
+            "value": "https://expressfinance-dpu-reg.dowsure.com/"
+          },
+          {
+            "key": "sec-ch-ua",
+            "value": "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\""
+          },
+          {
+            "key": "sec-ch-ua-mobile",
+            "value": "?0"
+          },
+          {
+            "key": "sec-ch-ua-platform",
+            "value": "\"Windows\""
+          },
+          {
+            "key": "sec-fetch-dest",
+            "value": "empty"
+          },
+          {
+            "key": "sec-fetch-mode",
+            "value": "cors"
+          },
+          {
+            "key": "sec-fetch-site",
+            "value": "same-site"
+          },
+          {
+            "key": "user-agent",
+            "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"19151287988\",\"areaCode\":\"+86\",\"code\":\"SIGNUP_VERIFICATION\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://dpu-gateway-reg.dowsure.com/dpu-user/auth/verification-codes",
+          "protocol": "https",
+          "host": [
+            "dpu-gateway-reg",
+            "dowsure",
+            "com"
+          ],
+          "path": [
+            "dpu-user",
+            "auth",
+            "verification-codes"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

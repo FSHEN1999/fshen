@@ -184,6 +184,27 @@ Registration operations append to environment-specific log files:
 
 Format: journey type, phone number, redirect URL
 
+## Daily Task Loop
+
+For day-to-day execution tracking in this repository, use [`daily_tasks.md`](daily_tasks.md) instead of `dpu模拟需求文档.docx`.
+
+- Treat `dpu模拟需求文档.docx` as a requirement/design source document, not as the daily checklist file.
+- When the user asks to "继续任务", "继续完成我的任务", or otherwise continue the queued work, read `daily_tasks.md` first.
+- Under the newest date section, execute the first unchecked item in order.
+- After a task is completed, change `- [ ]` to `- [x]`.
+- If a task is blocked, do not tick it. Add a short blocker note directly below that item and stop there.
+- Only move on to the next unchecked item when the current one is actually finished.
+- Keep task items short and action-oriented so they can be executed and checked off cleanly.
+
+## Run Repair Loop
+
+When running real automation in this repository:
+
+- If logs show `ERROR`, `致命错误`, `Stacktrace`, or a screenshot-save message, stop waiting immediately.
+- Read the latest run log and inspect the newest error screenshot before doing anything else.
+- Treat the first concrete runtime failure as the active task: record it, patch the smallest reliable fix, rerun, and only then continue the flow.
+- Do not leave a long-running process idle once a real failure is already visible in the logs.
+
 
 
 prod注意事项：bacth1，3 替换migration_data为生成真实客户json内容，配置migration_test_FP_json batch1的生存环境数据库，执行完毕migration脚本执行export_migration_json脚本（同样需要配置生产数据库），控制台输入手机号，得到需要回传FP的json。   

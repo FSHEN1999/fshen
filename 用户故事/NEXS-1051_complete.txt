@@ -1,0 +1,72 @@
+=== Page 69 ===
+ 
+INTERNAL 
+[NEXS-1051] [Application Abandon] - [API] - Application Abandon to FundPark Created: 17/Dec/25  Updated: 27/Jan/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Sage Ma  Assignee:  Noah Yao  
+Resolution:  Unresolved  Votes:  0  
+Labels:  None  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  image-2025-12-30-09-08-08-434.png      
+Issue Links:  Cloners 
+clones  NEXS-1045  [Application Abandon] - 1st Applicati...  Done  
+ 
+Epic Link: Application Abandon/Reject  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to update the logic for Application Abandon 
+So that make sure we follow the contract requirement set by AMZ 
+Pre-Condition:  
+
+
+=== Page 70 ===
+ 
+INTERNAL 
+1. The to be updated logic will be applied for application that has submitted to lender, and status has been changed to abandon  
+  
+Acceptance Criteria (AC):  
+AC1 - Application status is changed to abandon with activate limit for this lender 
+Given that in NEXS-1045 scenario, DPU Application status will be changed as abandon  
+When system changed the status to Abandon 
+Then send notification to lender to notify the application is now abandoned, the new approved offer and in progress application will be cancelled 
+AC2 - Application status is changed to abandon and no activate limit for this lender 
+Given that in NEXS-1045 scenario, DPU Application status will be changed as abandon  
+When system changed the status to Abandon 
+Then send notification to lender to notify the application is now abandoned, the new approved offer and in progress application will be cancelled 
+Then Lender cannot extract data and do any webhook notification on the seller 
+Then if Lender got PSP authorization, Lender need to remove the PSP authorization 
+AC3 - User have failed to signed the additional limit document 
+Given that User have activated limit, and failed to e-sign document 
+When current date exceed the offer expiry time 
+Then change DPU Application as abandon 
+Then change DPU Credit Approval as abandon 
+Then notice FP of this application abandon 
+AC4 - User have failed to signed the additional limit document 
+Given that User have no activated limit and have submitted application to FP 
+When AMZ Offer ID expired 
+Then change DPU Application as abandon 
+Then notice FP abandon this application 
+
+=== Page 71 ===
+ 
+INTERNAL 
+  
+ 
+ Comments     
+Comment by Yaju Shukla [ 27/Jan/26 ]  
+Rockall Gu  - this is in Vera's list for R1.1 delivery 
+Application Abandon/Reject [Application Abandon] - [API] - Update Application Abandon to FundPark NEXS-1051 Noah Lydia River,Brian,jiaming Jastick Edith/Eva 3 Y R1.1 Done 100% 
+ 
+Comment by Yaju Shukla [ 20/Jan/26 ]  
+Noah Yao  - please note fix version R1.1 removed as this is to be planned later. This is in backlog now. FYI - Rockall Gu  
+ 
+

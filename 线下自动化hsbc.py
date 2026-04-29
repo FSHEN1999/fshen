@@ -54,6 +54,7 @@ import js_scripts
 
 # 全局暂停管理器实例
 _pause_manager = get_pause_manager()
+SKIP_3P_AUTHORIZATION_FLOW = False
 
 # ==============================================================================
 # --- 1. 配置与常量 (集中管理，易于维护) ---
@@ -62,7 +63,7 @@ _pause_manager = get_pause_manager()
 # ============================ 环境配置 ============================
 # 支持的环境：sit, uat, dev, preprod, reg, local
 # 修改此变量以切换环境
-ENV = "uat"
+ENV = "reg"
 
 # 基础URL映射
 BASE_URL_DICT = {
@@ -89,7 +90,9 @@ DATABASE_CONFIG_DICT = {
         "password": "20250818dpu_sit",
         "database": "dpu_seller_center",
         "port": 3306,
-        "charset": "utf8mb4"
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     },
     "dev": {
         "host": "aurora-dpu-dev.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
@@ -97,7 +100,9 @@ DATABASE_CONFIG_DICT = {
         "password": "J9IUmPpD@Hon8Y#v",
         "database": "dpu_seller_center",
         "port": 3306,
-        "charset": "utf8mb4"
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     },
     "uat": {
         "host": "aurora-dpu-uat.cluster-cv2aqqmyo5k9.ap-east-1.rds.amazonaws.com",
@@ -105,7 +110,9 @@ DATABASE_CONFIG_DICT = {
         "password": "6S[a=u.*Z;Zt~b&-A4|Ma&q^w8r_3vz[",
         "database": "dpu_seller_center",
         "port": 3306,
-        "charset": "utf8mb4"
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     },
     "preprod": {
         "host": "43.199.241.190",
@@ -113,15 +120,19 @@ DATABASE_CONFIG_DICT = {
         "password": "OWBSNfx8cC5c#Or0",
         "database": "dpu_seller_center",
         "port": 3306,
-        "charset": "utf8mb4"
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     },
     "reg": {
-        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "host": "18.162.145.173",
         "user": "dpu_reg",
         "password": "r4asUYBX3R6LNdp",
         "database": "dpu_seller_center",
-        "port": 3306,
-        "charset": "utf8mb4"
+        "port": 3307,
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     },
     "local": {
         "host": "localhost",
@@ -129,7 +140,9 @@ DATABASE_CONFIG_DICT = {
         "password": "root",
         "database": "dpu_seller_center",
         "port": 3306,
-        "charset": "utf8mb4"
+        "charset": "utf8mb4",
+        "connect_timeout": 15,
+        "read_timeout": 15,
     }
 }
 
@@ -204,15 +217,15 @@ CONFIG = Config()
 # 元素定位器字典（与线上自动化保持一致）
 LOCATORS = {
     # 产品选择页面的"立即申请"按钮（DMF版本专用）
-    "PRODUCT_APPLY_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[3]/div[1]/div[3]/button"),
+    "PRODUCT_APPLY_BTN": (By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'card') or contains(@class, 'solution')][.//*[contains(normalize-space(.), 'Lending provided by') and contains(normalize-space(.), 'HSBC')]]//button[.//span[normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請'] or normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請']"),
 
     # 初始申请按钮
-    "INITIAL_APPLY_BTN": (By.XPATH, "//button[contains(., '立即申请')]"),
+    "INITIAL_APPLY_BTN": (By.XPATH, "//button[.//span[normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請'] or normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請']"),
 
     # 注册页面
     "PHONE_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/div/div[2]/input"),
     "VERIFICATION_CODE_INPUTS": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='1']"),
-    "REG_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[8]/button"),
+    "REG_NEXT_BTN": (By.XPATH, "//div[contains(@class, 'btn-box')]//button[.//span[normalize-space()='Next' or normalize-space()='下一步' or normalize-space()='下一頁'] or normalize-space()='Next' or normalize-space()='下一步' or normalize-space()='下一頁']"),
 
     # 密码设置页 - 使用绝对XPath路径（与线上流程一致）
     "PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[2]/div/div[1]/div/input"),
@@ -228,7 +241,7 @@ LOCATORS = {
     "NEXT_BTN": (By.XPATH, "//button[contains(., '下一页')]"),
 
     # 最终申请按钮（跳转页面后）
-    "FINAL_APPLY_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/div[3]/div[5]/button"),
+    "FINAL_APPLY_BTN": (By.XPATH, "//button[.//span[normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請'] or normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請']"),
 
     # 公司信息页
     "COMPANY_EN_NAME_INPUT": (By.XPATH, "(//input[contains(@class, 'el-input__inner') and @autocomplete='off'])[1]"),
@@ -443,6 +456,7 @@ class DatabaseExecutor:
         self.config = DBConfig.get_config(env)
         self.conn: Optional[pymysql.Connection] = None
         self.cursor: Optional[pymysql.Cursor] = None
+        self.env = env
         self._connect_with_retry()
 
     def _connect_with_retry(self) -> None:
@@ -461,18 +475,15 @@ class DatabaseExecutor:
                     raise
 
     def _connect(self) -> None:
-        """执行数据库连接（绑定本地物理网卡IP绕过VPN）"""
-        # 获取本地物理网卡IP用于绕过VPN
-        local_ip = get_local_physical_ip()
+        """执行数据库连接（与 mock_sit.py 保持一致，不强制绑定本地IP）"""
         connect_params = self.config.copy()
+        host = connect_params.get("host")
+        port = connect_params.get("port")
+        logging.info(f"🔗 正在连接数据库 [{self.env}] {host}:{port}")
 
-        if local_ip:
-            connect_params['bind_address'] = local_ip
-            logging.info(f"🔗 绑定本地IP: {local_ip} 绕过VPN直连数据库")
-
+        old_proxies = {}
         try:
             # 清除代理环境变量
-            old_proxies = {}
             for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
                 if os.environ.get(proxy_key):
                     old_proxies[proxy_key] = os.environ[proxy_key]
@@ -480,11 +491,10 @@ class DatabaseExecutor:
 
             self.conn = pymysql.connect(**connect_params, autocommit=True)
             self.cursor = self.conn.cursor()
-
-            if local_ip:
-                logging.info(f"✅ 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
-            else:
-                logging.info("✅ 数据库连接成功（系统自动路由）")
+            logging.info(f"✅ 数据库连接成功 [{self.env}]")
+        except Exception as e:
+            logging.error(f"❌ 数据库连接失败 [{self.env}] {host}:{port}: {e}")
+            raise
         finally:
             # 恢复代理环境变量
             for k, v in old_proxies.items():
@@ -505,6 +515,11 @@ class DatabaseExecutor:
 
     def execute_sql(self, sql: str) -> Optional[Any]:
         """执行SQL查询并返回单个结果（带自动重连）"""
+        sql_lower = sql.lower()
+        if SKIP_3P_AUTHORIZATION_FLOW and "platform_offer_id" in sql_lower:
+            logging.info("📍 已跳过 platform_offer_id 查询，直接进入商业信息页面")
+            return None
+
         for attempt in range(1, self.MAX_RECONNECT_ATTEMPTS + 1):
             try:
                 self._ensure_connected()
@@ -588,7 +603,7 @@ def close_global_db():
             _global_db = None
 
 
-def wait_for_sp_auth_state(phone: str, max_attempts: int = 15, interval: float = 1.0) -> Optional[str]:
+def wait_for_sp_auth_state(phone: str, max_attempts: int = 30, interval: float = 1.0) -> Optional[str]:
     """轮询等待SP授权state入库，替代固定等待。"""
     try:
         db = get_global_db()
@@ -616,14 +631,65 @@ def wait_for_sp_auth_state(phone: str, max_attempts: int = 15, interval: float =
     return None
 
 
+def wait_for_final_apply_ready(driver: webdriver.Remote, timeout: int = 12) -> None:
+    """等待最终申请页稳定，避免按钮过早点击。"""
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+    except Exception:
+        pass
+
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("""
+                const masks = Array.from(document.querySelectorAll('.el-loading-mask, .loading-mask, [aria-busy="true"]'));
+                return !masks.some(el => {
+                    const style = window.getComputedStyle(el);
+                    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                });
+            """)
+        )
+    except Exception:
+        pass
+
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(EC.element_to_be_clickable(LOCATORS["FINAL_APPLY_BTN"]))
+
+
+def click_final_apply_and_wait(driver: webdriver.Remote, phone: str) -> Optional[str]:
+    """等待最终申请按钮稳定后点击，并以state落库作为成功确认。"""
+    logging.info("[UI] 等待最终申请页稳定...")
+    wait_for_final_apply_ready(driver)
+    safe_click(driver, "FINAL_APPLY_BTN", "跳转页面后的立即申请按钮")
+    try:
+        WebDriverWait(driver, 8).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+    except Exception:
+        pass
+    logging.info("⏳ 首次点击后短轮询等待state入库...")
+    state = wait_for_sp_auth_state(phone, max_attempts=8, interval=1.0)
+    if state:
+        return state
+
+    logging.warning("[UI] 首次点击后仍未查询到state，尝试增强重试点击最终申请按钮...")
+    wait_for_final_apply_ready(driver)
+    element = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(EC.element_to_be_clickable(LOCATORS["FINAL_APPLY_BTN"]))
+    driver.execute_script("arguments[0].click();", element)
+    logging.info("[UI] 已通过JavaScript重试点击: 跳转页面后的立即申请按钮")
+    return wait_for_sp_auth_state(phone, max_attempts=22, interval=1.0)
+
+
 # ==============================================================================
 # --- 6. Webhook请求函数 ---
 # ==============================================================================
-def send_update_offer_request(phone: str) -> bool:
+def send_update_offer_request(phone: str) -> Optional[bool]:
     """发送updateOffer请求 (SP完成后、3PL前)"""
     update_offer_url = f"{BASE_URL}/dpu-auth/amazon-sp/updateOffer"
 
     try:
+        global SKIP_3P_AUTHORIZATION_FLOW
+        SKIP_3P_AUTHORIZATION_FLOW = False
         db = get_global_db()
         selling_partner_id = f"spshouquanfs{phone}"
 
@@ -633,7 +699,9 @@ def send_update_offer_request(phone: str) -> bool:
 
         if not all([idempotency_key, offer_id]):
             logging.error("❌ 数据库查询失败，缺少idempotencyKey或offerId")
-            return False
+            logging.warning("⚠️ 没拿到 idempotencyKey/offerId，直接提示到商业信息页面")
+            SKIP_3P_AUTHORIZATION_FLOW = True
+            return None
 
         logging.info(f"✅ 查询到idempotencyKey: {idempotency_key}")
         logging.info(f"✅ 查询到offerId: {offer_id}")
@@ -881,9 +949,31 @@ def safe_click(driver: webdriver.Remote, locator_key: str, action_description: s
         (By.CSS_SELECTOR, "button[type='button']"),
         (By.XPATH, "//div[contains(@class, 'form')]//button[last()]"),
     ]
+    final_apply_fallbacks = [
+        (By.XPATH, "//button[normalize-space()='立即申请']"),
+        (By.XPATH, "//button[normalize-space()='立即申請']"),
+        (By.XPATH, "//button[normalize-space()='Apply now']"),
+        (By.XPATH, "//button[.//span[normalize-space()='立即申请']]"),
+        (By.XPATH, "//button[.//span[normalize-space()='立即申請']]"),
+        (By.XPATH, "//button[.//span[normalize-space()='Apply now']]"),
+        (By.XPATH, "//span[normalize-space()='立即申请']/ancestor::button[1]"),
+        (By.XPATH, "//span[normalize-space()='立即申請']/ancestor::button[1]"),
+        (By.XPATH, "//span[normalize-space()='Apply now']/ancestor::button[1]"),
+        (By.CSS_SELECTOR, "button.application-btn"),
+    ]
+    product_apply_fallbacks = [
+        (By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'card')][.//*[contains(normalize-space(.), 'HSBC')]]//button[normalize-space()='Apply now']"),
+        (By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'card')][.//*[contains(normalize-space(.), 'HSBC')]]//button[.//span[normalize-space()='Apply now']]"),
+        (By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'card')][.//*[contains(normalize-space(.), 'HSBC')]]//span[normalize-space()='Apply now']/ancestor::button[1]"),
+        (By.XPATH, "(//button[normalize-space()='Apply now'])[1]"),
+    ]
 
     if locator_key == "REG_NEXT_BTN":
         fallback_locators = reg_next_fallbacks
+    elif locator_key == "FINAL_APPLY_BTN":
+        fallback_locators = final_apply_fallbacks
+    elif locator_key == "PRODUCT_APPLY_BTN":
+        fallback_locators = product_apply_fallbacks
 
     try:
         locator = LOCATORS.get(locator_key)
@@ -930,7 +1020,7 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
     if not locator:
         raise ValueError(f"定位器 '{locator_key}' 未在 LOCATORS 中定义")
 
-    # 备选定位器（特别是针对日期输入框）
+    # 备选定位器（特别是针对日期/手机号输入框）
     fallback_locators = []
     if locator_key == "DATE_INPUT":
         fallback_locators = [
@@ -939,10 +1029,78 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
             (By.XPATH, "//input[@placeholder='YYYY/MM/DD']"),
             (By.CSS_SELECTOR, "input.el-input__inner"),
         ]
+    elif locator_key == "PHONE_INPUT":
+        fallback_locators = [
+            (By.XPATH, "//fieldset[1]//input[@maxlength='15']"),
+            (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='15']"),
+            (By.XPATH, "//input[@type='tel']"),
+            (By.CSS_SELECTOR, "input.el-input__inner[maxlength='15']"),
+        ]
+
+    def _try_fill_phone_input_js() -> bool:
+        result = driver.execute_script("""
+            const value = arguments[0];
+            const selectors = [
+                'fieldset input[maxlength="15"]',
+                'input.el-input__inner[maxlength="15"]',
+                'input[type="tel"]',
+                'input[maxlength="15"]',
+                'input.el-input__inner'
+            ];
+
+            const isUsable = (el) => {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                return el.offsetParent !== null &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0' &&
+                    !el.disabled &&
+                    !el.readOnly;
+            };
+
+            let target = null;
+            let usedSelector = '';
+            for (const selector of selectors) {
+                const candidates = Array.from(document.querySelectorAll(selector));
+                target = candidates.find(isUsable);
+                if (target) {
+                    usedSelector = selector;
+                    break;
+                }
+            }
+
+            if (!target) {
+                return { success: false };
+            }
+
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            target.focus();
+            target.select?.();
+            setter.call(target, value);
+            ['input', 'change', 'keyup', 'blur'].forEach((eventName) => {
+                target.dispatchEvent(new Event(eventName, { bubbles: true }));
+            });
+
+            return {
+                success: true,
+                selector: usedSelector,
+                value: target.value
+            };
+        """, text)
+
+        if result and result.get("success"):
+            logging.info(
+                f"[UI] 已通过JS智能定位在 '{field_description}' 中输入: {text} "
+                f"(selector={result.get('selector')})"
+            )
+            return True
+        return False
 
     try:
         # 尝试主定位器
-        element = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(EC.visibility_of_element_located(locator))
+        timeout = 2 if locator_key == "PHONE_INPUT" else CONFIG.WAIT_TIMEOUT
+        element = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
         # 滚动到元素位置，确保元素可见
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
         time.sleep(0.1)
@@ -950,12 +1108,15 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
         element.send_keys(text)
         logging.info(f"[UI] 已在 '{field_description}' 中输入: {text}")
     except Exception as e:
+        if locator_key == "PHONE_INPUT" and _try_fill_phone_input_js():
+            return
         # 尝试备选定位器
         if fallback_locators:
             logging.warning(f"[UI] 主定位器失败，尝试备选定位器...")
             for i, fallback_locator in enumerate(fallback_locators, 1):
                 try:
-                    element = WebDriverWait(driver, 5).until(EC.visibility_of_element_located(fallback_locator))
+                    fallback_timeout = 2 if locator_key == "PHONE_INPUT" else 5
+                    element = WebDriverWait(driver, fallback_timeout).until(EC.element_to_be_clickable(fallback_locator))
                     # 滚动到元素位置
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
                     time.sleep(0.1)
@@ -965,13 +1126,15 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
                     return
                 except Exception:
                     continue
+        if locator_key == "PHONE_INPUT" and _try_fill_phone_input_js():
+            return
 
         logging.error(f"[UI] 向 '{field_description}' 输入时发生错误: {e}")
         raise
 
 
 def upload_image(driver: webdriver.Remote, description: str, custom_path: Optional[str] = None):
-    """上传图片到指定区域（优化版，使用JavaScript直接上传避免stale element错误）
+    """上传图片，直接使用Selenium file input。
 
     Args:
         driver: WebDriver实例
@@ -1012,83 +1175,23 @@ def upload_image(driver: webdriver.Remote, description: str, custom_path: Option
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"图片文件不存在: {image_path}")
 
-        # 3. 使用JavaScript直接上传（避免stale element问题）
         logging.info(f"[UI] 正在上传图片 '{target_file}' 用于: {description}")
+        from selenium.webdriver.common.by import By
+        file_input = None
 
-        # JavaScript上传函数：找到file input并设置文件路径
-        upload_js = f"""
-        (function() {{
-            // 查找所有file input
-            var inputs = document.querySelectorAll('input[type="file"]');
-            var targetInput = null;
+        try:
+            file_input = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+                EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
+            )
+        except Exception:
+            file_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
 
-            // 优先查找可见的file input
-            for (var i = 0; i < inputs.length; i++) {{
-                if (inputs[i].offsetParent !== null && inputs[i].offsetParent !== document.body) {{
-                    targetInput = inputs[i];
-                    break;
-                }}
-            }}
+        if not file_input:
+            raise Exception("页面上未找到可用的文件上传输入框")
 
-            // 如果没找到可见的，使用第一个
-            if (!targetInput && inputs.length > 0) {{
-                targetInput = inputs[0];
-            }}
-
-            if (!targetInput) {{
-                return {{success: false, message: '未找到file input'}};
-            }}
-
-            // 设置文件路径（使用FileList构造器）
-            try {{
-                // 创建一个File对象来模拟文件选择
-                var file = null;
-                targetInput.value = '{abs_image_path.replace(os.sep, '/')}';
-
-                // 触发change事件
-                var event = new Event('change', {{bubbles: true}});
-                targetInput.dispatchEvent(event);
-
-                return {{
-                    success: true,
-                    message: '上传成功',
-                    hasValue: targetInput.value !== ''
-                }};
-            }} catch (e) {{
-                return {{success: false, message: e.toString()}};
-            }}
-        }})();
-        """
-
-        # 执行上传
-        upload_result = driver.execute_script(upload_js)
-
-        if not upload_result or not upload_result.get('success'):
-            # JavaScript方式失败，尝试使用Selenium方式
-            logging.warning(f"[UI] JavaScript上传失败，尝试使用Selenium方式")
-
-            # 使用Selenium的find_element（每次都重新获取元素）
-            from selenium.webdriver.common.by import By
-            file_input = None
-
-            try:
-                file_input = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
-                    EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
-                )
-            except:
-                # 尝试通过CSS选择器
-                file_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
-
-            if file_input:
-                file_input.send_keys(abs_image_path)
-                logging.info(f"[UI] ✅ 已通过Selenium上传图片 '{target_file}' 用于: {description}")
-            else:
-                raise Exception("页面上未找到可用的文件上传输入框")
-        else:
-            logging.info(f"[UI] ✅ 已通过JavaScript上传图片 '{target_file}' 用于: {description}")
-
-        # 6. 等待上传处理完成
-        time.sleep(2)
+        file_input.send_keys(abs_image_path)
+        logging.info(f"[UI] ✅ 已通过Selenium上传图片 '{target_file}' 用于: {description}")
+        time.sleep(CONFIG.ACTION_DELAY)
 
     except Exception as e:
         logging.error(f"[UI] 上传图片 '{description}' 时发生错误: {e}")
@@ -1174,10 +1277,10 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
     logging.info("=" * 50)
     safe_send_keys(driver, "PHONE_INPUT", phone, "phone number")
 
-    send_code_btn_xpath = "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[6]/div/button"
+    send_code_btn_locator = (By.CSS_SELECTOR, "button.get-code-btn")
     try:
         send_code_btn = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
-            EC.element_to_be_clickable((By.XPATH, send_code_btn_xpath))
+            EC.element_to_be_clickable(send_code_btn_locator)
         )
         try:
             send_code_btn.click()
@@ -1447,11 +1550,11 @@ def handle_director_info(driver: webdriver.Remote, phone: str, auto_fill: bool):
 
         # 2. 上传身份证正面
         upload_image(driver, "身份证正面")
-        time.sleep(CONFIG.ACTION_DELAY * 3)
+        time.sleep(CONFIG.ACTION_DELAY)
 
         # 3. 上传身份证背面
         upload_image(driver, "身份证背面")
-        time.sleep(CONFIG.ACTION_DELAY * 3)
+        time.sleep(CONFIG.ACTION_DELAY)
 
         # 4. 填写出生日期（格式：2024/12/30）
         safe_send_keys(driver, "DIRECTOR_BIRTH_DATE_INPUT", "2024/12/30", "董事出生日期")
@@ -1955,14 +2058,13 @@ def run_offline_automation():
         logging.info("\n" + "=" * 50)
         logging.info("步骤 6: 提交最终申请")
         logging.info("=" * 50)
-        safe_click(driver, "FINAL_APPLY_BTN", "跳转页面后的立即申请按钮")
+        state = click_final_apply_and_wait(driver, phone)
 
         # --- 步骤 7: 完成SP授权请求 ---
         logging.info("\n" + "=" * 50)
         logging.info("步骤 7: 完成SP授权请求")
         logging.info("=" * 50)
 
-        state = wait_for_sp_auth_state(phone)
         if not state:
             logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
             return
@@ -1998,8 +2100,11 @@ def run_offline_automation():
         logging.info("=" * 50)
 
         time.sleep(3)
-        if send_update_offer_request(phone):
+        update_offer_result = send_update_offer_request(phone)
+        if update_offer_result is True:
             logging.info("✅ updateOffer请求成功！")
+        elif update_offer_result is None:
+            logging.info("📍 已跳过 updateOffer，后续将直接进入商业信息页面")
         else:
             logging.warning("⚠️ updateOffer请求失败，继续后续流程")
 
@@ -2013,6 +2118,8 @@ def run_offline_automation():
         interval = 5
 
         for attempt in range(max_attempts):
+            if SKIP_3P_AUTHORIZATION_FLOW:
+                break
             try:
                 db = get_global_db()
                 send_status_sql = f"""

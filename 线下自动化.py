@@ -18,7 +18,9 @@ import os
 import random
 import logging
 import re
+import ipaddress
 import socket
+import subprocess
 import json
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Dict, Any
@@ -196,9 +198,9 @@ LOCATORS = {
     "INITIAL_APPLY_BTN": (By.XPATH, "//button[contains(., '立即申请')]"),
 
     # 注册页面
-    "PHONE_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/div/div[2]/input"),
+    "PHONE_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='15']"),
     "VERIFICATION_CODE_INPUTS": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='1']"),
-    "REG_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[8]/button"),
+    "REG_NEXT_BTN": (By.XPATH, "//button[contains(., '下一步') or contains(., 'Next')]"),
 
     # 密码设置页 - 使用绝对XPath路径（与线上流程一致）
     "PASSWORD_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[2]/div/div[1]/div/input"),
@@ -209,13 +211,13 @@ LOCATORS = {
     # 声明页面的两个复选框
     "AGREE_CONSENT_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div[1]/div/label/span[1]/span"),
     "AUTHORIZATION_CHECKBOX": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div[2]/div/label/span[1]/span"),
-    "FINAL_REGISTER_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[5]/div[2]/button"),
+    "FINAL_REGISTER_BTN": (By.XPATH, "//button[.//span[normalize-space()='Sign up' or normalize-space()='注册' or normalize-space()='绔嬪嵆娉ㄥ唽' or normalize-space()='绔嬪嵆注册'] or normalize-space()='Sign up' or normalize-space()='注册' or normalize-space()='绔嬪嵆娉ㄥ唽' or normalize-space()='绔嬪嵆注册']"),
 
     # 通用下一步按钮
     "NEXT_BTN": (By.XPATH, "//button[contains(., '下一页')]"),
 
     # 最终申请按钮（跳转页面后）
-    "FINAL_APPLY_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/div[3]/div[6]/button"),
+    "FINAL_APPLY_BTN": (By.XPATH, "//button[.//span[normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請'] or normalize-space()='Apply now' or normalize-space()='立即申请' or normalize-space()='立即申請']"),
 
     # 公司信息页
     "COMPANY_EN_NAME_INPUT": (By.XPATH, "(//input[contains(@class, 'el-input__inner') and @autocomplete='off'])[1]"),
@@ -235,7 +237,7 @@ LOCATORS = {
     "BIRTH_DATE_INPUT": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div/div[1]/div[2]/div/div[3]/div[1]/div/div[1]/div/input"),  # 董事信息-出生日期
     "DIRECTOR_NEXT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[5]/div[2]/button[2]"),
     "REFERENCE_PHONE_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='15']"),
-    "REFERENCE_EMAIL_INPUT": (By.XPATH, "//input[contains(@class, 'el-input__inner') and @autocomplete='off' and not(@maxlength) and not(@placeholder)]"),
+    "REFERENCE_EMAIL_INPUT": (By.XPATH, "//*[normalize-space()='Email address' or normalize-space()='邮箱地址' or normalize-space()='電子郵件地址']/following::input[1]"),
 
     # 银行账户信息页
     # 银行选择主定位器（精准定位）
@@ -259,6 +261,19 @@ LOCATORS = {
     # 激活额度后的接受按钮
     "ACCEPT_BTN": (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[3]/div/div/div/div/div/div/div[2]/div[3]/button")
 }
+
+FINAL_APPLY_FALLBACKS = [
+    (By.XPATH, "//button[normalize-space()='Apply now']"),
+    (By.XPATH, "//button[normalize-space()='立即申请']"),
+    (By.XPATH, "//button[normalize-space()='立即申請']"),
+    (By.XPATH, "//button[.//span[normalize-space()='Apply now']]"),
+    (By.XPATH, "//button[.//span[normalize-space()='立即申请']]"),
+    (By.XPATH, "//button[.//span[normalize-space()='立即申請']]"),
+    (By.XPATH, "//span[normalize-space()='Apply now']/ancestor::button[1]"),
+    (By.XPATH, "//span[normalize-space()='立即申请']/ancestor::button[1]"),
+    (By.XPATH, "//span[normalize-space()='立即申請']/ancestor::button[1]"),
+    (By.CSS_SELECTOR, "button.application-btn"),
+]
 
 
 # ==============================================================================
@@ -327,25 +342,48 @@ def get_yes_no_choice(prompt: str) -> bool:
 # --- 4. 数据库配置 ---
 # ==============================================================================
 def get_local_physical_ip() -> Optional[str]:
-    """获取本地物理网卡IP地址（用于绕过VPN直连数据库）"""
+    """尝试获取可用于直连数据库的本地物理网卡 IP。"""
+    powershell_script = r"""
+$badAliases = '(?i)(vEthernet|WSL|Docker|Virtual|Loopback|Bluetooth|Hyper-V|TAP|VPN|Npcap|LetsTAP|VMware|Container)'
+$routes = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+    Sort-Object RouteMetric, InterfaceMetric
+$selectedIp = $null
+foreach ($route in $routes) {
+    $cfg = Get-NetIPConfiguration -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue
+    if (-not $cfg -or -not $cfg.IPv4Address) { continue }
+    if ($cfg.InterfaceAlias -match $badAliases) { continue }
+    foreach ($ip in $cfg.IPv4Address) {
+        if ($ip.IPAddress -and $ip.IPAddress -notmatch '^(127\.|169\.254\.|0\.0\.0\.0$)') {
+            $selectedIp = $ip.IPAddress
+            break
+        }
+    }
+    if ($selectedIp) { break }
+}
+if ($selectedIp) { $selectedIp }
+"""
+
     try:
-        # 创建一个UDP socket连接到公网地址（不会实际发送数据）
-        # 这会触发系统选择最佳路由，通常是物理网卡
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            # 连接到AWS的公网DNS（不实际发送数据）
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            # 排除常见的VPN虚拟网卡IP段
-            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
-                return local_ip
-            # 如果获取到的是内网IP，尝试通过主机名解析
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            if not local_ip.startswith(("10.", "172.16.", "192.168.", "127.")):
-                return local_ip
-    except Exception:
-        pass
-    # 如果上述方法失败，返回None让系统自动选择
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        candidate_ip = completed.stdout.strip()
+        if candidate_ip:
+            try:
+                ip_obj = ipaddress.ip_address(candidate_ip)
+            except ValueError:
+                logging.debug("[DB] PowerShell returned an invalid IP candidate: %s", candidate_ip)
+            else:
+                if not (ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified):
+                    logging.debug("[DB] Selected local bind IP: %s", candidate_ip)
+                    return candidate_ip
+    except Exception as exc:
+        logging.debug("[DB] Failed to detect local physical IP: %s", exc)
+
     return None
 
 
@@ -388,32 +426,64 @@ class DatabaseExecutor:
                     raise
 
     def _connect(self) -> None:
-        """执行数据库连接（绑定本地物理网卡IP绕过VPN）"""
-        # 获取本地物理网卡IP用于绕过VPN
+        """执行数据库连接，优先尝试绑定本地物理网卡 IP。"""
         local_ip = get_local_physical_ip()
         connect_params = self.config.copy()
+        connect_params.setdefault("connect_timeout", 8)
+        connect_params.setdefault("read_timeout", 30)
+        connect_params.setdefault("write_timeout", 30)
 
-        if local_ip:
-            connect_params['bind_address'] = local_ip
-            logging.info(f"🔗 绑定本地IP: {local_ip} 绕过VPN直连数据库")
+        old_proxies: Dict[str, str] = {}
+        for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
+            if os.environ.get(proxy_key):
+                old_proxies[proxy_key] = os.environ[proxy_key]
+                del os.environ[proxy_key]
 
         try:
-            # 清除代理环境变量
-            old_proxies = {}
-            for proxy_key in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY'):
-                if os.environ.get(proxy_key):
-                    old_proxies[proxy_key] = os.environ[proxy_key]
-                    del os.environ[proxy_key]
+            bind_candidates = [local_ip] if local_ip else []
+            bind_candidates.append(None)
+            last_error: Optional[Exception] = None
 
-            self.conn = pymysql.connect(**connect_params, autocommit=True)
-            self.cursor = self.conn.cursor()
+            for bind_address in bind_candidates:
+                current_params = connect_params.copy()
+                if bind_address:
+                    current_params['bind_address'] = bind_address
+                    logging.info(f"[DB] Binding local IP: {bind_address}")
+                else:
+                    current_params.pop('bind_address', None)
+                    logging.info("[DB] Connecting with system routing")
 
-            if local_ip:
-                logging.info(f"✅ 数据库直连成功（已绑定 {local_ip} 绕过VPN）")
-            else:
-                logging.info("✅ 数据库连接成功（系统自动路由）")
+                try:
+                    self.conn = pymysql.connect(**current_params, autocommit=True)
+                    self.cursor = self.conn.cursor()
+                    if bind_address:
+                        logging.info(f"[DB] Database connected via local IP: {bind_address}")
+                    else:
+                        logging.info("[DB] Database connected with system routing")
+                    return
+                except Exception as exc:
+                    last_error = exc
+                    if self.cursor:
+                        try:
+                            self.cursor.close()
+                        except Exception:
+                            pass
+                        self.cursor = None
+                    if self.conn:
+                        try:
+                            self.conn.close()
+                        except Exception:
+                            pass
+                        self.conn = None
+
+                    if bind_address:
+                        logging.warning(f"[DB] Connect with bind_address {bind_address} failed: {exc}")
+                        continue
+                    raise
+
+            if last_error:
+                raise last_error
         finally:
-            # 恢复代理环境变量
             for k, v in old_proxies.items():
                 os.environ[k] = v
 
@@ -1295,6 +1365,8 @@ def safe_click(driver: webdriver.Remote, locator_key: str, action_description: s
 
     if locator_key == "REG_NEXT_BTN":
         fallback_locators = reg_next_fallbacks
+    elif locator_key == "FINAL_APPLY_BTN":
+        fallback_locators = FINAL_APPLY_FALLBACKS
 
     try:
         locator = LOCATORS.get(locator_key)
@@ -1350,10 +1422,174 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
             (By.XPATH, "//input[@placeholder='YYYY/MM/DD']"),
             (By.CSS_SELECTOR, "input.el-input__inner"),
         ]
+    elif locator_key == "PHONE_INPUT":
+        fallback_locators = [
+            (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/fieldset[1]/div/div/div/div/div[2]/input"),
+            (By.XPATH, "//fieldset[1]//input[@maxlength='15']"),
+            (By.XPATH, "//input[@type='tel']"),
+            (By.CSS_SELECTOR, "input.el-input__inner[maxlength='15']"),
+        ]
+    elif locator_key == "REFERENCE_EMAIL_INPUT":
+        fallback_locators = [
+            (By.XPATH, "(//*[normalize-space()='Email address' or normalize-space()='邮箱地址' or normalize-space()='電子郵件地址']/following::input[not(@disabled) and not(@readonly)])[1]"),
+            (By.XPATH, "(//input[contains(@class, 'el-input__inner') and @maxlength='15']/following::input[contains(@class, 'el-input__inner') and not(@maxlength) and not(@placeholder) and not(@disabled) and not(@readonly)])[1]"),
+            (By.CSS_SELECTOR, "input[type='email']"),
+        ]
+
+    def _try_fill_phone_input_js() -> bool:
+        result = driver.execute_script("""
+            const value = arguments[0];
+            const selectors = [
+                'fieldset input[maxlength="15"]',
+                'input.el-input__inner[maxlength="15"]',
+                'input[type="tel"]',
+                'input[maxlength="15"]',
+                'input.el-input__inner'
+            ];
+
+            const isUsable = (el) => {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                return el.offsetParent !== null &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0' &&
+                    !el.disabled &&
+                    !el.readOnly;
+            };
+
+            let target = null;
+            let usedSelector = '';
+            for (const selector of selectors) {
+                const candidates = Array.from(document.querySelectorAll(selector));
+                target = candidates.find(isUsable);
+                if (target) {
+                    usedSelector = selector;
+                    break;
+                }
+            }
+
+            if (!target) {
+                return { success: false };
+            }
+
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            target.focus();
+            target.select?.();
+            setter.call(target, value);
+            ['input', 'change', 'keyup', 'blur'].forEach((eventName) => {
+                target.dispatchEvent(new Event(eventName, { bubbles: true }));
+            });
+
+            return {
+                success: true,
+                selector: usedSelector,
+                value: target.value
+            };
+        """, text)
+
+        if result and result.get("success"):
+            logging.info(
+                f"[UI] 通过JS智能定位在 '{field_description}' 中输入 {text} "
+                f"(selector={result.get('selector')})"
+            )
+            return True
+        return False
+
+    def _try_fill_reference_email_input_js() -> bool:
+        result = driver.execute_script("""
+            const value = arguments[0];
+            const normalize = (text) => (text || '').replace(/\\s+/g, ' ').trim();
+            const isUsable = (el) => {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 &&
+                    rect.height > 0 &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0' &&
+                    !el.disabled &&
+                    !el.readOnly;
+            };
+            const setValue = (target) => {
+                target.scrollIntoView({ block: 'center' });
+                target.focus();
+                target.select?.();
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                if (setter) {
+                    setter.call(target, value);
+                } else {
+                    target.value = value;
+                }
+                ['input', 'change', 'keyup', 'blur'].forEach((eventName) => {
+                    target.dispatchEvent(new Event(eventName, { bubbles: true }));
+                });
+            };
+
+            const visibleInputs = Array.from(document.querySelectorAll('input')).filter(isUsable);
+            let target = null;
+            let strategy = '';
+
+            const labelCandidates = Array.from(document.querySelectorAll('label, div, span, p')).filter((el) => {
+                const text = normalize(el.textContent);
+                return text === 'Email address' || text === '邮箱地址' || text === '電子郵件地址';
+            });
+
+            for (const label of labelCandidates) {
+                const labelRect = label.getBoundingClientRect();
+                target = visibleInputs
+                    .map((input) => ({ input, rect: input.getBoundingClientRect() }))
+                    .filter(({ rect }) => rect.top >= labelRect.top && rect.top - labelRect.bottom < 140 && Math.abs(rect.left - labelRect.left) < 120)
+                    .sort((a, b) => (a.rect.top - b.rect.top) || (a.rect.left - b.rect.left))[0]?.input;
+                if (target) {
+                    strategy = 'label';
+                    break;
+                }
+            }
+
+            if (!target) {
+                const phone = visibleInputs.find((input) => input.getAttribute('maxlength') === '15');
+                if (phone) {
+                    const phoneRect = phone.getBoundingClientRect();
+                    target = visibleInputs
+                        .map((input) => ({ input, rect: input.getBoundingClientRect() }))
+                        .filter(({ input, rect }) =>
+                            input !== phone &&
+                            !input.hasAttribute('maxlength') &&
+                            !input.getAttribute('placeholder') &&
+                            Math.abs(rect.top - phoneRect.top) < 80 &&
+                            rect.left > phoneRect.right
+                        )
+                        .sort((a, b) => a.rect.left - b.rect.left)[0]?.input;
+                    if (target) {
+                        strategy = 'right-of-phone';
+                    }
+                }
+            }
+
+            if (!target) {
+                return { success: false, reason: 'email_input_not_found' };
+            }
+
+            setValue(target);
+            return { success: target.value === value, value: target.value, strategy };
+        """, text)
+
+        if result and result.get("success"):
+            logging.info(
+                f"[UI] 通过JS智能定位在 '{field_description}' 中输入 {text} "
+                f"(strategy={result.get('strategy')})"
+            )
+            return True
+
+        logging.warning(f"[UI] JS智能定位未找到 '{field_description}': {result}")
+        return False
 
     try:
         # 尝试主定位器
-        element = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(EC.visibility_of_element_located(locator))
+        timeout = 2 if locator_key == "PHONE_INPUT" else CONFIG.WAIT_TIMEOUT
+        element = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
         element.clear()
         element.send_keys(text)
         logging.info(f"[UI] 已在 '{field_description}' 中输入: {text}")
@@ -1363,13 +1599,74 @@ def safe_send_keys(driver: webdriver.Remote, locator_key: str, text: str, field_
             logging.warning(f"[UI] 主定位器失败，尝试备选定位器...")
             for i, fallback_locator in enumerate(fallback_locators, 1):
                 try:
-                    element = WebDriverWait(driver, 5).until(EC.visibility_of_element_located(fallback_locator))
+                    fallback_timeout = 2 if locator_key == "PHONE_INPUT" else 5
+                    element = WebDriverWait(driver, fallback_timeout).until(EC.element_to_be_clickable(fallback_locator))
                     element.clear()
                     element.send_keys(text)
                     logging.info(f"[UI] 使用备选定位器 #{i} 在 '{field_description}' 中输入: {text}")
                     return
                 except Exception:
                     continue
+
+        if locator_key == "REFERENCE_EMAIL_INPUT" and _try_fill_reference_email_input_js():
+            return
+
+        # 回退：尝试使用JavaScript直接设置值（更强的容错），支持XPath和CSS定位器
+        try:
+            logging.warning(f"[UI] 常规输入失败，尝试使用JavaScript回退方法在 '{field_description}' 填值")
+            js_result = None
+            by, locator_value = locator
+            if by == By.CSS_SELECTOR:
+                js = """
+                return (function(sel, value){
+                    const el = document.querySelector(sel);
+                    if(!el) return {success:false, reason:'not_found'};
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    el.focus(); el.select && el.select();
+                    setter.call(el, value);
+                    ['input','change','blur'].forEach(n => el.dispatchEvent(new Event(n, {bubbles:true}))); 
+                    return {success:true, value: el.value};
+                })(arguments[0], arguments[1]);
+                """
+                js_result = driver.execute_script(js, locator_value, text)
+            elif by == By.XPATH:
+                # XPath -> evaluate to node
+                js = """
+                return (function(xpath, value){
+                    const res = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                    const el = res.singleNodeValue;
+                    if(!el) return {success:false, reason:'not_found'};
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    el.focus(); el.select && el.select();
+                    setter.call(el, value);
+                    ['input','change','blur'].forEach(n => el.dispatchEvent(new Event(n, {bubbles:true}))); 
+                    return {success:true, value: el.value};
+                })(arguments[0], arguments[1]);
+                """
+                js_result = driver.execute_script(js, locator_value, text)
+            else:
+                # 通用选择器策略：尝试通过class或属性查找可见input
+                js = """
+                return (function(value){
+                    const candidates = Array.from(document.querySelectorAll('input'));
+                    const el = candidates.find(e => e.offsetParent !== null && !e.disabled && !e.readOnly);
+                    if(!el) return {success:false, reason:'not_found'};
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    el.focus(); el.select && el.select();
+                    setter.call(el, value);
+                    ['input','change','blur'].forEach(n => el.dispatchEvent(new Event(n, {bubbles:true}))); 
+                    return {success:true, value: el.value};
+                })(arguments[0]);
+                """
+                js_result = driver.execute_script(js, text)
+
+            if js_result and js_result.get('success'):
+                logging.info(f"[UI] ✅ JS回退方式在 '{field_description}' 中输入成功 (value={js_result.get('value')})")
+                return
+            else:
+                logging.warning(f"[UI] JS回退未成功: {js_result}")
+        except Exception as js_e:
+            logging.warning(f"[UI] JS回退方式在 '{field_description}' 填写时异常: {js_e}")
 
         logging.error(f"[UI] 向 '{field_description}' 输入时发生错误: {e}")
         raise
@@ -1533,11 +1830,23 @@ def handle_initial_registration(driver: webdriver.Remote, phone: str) -> Optiona
     logging.info("=" * 50)
     safe_send_keys(driver, "PHONE_INPUT", phone, "phone number")
 
-    send_code_btn_xpath = "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[6]/div/button"
+    send_code_btn_locators = [
+        (By.CSS_SELECTOR, "button.get-code-btn"),
+        (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[6]/div/button"),
+        (By.XPATH, "//button[contains(., '验证码') or contains(., 'Code')]"),
+    ]
     try:
-        send_code_btn = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
-            EC.element_to_be_clickable((By.XPATH, send_code_btn_xpath))
-        )
+        send_code_btn = None
+        for send_code_btn_locator in send_code_btn_locators:
+            try:
+                send_code_btn = WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+                    EC.element_to_be_clickable(send_code_btn_locator)
+                )
+                break
+            except Exception:
+                continue
+        if not send_code_btn:
+            raise TimeoutError("send code button not found")
         try:
             send_code_btn.click()
         except Exception:
@@ -1680,6 +1989,93 @@ def wait_for_sp_auth_state(phone: str, max_attempts: int = 15, interval: float =
         return None
 
     return None
+
+
+def wait_for_final_apply_ready(driver: webdriver.Remote, timeout: int = 12) -> None:
+    """等待最终申请页稳定，避免按钮过早点击。"""
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+    except Exception:
+        pass
+
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("""
+                const masks = Array.from(document.querySelectorAll('.el-loading-mask, .loading-mask, [aria-busy="true"]'));
+                return !masks.some(el => {
+                    const style = window.getComputedStyle(el);
+                    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                });
+            """)
+        )
+    except Exception:
+        pass
+
+    WebDriverWait(driver, CONFIG.WAIT_TIMEOUT).until(
+        EC.element_to_be_clickable(LOCATORS["FINAL_APPLY_BTN"])
+    )
+
+
+def dispatch_final_apply_click(driver: webdriver.Remote, element) -> None:
+    """通过多种鼠标事件增强最终申请按钮的触发稳定性。"""
+    driver.execute_script("""
+        const el = arguments[0];
+        el.scrollIntoView({block: 'center', inline: 'center'});
+        const events = ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click'];
+        for (const type of events) {
+            el.dispatchEvent(new MouseEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                buttons: 1
+            }));
+        }
+    """, element)
+
+
+def click_final_apply_and_wait(driver: webdriver.Remote, phone: str) -> Optional[str]:
+    """点击最终申请按钮，并以SP授权state落库作为成功确认。"""
+    logging.info("[UI] 等待最终申请页稳定...")
+    wait_for_final_apply_ready(driver)
+    safe_click(driver, "FINAL_APPLY_BTN", "跳转页面后的立即申请按钮")
+
+    try:
+        WebDriverWait(driver, 8).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+    except Exception:
+        pass
+
+    logging.info("⏳ 首次点击后短轮询等待state入库...")
+    state = wait_for_sp_auth_state(phone, max_attempts=8, interval=1.0)
+    if state:
+        return state
+
+    logging.warning("[UI] 首次点击后仍未查询到state，尝试增强重试点击最终申请按钮...")
+    candidate_locators = [LOCATORS["FINAL_APPLY_BTN"], *FINAL_APPLY_FALLBACKS]
+    seen_locators = set()
+
+    for index, candidate in enumerate(candidate_locators, 1):
+        locator_key = tuple(candidate)
+        if locator_key in seen_locators:
+            continue
+        seen_locators.add(locator_key)
+
+        try:
+            wait_for_final_apply_ready(driver)
+            element = WebDriverWait(driver, 4).until(EC.element_to_be_clickable(candidate))
+            dispatch_final_apply_click(driver, element)
+            logging.info(f"[UI] 已通过增强事件重试点击最终申请按钮（候选 #{index}）")
+        except Exception:
+            continue
+
+        state = wait_for_sp_auth_state(phone, max_attempts=4, interval=1.0)
+        if state:
+            return state
+
+    return wait_for_sp_auth_state(phone, max_attempts=14, interval=1.0)
 
 
 def get_token_from_browser(driver: webdriver.Remote) -> Optional[str]:
@@ -2448,14 +2844,12 @@ def run_offline_automation():
         logging.info("\n" + "=" * 50)
         logging.info("步骤 5: 提交最终申请")
         logging.info("=" * 50)
-        safe_click(driver, "FINAL_APPLY_BTN", "跳转页面后的立即申请按钮")
-
         # --- 步骤 6: 完成SP授权请求 ---
         logging.info("\n" + "=" * 50)
         logging.info("步骤 6: 完成SP授权请求")
         logging.info("=" * 50)
 
-        state = wait_for_sp_auth_state(phone)
+        state = click_final_apply_and_wait(driver, phone)
         if not state:
             logging.error(f"❌ 未查询到SP授权的state，手机号: {phone}")
             return

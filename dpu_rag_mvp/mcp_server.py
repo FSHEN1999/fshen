@@ -4,7 +4,7 @@ from dataclasses import asdict
 
 from mcp.server.fastmcp import FastMCP
 
-from dpu_rag_mvp.core import automation_catalog, build_index, get_status, search, suggest_automation
+from dpu_rag_mvp.core import automation_catalog, build_index, get_status, search, suggest_automation, topic_portals
 
 
 mcp = FastMCP("dpu-local-rag")
@@ -23,10 +23,19 @@ def rag_build_index() -> dict:
 
 
 @mcp.tool()
-def rag_search(query: str, limit: int = 8, kind: str = "") -> list[dict]:
-    """Search project code, docs, configs, and automation files."""
+def rag_search(query: str, limit: int = 8, kind: str = "", rerank: bool = True, candidate_limit: int = 80) -> list[dict]:
+    """Search project code, docs, configs, and automation files with usefulness reranking by default."""
     kind_filter = kind or None
-    return [asdict(item) for item in search(query, limit=limit, kind=kind_filter)]
+    return [
+        asdict(item)
+        for item in search(
+            query,
+            limit=limit,
+            kind=kind_filter,
+            rerank=rerank,
+            candidate_limit=candidate_limit,
+        )
+    ]
 
 
 @mcp.tool()
@@ -41,6 +50,11 @@ def rag_suggest_automation(goal: str, limit: int = 8) -> list[dict]:
     return [asdict(item) for item in suggest_automation(goal, limit=limit)]
 
 
+@mcp.tool()
+def rag_topic_portals() -> list[dict]:
+    """List curated topic entrypoints for long DPU project context."""
+    return [asdict(item) for item in topic_portals()]
+
+
 if __name__ == "__main__":
     mcp.run()
-

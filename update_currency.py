@@ -1,17 +1,18 @@
 import pymysql
-from pymysql.constants import CLIENT
 
 # 数据库配置（reg环境）
 db_config = {
-    'host': 'aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com',
+    'host': '18.162.145.173',
     'user': 'dpu_reg',
     'password': 'r4asUYBX3R6LNdp',
     'database': 'dpu_seller_center',
-    'port': 3306,
-    'charset': 'utf8mb4'
+    'port': 3307,
+    'charset': 'utf8mb4',
+    'connect_timeout': 15,
+    'read_timeout': 15,
 }
 
-conn = pymysql.connect(**db_config, autocommit=True, client_flag=CLIENT.INTERACTIVE)
+conn = pymysql.connect(**db_config, autocommit=True)
 cursor = conn.cursor()
 
 # 更新货币为CNY

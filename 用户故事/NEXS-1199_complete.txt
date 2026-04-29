@@ -1,0 +1,232 @@
+=== Page 5 ===
+ 
+INTERNAL 
+[NEXS-1199] [CNY LoC] - [Application] - 1st Application Rejection + Data Deletion Created: 02/Feb/26  Updated: 05/Mar/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: R3.0  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Adrian Chiu  Assignee:  Adrian Chiu  
+Resolution:  Unresolved  Votes:  0  
+Labels:  None  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  Picture1-1.png     Picture1.png     image-2026-02-11-09-17-09-310-1.png     image-2026-02-11-09-17-09-
+310-2.png     image-2026-02-11-09-17-09-310.png     image-2026-02-11-09-19-40-230.png     image-2026-
+02-11-09-20-05-073.png     image-2026-02-11-09-20-21-112.png     image-2026-03-04-10-17-50-
+431.png     image-2026-03-05-15-46-56-119.png      
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As a loan applicant on HSBC Express Finance, I would like to know if my application has been rejected 
+So that I may proceed to find alternative means of financing 
+
+
+=== Page 6 ===
+ 
+INTERNAL 
+   
+Acceptance Criteria (AC):  
+AC1: Offer Landing Page if application rejected 
+GIVEN the offer is rejected by FundPark (Lender rejection or OWS rejection) 
+WHEN the user is browsing the Offer Landing page 
+THEN the user will be directed to the Lender Rejection page as below 
+
+
+=== Page 7 ===
+ 
+INTERNAL 
+ 
+ 
+3 user journey for application rejection 
+AC 2.1:  70K loan request of [70k-1.5M]  journey 
+GIVEN that the user has submitted application of 70k instant fund, 
+When the user has input all the drawdown information and landed on pending assessment page (Refer to NEXS-1198) 
+
+
+=== Page 8 ===
+ 
+INTERNAL 
+AND FundPark has rejected the application 
+THEN the user will be directed to the Lender Rejection page  
+AC 2.2:  select up to 1.5M loan application of [70k-1.5M] journey 
+GIVEN that the user select loan offer up to CNY1.5M on offer selection page  
+And the user will land on the pending assessment page for the credit assessment result (Refer to NEXS-1198)   
+WHEN FundPark rejected the application 
+THEN the user will be directed to the Lender Rejection page 
+AC 2.3:  [1.5M-10M] journey 
+GIVEN that the user has input all information on "Business Information" page and "Connected Parties Information" page 
+AND the user will land on the pending assessment page for the credit assessment result  (Refer to NEXS-1198) 
+WHEN FundPark reject the application 
+THEN the user will be directed to the Lender Rejection page  
+  
+ 
+Lender Rejection  
+AC3: Lender rejection - Fraud Rejection journey 
+Given the user has submit the loan application  
+And FundPark rejected the offer due to Fraud detected 
+WHEN the user is browsing the Offer Landing page 
+THEN the user will be directed to the Lender Rejection page  
+AC3.2: Lender Rejection: Fraud Rejection Logic 
+GIVEN the Seller submit the application to FundPark 
+WHEN ** FundPark reject the application with reason include keyword "Fraud" & Current Time - Reject Time > 24 h & there is no other active 
+application 
+THEN DPU will mark Application as Rejected and notify Rejection status to AMZ along with Application Rejection Category = KYC, and 
+
+=== Page 9 ===
+ 
+INTERNAL 
+Application Rejection Code = Fraud 
+(Scheduled task run at 23:30:00 a daily basis) 
+AC4: Lender Rejection: Non-fraud Rejection Logic 
+GIVEN the Seller submit the application to FundPark & Current Time - Reject Time > 24 h & there is no other active application 
+WHEN FundPark reject the application with reason DO NOT include keyword "Fraud" 
+THEN DPU will mark Application as Rejected and notify Rejection status to AMZ along with Application Rejection Category = POLICY, and 
+Application Rejection Code = FAILED_APPLICATION_CRITERIA  
+(Scheduled task run at 23:30:00 a daily basis) 
+ 
+OWS Rejection 
+AC 5.1: Sanction hit and BOSS user reject the loan application (implemented in AC5 NEXS-1148 in S16)  
+GIVEN that the OWS RTS screening hit the "MATCH" result 
+AND the BOSS User confirm to rejects the application on BOSS's Sanctions Screening page. 
+WHEN the user is browsing the Offer Landing page 
+THEN the user will be directed to the Lender Rejection page 
+AC5.2: OWS Rejection Logic  
+GIVEN ** that the OWS RTS screening hit the "MATCH" result 
+AND ** the BOSS User confirm to rejects the application on BOSS's Sanctions Screening page. 
+THEN DPU will mark Application as Rejected and notify Rejection status to AMZ along with Application Rejection Category = KYC, and 
+Application Rejection Code = SANCTION_AND_POLITICAL_PERSON_CHECK_FAILED 
+(Scheduled task run at 23:30:00 a daily basis) 
+ 
+Data Deletion 
+AC6: Data deletion when offer rejected 
+GIVEN that receive reject status from lender 
+WHEN DPU update reject status to Amazon 
+
+=== Page 10 ===
+ 
+INTERNAL 
+THEN Verified status, if cannot retrieve data 
+THEN Change 3P Auth Token as expired 
+THEN Remove 3PL Seller Performance data only 
+THEN reset 3PL linkage merchant's limit value including indicative limit  (TBC) 
+ 
+Pending Question: 
+If CNY LoC offer received lender rejection (non-fraud), will the user be referred to USD LoC? (vice versa) 
+ 
+   
+ 
+ 
+  
+
+
+=== Page 11 ===
+ 
+INTERNAL 
+[NEXS-1196] [AMZ API] - Push CNY Loan Status and Data to AMZ Created: 02/Feb/26  Updated: 08/Mar/26  
+Status: In Progress 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Adrian Chiu  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  None  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Issue Links:  Cloners 
+clones  NEXS-535  [2k - 200k Journey] - [API] - Amazon ...  Done  
+ 
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As the Express Finance, I want to update the status and loan data with CNY currency to AMZ when a user applies for a CNY offer 
+So that ensuring a consistent experience across Express Finance and AMZ 
+Pre-Condition:  
+
+=== Page 12 ===
+ 
+INTERNAL 
+1. AMZ has confirmed the API items as outlined in below table. 
+Acceptance Criteria:  
+Given the user apply for CNY LoC Offer 
+When the user go through the journey from application -> drawdown -> repayment 
+Then the Express Finance should update the status and loan data with CNY currency to AMZ 
+API Name Confirmed with AMZ on 28-Jan-2026 Triggering Logic 
+Creation Application Confirmed no change from USD for CNY Offer.  
+1. After the user has signed up 
+2. After the application is returned by 
+lender for resubmission 
+Application Received Confirmed no change from USD for CNY Offer After the user has submitted the loan 
+application to lender 
+Approve Application 1) Currency attribute = CNY to AMZ for CNY offer 
+2) Currency Attribute = USD to AMZ for USD offer 
+After the user has received the approved 
+offer from lender 
+Lock AMZ A/C Confirmed no change to USD for CNY After the user has completed eSign 
+Create Credit Approval 1) Currency attribute = CNY to AMZ for CNY offer 
+2) Currency Attribute = USD to AMZ for USD offer After the user has completed eSign 
+Create Loan 1) Currency attribute = CNY to AMZ for CNY offer 
+2) Currency Attribute = USD to AMZ for USD offer After the user perform every drawdown 
+Create Repayment Schedule Since the repayment is linked to the respective loan, so 
+no need to include currency sent to AMZ After the user perform every drawdown 
+
+=== Page 13 ===
+ 
+INTERNAL 
+Update Credit Approval 1) Currency attribute = CNY to AMZ for CNY offer 
+2) Currency Attribute = USD to AMZ for USD offer 
+When user have existing credit approval, 
+user's approved limit change 
+  
+Profilio APIs: 
+CreateLenderCreditApprovalDataRequest   
+CreateLenderLoanDataRequest  
+CreateLenderPortfolioDataRequest  
+CurrenyCode for 3 APIs will be CNY to AMZ for 
+CNY offer, USD to AMZ for USD offer   
+   
+ 
+ 
+  
+
+=== Page 14 ===
+ 
+INTERNAL 
+[NEXS-1177] [CNY LoC] [￥1.5M - ￥10M] - Connected parties information Page - Spouse Contact Information Input Created: 
+27/Jan/26  Updated: 26/Feb/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Adrian Chiu  Assignee:  Sage Ma  
+Resolution:  Unresolved  Votes:  0  
+Labels:  business_story  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  Picture11-1.png     Picture11.png     Picture12.png      
+Issue Links:  Cloners 
+clones  NEXS-864  [2M and above Journey] - Director/Sha...  To Do  
+ 
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to capture the contact information of the spouses of Legal representative/ >=25% UBOs when 
+the user apply for a loan limit>CNY1.5M 
+So that send the data to the Lender for approval of the loan request 
+Pre-Condition:  
+

@@ -1,0 +1,1 @@
+import{g as n}from"./commonScript-CDU712wE.js";import{r as o}from"./vue-D9JL3njn.js";function f(e){const r=o();function t(){return new Promise(s=>{r.value=n(e.reportId,e.socketUrl,e.host),r.value.addEventListener("message",a=>{e.onMessage&&e.onMessage(a)}),r.value.addEventListener("open",()=>{s(!0)})})}return{websocket:r,createSocket:t}}export{f as u};

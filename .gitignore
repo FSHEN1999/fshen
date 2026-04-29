@@ -7,3 +7,12 @@ __pycache__/
 error_screenshot_*.png
 register_*.txt
 .idea.pre_sync_backup_*/
+codex_sessions_rag/
+*.bak
+*.bak_*
+*.stackdump
+*.tmp
+*.log
+.playwright-mcp/
+output/*.json
+output/*_latest_run.txt

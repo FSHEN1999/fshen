@@ -8,21 +8,21 @@ from selenium.webdriver.common.by import By
 
 class RegistrationPage:
     """注册页面元素定位"""
-    PHONE_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/div/div[2]/input")
+    PHONE_INPUT = (By.XPATH, "//fieldset[1]//input[@maxlength='15']")
     VERIFICATION_CODE_INPUTS = (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='1']")
-    NEXT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[8]/button")
+    NEXT_BTN = (By.XPATH, "//div[contains(@class, 'btn-box')]//button[.//span[normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next'] or normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next']")
 
 
 class PasswordSetupPage:
     """密码设置页面元素定位"""
-    PASSWORD_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[2]/div/div[1]/div/input")
-    CONFIRM_PASSWORD_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[1]/div[5]/div/div[1]/div/input")
-    SECURITY_QUESTION_DROPDOWN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[2]/div/div/div[1]/div[1]/div[2]")
-    SECURITY_ANSWER_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[2]/div[4]/div/div[1]/div/input")
-    EMAIL_ADDRESS_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[3]/div[2]/div/div[1]/div/input")
-    AGREE_DECLARATION_CHECKBOX = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div/div/label/span[1]/span")
-    AGREE_AUTHORIZATION_CHECKBOX = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[4]/div[2]/div/label/span[1]/span")
-    REGISTER_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[1]/div/form/div[5]/div[2]/button")
+    PASSWORD_INPUT = (By.XPATH, "(//input[@type='password' and contains(@class, 'el-input__inner')])[1]")
+    CONFIRM_PASSWORD_INPUT = (By.XPATH, "(//input[@type='password' and contains(@class, 'el-input__inner')])[2]")
+    SECURITY_QUESTION_DROPDOWN = (By.XPATH, "//div[contains(@class, 'section-container')][.//h2[normalize-space()='Security question' or normalize-space()='安全问题' or normalize-space()='安全問題']]//div[contains(@class, 'el-select__wrapper')]")
+    SECURITY_ANSWER_INPUT = (By.XPATH, "//div[contains(@class, 'section-container')][.//h2[normalize-space()='Security question' or normalize-space()='安全问题' or normalize-space()='安全問題']]//input[contains(@class, 'el-input__inner') and @type='text' and @autocomplete='off']")
+    EMAIL_ADDRESS_INPUT = (By.XPATH, "//div[contains(@class, 'section-container')][.//h2[normalize-space()='Contact information' or normalize-space()='联系信息' or normalize-space()='聯絡資訊']]//input[contains(@class, 'el-input__inner') and @type='text']")
+    AGREE_DECLARATION_CHECKBOX = (By.XPATH, "(//div[contains(@class, 'checkbox-container')]//span[contains(@class, 'el-checkbox__inner')])[1]")
+    AGREE_AUTHORIZATION_CHECKBOX = (By.XPATH, "(//div[contains(@class, 'checkbox-container2')]//span[contains(@class, 'el-checkbox__inner')])[1]")
+    REGISTER_BTN = (By.XPATH, "//button[.//span[normalize-space()='Sign up' or normalize-space()='注册' or normalize-space()='註冊' or normalize-space()='立即注册' or normalize-space()='立即註冊'] or normalize-space()='Sign up' or normalize-space()='注册' or normalize-space()='註冊' or normalize-space()='立即注册' or normalize-space()='立即註冊']")
     SECURITY_OPTION = (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')][1]")
 
 
@@ -31,10 +31,10 @@ class CompanyInfoPage:
     COMPANY_EN_NAME_INPUT = (By.XPATH, "(//input[contains(@class, 'el-input__inner') and @autocomplete='off'])[1]")
     BUSINESS_REG_NO_INPUT = (By.XPATH, "(//input[contains(@class, 'el-input__inner') and @autocomplete='off'])[3]")
     COMPANY_CN_NAME_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[5]/div[2]/div/div/div/input")
-    BUSINESS_NATURE_SELECT = (By.XPATH, "//span[text()='企业经营性质']/ancestor::div[contains(@class, 'el-form-item')]//div[contains(@class, 'el-select')]")
+    BUSINESS_NATURE_SELECT = (By.XPATH, "//div[contains(@class, 'el-form-item')][.//span[normalize-space()='企业经营性质' or normalize-space()='企業經營性質' or normalize-space()='Business nature']]//div[contains(@class, 'el-select')]")
     BUSINESS_NATURE_OPTIONS = (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]")
     ESTABLISHED_DATE_INPUT = (By.XPATH, "//input[@placeholder='YYYY/MM/DD']")
-    REGISTERED_ADDRESS_INPUT = (By.XPATH, "//textarea[@placeholder='请输入注册地址']")
+    REGISTERED_ADDRESS_INPUT = (By.XPATH, "//textarea[@placeholder='请输入注册地址' or @placeholder='請輸入註冊地址' or @placeholder='Please enter registered address']")
     DISTRICT_SELECT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[9]/div[2]/div/div[1]/div[1]/div[1]/div[2]")
     DISTRICT_FIRST_OPTION = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[9]/div[2]/div/div[1]/div[2]/div/div/div[1]/ul/li[1]")
     DETAIL_ADDRESS_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[9]/div[3]/div/div[1]/div/input")
@@ -44,7 +44,7 @@ class CompanyInfoPage:
     BUSINESS_REG_CERT_UPLOAD = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[2]/div[2]/div[2]/div[1]/div/div")
     COMPANY_ARTICLES_UPLOAD = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[3]/div[1]/div[2]/div[1]/div/div")
     ANNUAL_RETURN_UPLOAD = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/form/div[3]/div[2]/div[2]/div[1]/div/div")
-    NEXT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div/div[2]/div/div[3]/div[2]/button[2]")
+    NEXT_BTN = (By.XPATH, "//button[.//span[normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next'] or normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next']")
 
 
 class DirectorInfoPage:
@@ -53,13 +53,13 @@ class DirectorInfoPage:
     TITLE_FIRST_OPTION = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[1]/div[1]/div[2]/div/div[1]/div/div/div[1]/div[2]/div/div/div[1]/ul/li[1]")
     ID_FRONT_UPLOAD = (By.XPATH, "//div[contains(@class, 'el-upload-dragger') and .//img[contains(@src, 'PRC%20ID-Front')]]")
     ID_BACK_UPLOAD = (By.XPATH, "//div[contains(@class, 'el-upload-dragger') and .//img[contains(@src, 'PRC%20ID-Back')]]")
-    BIRTH_DATE_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[1]/div[1]/div[2]/div/div[4]/div[1]/div/div[1]/div/input")
+    BIRTH_DATE_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div/div[1]/div[2]/div/div[3]/div[1]/div/div[1]/div/input")
     ID_NUMBER_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[1]/div[1]/div[2]/div/div[4]/div[2]/div/div/div/input")
     DETAIL_ADDRESS_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[1]/div[1]/div[2]/div/div[7]/div[2]/div/div[1]/div/input")
     GUARANTOR_CHECKBOX = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[4]/div/div[1]/div/label/span[1]/span")
     REFERENCE_PHONE = (By.XPATH, "//input[contains(@class, 'el-input__inner') and @maxlength='15']")
     REFERENCE_EMAIL = (By.XPATH, "//input[contains(@class, 'el-input__inner') and @autocomplete='off' and not(@maxlength) and not(@placeholder)]")
-    NEXT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[5]/div[2]/button[2]")
+    NEXT_BTN = (By.XPATH, "//button[.//span[normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next'] or normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next']")
 
 
 class BankAccountPage:
@@ -69,30 +69,30 @@ class BankAccountPage:
     BANK_SELECT_OPTIONS = (By.XPATH, "//li[contains(@class, 'el-select-dropdown__item')]")
     BANK_ACCOUNT_INPUT = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[4]/div/div/div/input")
     BANK_SELECT_SVG = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/form/div[2]/div/div/div/div[2]/i/svg")
-    NEXT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div/div[4]/div[2]/button[2]")
+    NEXT_BTN = (By.XPATH, "//button[.//span[normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next'] or normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next']")
 
 
 class ContactInfoPage:
     """联系人信息页面元素定位"""
     CONTACT_DROPDOWN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[2]/div[2]/div/div/div/div[1]/div[1]/div[2]")
     CONTACT_FIRST_OPTION = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/form/div[2]/div[2]/div/div/div/div[2]/div/div/div[1]/ul/li")
-    SUBMIT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[5]/div[2]/button[2]")
+    SUBMIT_BTN = (By.XPATH, "//button[.//span[normalize-space()='提交' or normalize-space()='提交資料' or normalize-space()='Submit' or normalize-space()='Continue submission'] or normalize-space()='提交' or normalize-space()='提交資料' or normalize-space()='Submit' or normalize-space()='Continue submission']")
 
 
 class ApprovalPage:
     """审批成功后页面元素定位"""
-    ACTIVATE_CREDIT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/div[3]/div[2]/div[7]/div[2]/button")
-    ACCEPT_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[3]/div/div/div/div/div/div/div[2]/div[3]/button")
+    ACTIVATE_CREDIT_BTN = (By.XPATH, "//button[.//span[contains(normalize-space(), '激活额度') or contains(normalize-space(), '激活額度') or contains(normalize-space(), 'Activate credit') or contains(normalize-space(), 'Activate limit')] or contains(normalize-space(), '激活额度') or contains(normalize-space(), '激活額度') or contains(normalize-space(), 'Activate credit') or contains(normalize-space(), 'Activate limit')]")
+    ACCEPT_BTN = (By.XPATH, "//button[.//span[normalize-space()='接受' or normalize-space()='接受並繼續' or normalize-space()='Accept' or normalize-space()='Accept and continue'] or normalize-space()='接受' or normalize-space()='接受並繼續' or normalize-space()='Accept' or normalize-space()='Accept and continue']")
 
 
 class LandingPage:
     """起始页面元素定位"""
-    PRODUCT_APPLY_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[3]/div[1]/div[3]/button")
-    INITIAL_APPLY_BTN = (By.XPATH, "//button[contains(., '立即申请')]")
-    FINAL_APPLY_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/div[3]/div[5]/button")
+    PRODUCT_APPLY_BTN = (By.XPATH, "/html/body/div[1]/div[1]/div[3]/div/div[2]/div/div[2]/div/div[2]/div/div[4]/button")
+    INITIAL_APPLY_BTN = (By.XPATH, "//button[.//span[normalize-space()='立即申请' or normalize-space()='立即申請' or normalize-space()='Apply now'] or normalize-space()='立即申请' or normalize-space()='立即申請' or normalize-space()='Apply now']")
+    FINAL_APPLY_BTN = (By.XPATH, "//button[.//span[normalize-space()='立即申请' or normalize-space()='立即申請' or normalize-space()='Apply now'] or normalize-space()='立即申请' or normalize-space()='立即申請' or normalize-space()='Apply now']")
 
 
 # API定位器
 class APILocators:
     """API相关的通用定位"""
-    NEXT_BTN = (By.XPATH, "//button[contains(., '下一页')]")
+    NEXT_BTN = (By.XPATH, "//button[.//span[normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next'] or normalize-space()='下一步' or normalize-space()='下一頁' or normalize-space()='下一页' or normalize-space()='Next']")

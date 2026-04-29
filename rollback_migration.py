@@ -40,7 +40,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "uat": {
@@ -50,7 +50,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "preprod": {
@@ -60,17 +60,17 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "reg": {
-        "host": "aurora-dpu-reg.cluster-cxm4ce0i8nzq.ap-east-1.rds.amazonaws.com",
+        "host": "18.162.145.173",
         "user": "dpu_reg",
         "password": "r4asUYBX3R6LNdp",
         "database": "dpu_seller_center",
-        "port": 3306,
+        "port": 3307,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
     "dev": {
@@ -80,7 +80,7 @@ DATABASE_CONFIG = {
         "database": "dpu_seller_center",
         "port": 3306,
         "charset": "utf8mb4",
-        "connect_timeout": 1500,
+        "connect_timeout": 15,
         "read_timeout": 15,
     },
 }
@@ -93,7 +93,7 @@ log = logging.getLogger(__name__)
 class ExecuteSql:
     def __init__(self, env=ENV):
         self.env = env
-        self.conn = pymysql.connect(**DATABASE_CONFIG[env], autocommit=True, client_flag=CLIENT.INTERACTIVE)
+        self.conn = pymysql.connect(**DATABASE_CONFIG[env], autocommit=True)
         self.cursor = self.conn.cursor()
 
     def __enter__(self):

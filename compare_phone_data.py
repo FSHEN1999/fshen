@@ -15,7 +15,7 @@ DB_CONFIG = {
     "database": "dpu_seller_center",
     "port": 3306,
     "charset": "utf8mb4",
-    "connect_timeout": 1500,
+    "connect_timeout": 15,
     "read_timeout": 15,
 }
 
@@ -66,7 +66,7 @@ class DatabaseComparator:
 
     def connect(self):
         """连接数据库"""
-        self.conn = pymysql.connect(**self.config, autocommit=True, client_flag=CLIENT.INTERACTIVE)
+        self.conn = pymysql.connect(**self.config, autocommit=True)
         self.cursor = self.conn.cursor()
 
     def close(self):
