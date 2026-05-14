@@ -1,0 +1,52 @@
+# BOSS直聘自动投递配置 — 示例文件
+# 复制为 config.yaml 后填入你自己的参数：
+#   cp config.yaml.example config.yaml
+
+search:
+  # 搜索关键词（多关键词轮询）
+  keywords:
+    - "测试开发"
+    - "自动化测试"
+    - "测试负责人"
+    - "测试组长"
+    - "高级测试工程师"
+    - "接口自动化测试"
+    - "质量保障"
+    - "QA Lead"
+    - "AI测试"
+    - "Agent测试"
+    - "大模型测试"
+    - "金融测试"
+  city: "深圳"              # 目标城市
+  salary_range: "15-25K"    # 期望薪资筛选
+  experience: "5-10年"       # 经验要求
+
+# 打招呼话术（{company} {job_title} 会自动替换，多条随机选）
+# 强烈建议改成你自己的自我介绍
+greetings:
+  - "您好，看到{job_title}在招。我5年银行/跨境金融测试经验，做过测试负责人，熟悉接口、数据库一致性、自动化回归和上线质量把关，方便了解下岗位测试范围吗？"
+  - "您好，{job_title}这个方向比较匹配。我有测试开发和测试组长经验，熟悉Python+Selenium/Requests、Postman、JMeter、MySQL，也在尝试Agent辅助用例和报告产出。方便聊聊吗？"
+
+# 投递控制
+limits:
+  daily_max: 100        # 每日投递上限（BOSS 封号阈值约 200-300，保守 100）
+  interval_min: 3       # 操作间隔秒数（最小）
+  interval_max: 8       # 操作间隔秒数（最大）
+  max_pages: 10         # 每个关键词最大翻页数
+
+# 黑名单（跳过这些公司/职位）
+blacklist:
+  companies: []         # 黑名单公司名（部分匹配）
+  title_keywords:       # 职位名包含则跳过
+    - "实习"
+    - "应届"
+    - "初级"
+    - "助理"
+    - "前端"
+    - "运维"
+    - "算法"
+  exclude_hr_title: []  # HR职称包含则跳过（如"猎头"）
+
+# 飞书通知（可选，需单独配 webhook）
+notify:
+  feishu: false

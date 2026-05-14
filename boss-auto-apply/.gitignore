@@ -1,0 +1,78 @@
+# ============================================================
+# 敏感数据 — 登录态/投递记录/个人隐私，绝对不能进 git
+# ============================================================
+data/cookies.json
+data/cookies*.json
+data/chrome_profile/
+data/chrome_profile*/
+data/chrome_profile_java_agent/
+data/applied.json
+data/jobs_log.csv
+data/interviews.json
+data/chat_state.json
+data/chat_states.json
+data/auto_loop_state.json
+data/boss_monitor_state.json
+data/explore_buttons.json
+data/ui_explore.json
+data/jd_cache.json
+data/dom_dumps/
+
+# 真实配置（含个人薪资期望/黑名单偏好），只提交 .example
+config.yaml
+
+# ============================================================
+# 运行期产物
+# ============================================================
+data/*.log
+data/*.png
+data/*.html
+data/*.txt
+data/*.jpg
+data/ai_calls.jsonl
+data/boss_data.db
+data/boss_data.db-*
+logs/
+*.log
+screenshot.png
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+pytest-cache-files-*/
+.codex_build/pytest-tmp*/
+.codex_build/*.tmp
+.codex_build/pt-*/
+.codex_build/storage-test/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================================
+# 调试/探索脚本（本项目用 archive/ 或直接丢弃）
+# ============================================================
+debug_*.py
+explore_*.py
+diagnose_*.py
+test_*.py
+
+# ============================================================
+# IDE / OS
+# ============================================================
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local AI provider secrets
+.env.local.ps1
+/.codex_build/chrome-resume-print/

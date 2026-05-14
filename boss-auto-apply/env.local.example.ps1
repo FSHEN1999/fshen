@@ -1,0 +1,11 @@
+$env:BOSS_AI_REPLY = "1"
+$env:BOSS_RAG_ENABLE = "1"
+$env:BOSS_AI_PROVIDER = "qwen"
+$env:BOSS_QWEN_BASE_URL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+$env:BOSS_QWEN_API_KEY = "replace-with-your-api-key"
+$env:BOSS_QWEN_MODEL = "qwen3.6-plus"
+
+$env:BOSS_CANDIDATE_NAME = "replace-with-your-name"
+$env:BOSS_CANDIDATE_PHONE = "replace-with-your-phone"
+$env:BOSS_CANDIDATE_EMAIL = "replace-with-your-email"
+$env:BOSS_RESUME_FILE = "D:\path\to\resume.pdf"
