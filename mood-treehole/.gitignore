@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.db
+*.db-journal
+*.sqlite3
+.env
+backend/.env
+frontend/.env
+backend/__pycache__/
+frontend/__pycache__/
+*.py[cod]
+*.log
