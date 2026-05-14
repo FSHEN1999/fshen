@@ -1,121 +1,137 @@
 # -*- coding: utf-8 -*-
-"""Pydantic 请求模型定义"""
-from typing import Optional, Literal
+"""Pydantic request models."""
+
+from __future__ import annotations
+
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class ConnectRequest(BaseModel):
-    """连接请求：选择环境 + 输入手机号"""
     env: Literal["sit", "uat", "dev", "preprod", "reg", "local"]
-    phone_number: str = Field(..., pattern=r"^\d{8}$|^\d{11}$", description="8位或11位数字手机号")
+    phone_number: str = Field(..., pattern=r"^\d{8}$|^\d{11}$")
 
 
 class RegisterRequest(BaseModel):
-    """注册新账号请求"""
     env: Literal["sit", "uat", "dev", "preprod", "reg", "local"]
     journey: Literal["200K", "500K", "2000K"] = "500K"
     currency: Literal["CNY", "USD"] = "USD"
     offline: bool = False
 
 
-# ---- Mock 操作请求（全部携带 session_id） ----
-
 class MockBaseRequest(BaseModel):
-    """Mock 操作基类"""
     session_id: str
 
 
 class LinkSp3plRequest(MockBaseRequest):
-    """SP-3PL 关联（无额外参数）"""
     pass
 
 
 class UnderwrittenRequest(MockBaseRequest):
-    """核保状态"""
-    amount: int = Field(..., gt=0, description="评估额度")
+    amount: int = Field(..., gt=0)
     status: Literal["APPROVED", "REJECTED"]
 
 
 class ApprovedOfferRequest(MockBaseRequest):
-    """审批状态"""
-    amount: int = Field(..., gt=0, description="授信额度")
+    amount: int = Field(..., gt=0)
     status: Literal["APPROVED", "RETURNED", "REJECTED"]
-    failure_reason_index: Optional[int] = Field(None, ge=1, le=5, description="退回原因编号(1-5)，RETURNED时必填")
+    rejection_reason: Optional[Literal["fraud", "others"]] = None
+    failure_reason_index: Optional[int] = Field(None, ge=1, le=7)
 
 
 class PspStartRequest(MockBaseRequest):
-    """PSP 开始"""
     status: Literal["PROCESSING", "FAIL", "INITIAL"]
 
 
 class PspCompletedRequest(MockBaseRequest):
-    """PSP 完成"""
     status: Literal["SUCCESS", "FAIL", "INITIAL"]
 
 
 class EsignRequest(MockBaseRequest):
-    """电子签"""
-    signed_amount: int = Field(..., gt=0, description="签约额度")
+    signed_amount: int = Field(..., gt=0)
     status: Literal["SUCCESS", "FAIL"]
 
 
 class DrawdownRequest(MockBaseRequest):
-    """放款"""
-    amount: float = Field(..., gt=0, description="放款额度")
+    amount: float = Field(..., gt=0)
     status: Literal["APPROVED", "REJECTED"]
-    failure_reason_index: Optional[int] = Field(None, ge=1, le=5, description="放款失败原因编号(1-5)，REJECTED时必填")
+    failure_reason_index: Optional[int] = Field(None, ge=1, le=5)
 
 
 class RepaymentStartRequest(MockBaseRequest):
-    """还款开始"""
-    principal_amount: float = Field(..., gt=0, description="还款本金")
-    outstanding_amount: float = Field(..., ge=0, description="未结清金额")
+    principal_amount: float = Field(..., gt=0)
+    outstanding_amount: float = Field(..., ge=0)
 
 
 class RepaymentRequest(MockBaseRequest):
-    """还款"""
-    principal_amount: float = Field(..., gt=0, description="还款本金")
-    outstanding_amount: float = Field(..., ge=0, description="未结清金额")
+    principal_amount: float = Field(..., gt=0)
+    outstanding_amount: float = Field(..., ge=0)
     status: Literal["Success", "Failure"]
-    failure_reason_index: Optional[int] = Field(None, ge=1, le=2, description="失败原因编号(1-2)，Failure时必填")
+    failure_reason_index: Optional[int] = Field(None, ge=1, le=2)
 
 
 class MultiShopBindingRequest(MockBaseRequest):
-    """多店铺 SP 绑定"""
-    state: str = Field(..., min_length=1, description="state 值")
+    state: str = Field(..., min_length=1)
 
 
 class SpStatusUpdateRequest(MockBaseRequest):
-    """SP 状态更新"""
-    platform_seller_id: Optional[str] = Field(None, description="platform_seller_id，为空时使用已生成的")
+    platform_seller_id: Optional[str] = None
     status: Literal["SUCCESS", "FAIL"]
-    failure_reason_index: Optional[int] = Field(None, ge=1, le=3, description="失败原因编号(1-3)，FAIL时必填")
+    failure_reason_index: Optional[int] = Field(None, ge=1, le=3)
 
 
 class MultiShop3plRedirectRequest(MockBaseRequest):
-    """3PL 重定向（无额外参数）"""
     pass
 
 
 class SystemEventRequest(MockBaseRequest):
-    """系统事件通知"""
     event_type: Literal[
         "EXCEPTION-APPLICATION-CREATION",
         "INDICATIVE-OFFER",
         "IN-PROCESS",
         "ERROR",
-        "ETB-customer"
+        "ETB-customer",
     ]
     application_unique_id: Optional[str] = None
     error_code: Optional[Literal["B-6003", "B-6005"]] = None
 
 
+class ApplicationAbandonRequest(MockBaseRequest):
+    abandon_reason: Literal[
+        "SellerCancelled",
+        "OfferExpired",
+        "ApplicationInfoNotSubmitted",
+        "LenderOfferNotReturned",
+    ]
+
+
 class PspHsbcStartRequest(MockBaseRequest):
-    """PSP 开始（HSBC）（无额外参数）"""
     pass
 
 
 class PspHsbcCompletedRequest(MockBaseRequest):
-    """PSP 完成（HSBC）"""
     result: Literal["SUCCESS", "FAIL"]
+
+
+class AiChatMessage(BaseModel):
+    role: Literal["user", "assistant", "tool"]
+    content: str
+
+
+class AiChatContext(BaseModel):
+    active_session_id: Optional[str] = None
+    session: Optional[dict] = None
+    selected_env: Optional[str] = None
+    selected_register_env: Optional[str] = None
+    selected_currency: Optional[str] = None
+    preferred_currency: Optional[str] = None
+    selected_journey: Optional[str] = None
+    recent_logs: list[dict] = Field(default_factory=list)
+    recent_activities: list[dict] = Field(default_factory=list)
+
+
+class AiChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    history: list[AiChatMessage] = Field(default_factory=list)
+    context: AiChatContext = Field(default_factory=AiChatContext)

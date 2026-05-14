@@ -2,12 +2,12 @@
 
 ## 1. 一句话结论
 
-推荐方案不是让 MeterSphere 直接驱动 `mock_uat.py` / `mock_sit.py` 的 CLI，也不是让它直接接管 `线上自动化.py`。
+推荐方案不是让 MeterSphere 直接驱动 `mock_sit.py` 的 CLI，也不是让它直接接管 `线上自动化.py`。
 
 最佳接入方式是：
 
 - 以 `mockapi/web/app.py` 提供的 FastAPI 作为 MeterSphere 的统一接入层
-- 以 `mockapi/mock_uat.py`、`mockapi/mock_sit.py` 作为底层业务执行器
+- 以 `mockapi/mock_sit.py` 作为统一底层业务执行器
 - 以 `线上自动化.py` 仅作为少量 UI 冒烟补充，不作为主回归入口
 
 ## 2. 背景与目标
@@ -15,7 +15,7 @@
 当前仓库已经具备三类能力：
 
 - Web API 接入层：`mockapi/web/app.py`
-- DPU 状态模拟能力：`mockapi/mock_uat.py`、`mockapi/mock_sit.py`
+- DPU 状态模拟能力：`mockapi/mock_sit.py`
 - UI 自动化能力：`线上自动化.py`
 
 MeterSphere 最擅长的是：
@@ -43,7 +43,7 @@ MeterSphere 最擅长的是：
 
 反过来看，另外两个入口都不适合作为主接入面：
 
-- `mock_uat.py` / `mock_sit.py`
+- `mock_sit.py`
   - 优点是能力完整
   - 缺点是以脚本/交互式流程为主，不适合 MeterSphere 直接调用和变量编排
 - `线上自动化.py`
@@ -67,7 +67,6 @@ Adapter: web/services/mock_adapter.py
 
 Execution Layer
   -> mockapi/mock_sit.py
-  -> mockapi/mock_uat.py
 
 Supplement
   -> 线上自动化.py 只做少量 UI smoke
@@ -649,7 +648,7 @@ uvicorn web.app:app --host 0.0.0.0 --port 8000
 
 ### 14.1 不建议直接调用 CLI
 
-如果 MeterSphere 直接调 `mock_uat.py` / `mock_sit.py`：
+如果 MeterSphere 直接调 `mock_sit.py`：
 
 - 输入输出不稳定
 - 不利于参数提取
@@ -724,7 +723,7 @@ uvicorn web.app:app --host 0.0.0.0 --port 8000
 最终推荐结论如下：
 
 - 主入口选 `mockapi/web/app.py`
-- 底层执行依赖 `mockapi/mock_uat.py`、`mockapi/mock_sit.py`
+- 底层执行依赖 `mockapi/mock_sit.py`
 - `线上自动化.py` 只做补充冒烟，不做主回归入口
 - MeterSphere 负责接口编排、变量提取、断言和回归报告
 

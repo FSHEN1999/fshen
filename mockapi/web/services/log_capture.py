@@ -3,8 +3,9 @@
 import asyncio
 import logging
 import time
-from collections import defaultdict
-from typing import Dict
+from collections import deque
+from datetime import datetime
+from typing import Dict, Optional
 
 
 class WebSocketLogHandler(logging.Handler):
@@ -18,6 +19,7 @@ class WebSocketLogHandler(logging.Handler):
         ))
         self._queues: Dict[str, asyncio.Queue] = {}
         self._loop: asyncio.AbstractEventLoop = None
+        self._history = deque(maxlen=5000)
 
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         """设置事件循环引用（在 FastAPI startup 时调用）"""
@@ -38,12 +40,15 @@ class WebSocketLogHandler(logging.Handler):
         msg = self.format(record)
         log_entry = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created)),
+            "created": record.created,
             "level": record.levelname,
             "message": record.getMessage(),
             "formatted": msg,
             "funcName": record.funcName,
             "lineno": record.lineno,
+            "logger": record.name,
         }
+        self._history.append(log_entry)
 
         for session_id, queue in list(self._queues.items()):
             try:
@@ -55,6 +60,50 @@ class WebSocketLogHandler(logging.Handler):
                     queue.put_nowait(log_entry)
                 except Exception:
                     pass
+
+    @staticmethod
+    def _parse_time(value: Optional[str]) -> Optional[float]:
+        if not value:
+            return None
+        normalized = value.strip().replace("T", " ")
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                return datetime.strptime(normalized[:19], fmt).timestamp()
+            except ValueError:
+                continue
+        return None
+
+    def query_logs(
+        self,
+        keyword: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        session_id: Optional[str] = None,
+        limit: int = 500,
+    ) -> list[dict]:
+        """Query retained logs by fuzzy keyword and optional time range."""
+        keyword_text = (keyword or "").strip().lower()
+        start_ts = self._parse_time(start_time)
+        end_ts = self._parse_time(end_time)
+        session_text = (session_id or "").strip().lower()
+        max_items = max(1, min(limit, 2000))
+
+        results = []
+        for entry in reversed(self._history):
+            created = entry.get("created", 0)
+            haystack = f"{entry.get('formatted', '')}\n{entry.get('message', '')}".lower()
+            if start_ts is not None and created < start_ts:
+                continue
+            if end_ts is not None and created > end_ts:
+                continue
+            if keyword_text and keyword_text not in haystack:
+                continue
+            if session_text and session_text not in haystack:
+                continue
+            results.append(dict(entry))
+            if len(results) >= max_items:
+                break
+        return results
 
 
 # 全局单例

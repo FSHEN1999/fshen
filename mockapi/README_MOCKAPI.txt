@@ -3,7 +3,7 @@
 Included here:
 - frontend source
 - web FastAPI source
-- mock_sit/mock_uat core scripts
+- mock_sit core script
 - helper modules and refactor notes
 
 Excluded on purpose:

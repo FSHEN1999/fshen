@@ -45,6 +45,8 @@ class EnumsResponse(BaseModel):
     repayment_statuses: list[str]
     system_event_types: list[str]
     returned_failure_reasons: list[dict]
+    approved_rejection_reasons: list[dict]
     drawdown_failure_reasons: list[dict]
     repayment_failure_reasons: list[dict]
     sp_update_failure_reasons: list[dict]
+    application_abandon_reasons: list[dict]

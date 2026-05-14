@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+frontend/node_modules/
+frontend/.vite/
+tmp/
+.env
+register_*.txt
+*.log
+.git/
+.idea/
+mockapi-*.png
+web/static/assets/*.map

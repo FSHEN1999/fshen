@@ -16,3 +16,5 @@ codex_sessions_rag/
 .playwright-mcp/
 output/*.json
 output/*_latest_run.txt
+output/datagrip_recovery_*/
+boss-auto-apply/

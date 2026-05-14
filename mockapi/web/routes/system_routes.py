@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """系统路由：环境列表、连接/断开、健康检查、枚举查询"""
 import asyncio
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from web.models.requests import ConnectRequest
 from web.models.responses import ApiResponse, ConnectResponse, EnumsResponse
+from web.services.log_capture import ws_log_handler
 from web.services.session_manager import session_manager
 
 router = APIRouter(prefix="/api", tags=["系统"])
@@ -29,7 +31,7 @@ async def list_enums():
     data = EnumsResponse(
         environments=["sit", "uat", "dev", "preprod", "reg", "local"],
         journeys=["200K", "500K", "2000K"],
-        currencies=["CNY", "USD"],
+        currencies=["USD", "CNY"],
         underwritten_statuses=["APPROVED", "REJECTED"],
         approved_offer_statuses=["APPROVED", "RETURNED", "REJECTED"],
         esign_statuses=["SUCCESS", "FAIL"],
@@ -50,6 +52,12 @@ async def list_enums():
             {"index": 3, "label": "ID 号码与 CR 记录不相符"},
             {"index": 4, "label": "未能通过公司结构校验"},
             {"index": 5, "label": "需要人工处理反洗钱验证"},
+            {"index": 6, "label": "不正确统一社会信用代码"},
+            {"index": 7, "label": "ID号码与公司登记资料不相符"},
+        ],
+        approved_rejection_reasons=[
+            {"value": "fraud", "label": "fraud"},
+            {"value": "others", "label": "others"},
         ],
         drawdown_failure_reasons=[
             {"index": 1, "code": "ER001", "label": "无有效银行账户"},
@@ -66,6 +74,12 @@ async def list_enums():
             {"index": 1, "label": "Lender and seller country not align"},
             {"index": 2, "label": "Active credit approval exists"},
             {"index": 3, "label": "An offer already exists for the seller"},
+        ],
+        application_abandon_reasons=[
+            {"value": "SellerCancelled", "label": "卖家取消"},
+            {"value": "OfferExpired", "label": "报价过期"},
+            {"value": "ApplicationInfoNotSubmitted", "label": "申请信息未提交"},
+            {"value": "LenderOfferNotReturned", "label": "资方报价未返回"},
         ],
     )
     return ApiResponse(success=True, message="获取枚举成功", data=data.model_dump())
@@ -102,3 +116,22 @@ async def list_sessions():
     """列出所有活跃会话"""
     sessions = session_manager.list_sessions()
     return ApiResponse(success=True, message=f"共 {len(sessions)} 个活跃会话", data=sessions)
+
+
+@router.get("/logs", response_model=ApiResponse)
+async def query_logs(
+    keyword: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    session_id: Optional[str] = None,
+    limit: int = 500,
+):
+    logs = ws_log_handler.query_logs(
+        keyword=keyword,
+        start_time=start_time,
+        end_time=end_time,
+        session_id=session_id,
+        limit=limit,
+    )
+    return ApiResponse(success=True, message=f"??? {len(logs)} ???", data=logs)
+

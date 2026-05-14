@@ -9,6 +9,7 @@ from web.models.requests import (
     RepaymentStartRequest, RepaymentRequest,
     MultiShopBindingRequest, SpStatusUpdateRequest, MultiShop3plRedirectRequest,
     SystemEventRequest, PspHsbcStartRequest, PspHsbcCompletedRequest,
+    ApplicationAbandonRequest,
 )
 from web.models.responses import ApiResponse
 from web.services.session_manager import session_manager
@@ -48,7 +49,8 @@ async def mock_approved_offer(req: ApprovedOfferRequest):
     result = await asyncio.to_thread(
         service.mock_approved_offer_status,
         amount=req.amount, status=req.status,
-        failure_reason_index=req.failure_reason_index
+        failure_reason_index=req.failure_reason_index,
+        rejection_reason=req.rejection_reason,
     )
     msg = f"审批状态更新{'成功' if result.get('success') else '失败'}"
     return ApiResponse(success=result.get("success", False), message=msg, data=result)
@@ -167,6 +169,18 @@ async def mock_system_event(req: SystemEventRequest):
         error_code=req.error_code
     )
     msg = f"系统事件通知{'成功' if result.get('success') else '失败'}"
+    return ApiResponse(success=result.get("success", False), message=msg, data=result)
+
+
+# 16. Abandon(application.status)
+@router.post("/application-abandon", response_model=ApiResponse)
+async def mock_application_abandon(req: ApplicationAbandonRequest):
+    service = _get_service(req.session_id)
+    result = await asyncio.to_thread(
+        service.mock_application_abandon_status,
+        abandon_reason=req.abandon_reason,
+    )
+    msg = f"Abandon状态通知{'成功' if result.get('success') else '失败'}"
     return ApiResponse(success=result.get("success", False), message=msg, data=result)
 
 

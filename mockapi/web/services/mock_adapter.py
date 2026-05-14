@@ -18,6 +18,7 @@ from mock_sit import (
     DPUStatus, RepaymentStatus, DrawdownFailureReason, ReturnedFailureReason,
     generate_uuid37, get_utc_time, get_current_time, calculate_future_date,
     validate_numeric_input, validate_phone_number, SCRIPT_DIR,
+    fetch_sms_verification_code,
     log, faker
 )
 import requests as http_requests
@@ -74,9 +75,9 @@ class WebDPUMockService(DPUMockService):
         log.info("=" * 60)
         log.info(f"【{label}】完整请求信息")
         log.info("=" * 60)
+        log.info("请求方法: POST")
         log.info(f"请求URL: {self.api_config.webhook_url}")
-        log.info(f"请求方法: POST")
-        log.info(f"请求Body（JSON）:")
+        log.info("请求Body（JSON）:")
         log.info(json.dumps(data, indent=2, ensure_ascii=False))
         log.info("=" * 60)
 
@@ -104,11 +105,14 @@ class WebDPUMockService(DPUMockService):
         log.info("=" * 60)
         log.info(f"【{label}】完整请求信息")
         log.info("=" * 60)
+        log.info("请求方法: POST")
         log.info(f"请求URL: {url}")
         if json_data:
-            log.info(f"请求Body: {json.dumps(json_data, indent=2, ensure_ascii=False)}")
+            log.info(f"请求Body（JSON）: {json.dumps(json_data, indent=2, ensure_ascii=False)}")
         if params:
             log.info(f"请求Params: {params}")
+        if headers:
+            log.info(f"请求Headers: {json.dumps(headers, ensure_ascii=False)}")
         log.info("=" * 60)
 
         try:
@@ -188,7 +192,8 @@ class WebDPUMockService(DPUMockService):
     # ======================== 3. 审批 ========================
 
     def mock_approved_offer_status(self, amount: int = None, status: str = None,
-                                    failure_reason_index: int = None) -> dict:
+                                    failure_reason_index: int = None,
+                                    rejection_reason: str = None) -> dict:
         """模拟审批状态更新"""
         if amount is None or status is None:
             return super().mock_approved_offer_status()
@@ -196,12 +201,14 @@ class WebDPUMockService(DPUMockService):
         approved_amount = round(float(amount), 2)
         approved_status = status
 
-        # 处理退回原因
+        # Keep Web API behavior aligned with the current mock_sit approval flow.
         failure_reason = None
         if approved_status == "RETURNED" and failure_reason_index is not None:
             reasons = list(ReturnedFailureReason)
             if 1 <= failure_reason_index <= len(reasons):
                 failure_reason = reasons[failure_reason_index - 1].value
+        elif approved_status == "REJECTED":
+            failure_reason = rejection_reason if rejection_reason in {"fraud", "others"} else "others"
 
         request_body = {
             "data": {
@@ -244,7 +251,7 @@ class WebDPUMockService(DPUMockService):
             }
         }
         result = self._do_post_webhook(request_body, "审批状态")
-        result.update({"amount": approved_amount, "status": approved_status})
+        result.update({"amount": approved_amount, "status": approved_status, "failure_reason": failure_reason})
         return result
 
     # ======================== 4/5. PSP 开始/完成 ========================
@@ -681,6 +688,50 @@ class WebDPUMockService(DPUMockService):
         result.update({"event_type": event_type, "application_unique_id": app_unique_id})
         return result
 
+    # ======================== 16. Abandon(application.status) ========================
+
+    def mock_application_abandon_status(self, abandon_reason: str = None) -> dict:
+        """Send application.status Abandoned notification without interactive input."""
+        if abandon_reason is None:
+            return super().mock_application_abandon_status()
+
+        valid_reasons = {
+            "SellerCancelled",
+            "OfferExpired",
+            "ApplicationInfoNotSubmitted",
+            "LenderOfferNotReturned",
+        }
+        if abandon_reason not in valid_reasons:
+            return {"success": False, "error": f"不支持的 abandon_reason: {abandon_reason}"}
+
+        dpu_application_id = self.credit_offer_application_unique_id or self.application_unique_id
+        if not self.merchant_id:
+            return {"success": False, "error": "未获取到 merchant_id，无法发送 abandon 通知"}
+        if not dpu_application_id:
+            return {"success": False, "error": "未获取到 dpuApplicationId，无法发送 abandon 通知"}
+
+        request_body = {
+            "data": {
+                "eventType": "application.status",
+                "eventId": generate_uuid37(),
+                "eventMessage": "Application approval process completed successfully",
+                "enquiryUrl": "https://api.lender.com/enquiry/12345",
+                "datetime": get_current_time("%Y-%m-%dT%H:%M:%S"),
+                "details": {
+                    "merchantId": self.merchant_id,
+                    "dpuApplicationId": dpu_application_id,
+                    "status": "Abandoned",
+                    "abandonReason": abandon_reason,
+                    "lastUpdatedOn": get_current_time(),
+                    "lastUpdatedBy": "system"
+                }
+            }
+        }
+
+        result = self._do_post_webhook(request_body, "Abandon状态")
+        result.update({"dpu_application_id": dpu_application_id, "abandon_reason": abandon_reason})
+        return result
+
     # ======================== 14. PSP 开始（HSBC） ========================
 
     def mock_psp_start_status_hsbc(self) -> dict:
@@ -826,29 +877,78 @@ class WebDPUMockService(DPUMockService):
         offer_id = ""
         redirect_url = redirect_url_base
         if not offline:
-            offer_id = DPUMockService._create_offer_id(journey, api_config)
+            offer_id = DPUMockService._create_offer_id(journey, currency, api_config)
             if not offer_id:
                 return {"success": False, "error": "创建 offer_id 失败"}
             redirect_url = f"{redirect_url_base}?offerId={offer_id}"
 
-        # 验证码验证
-        validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
         common_headers = {
             "accept": "application/json, text/plain, */*",
             "content-type": "application/json",
             "product-currency": currency,
             "finance-product": "LINE_OF_CREDIT",
             "funder-resource": "FUNDPARK",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36",
+        }
+
+        # 先触发短信验证码落库，再从 dpu_sms_record 读取真实验证码。
+        verification_url = f"{base_url}/dpu-user/auth/verification-codes"
+        verification_payload = {"areaCode": "+86", "code": "SIGNUP_VERIFICATION", "phone": phone_number}
+        try:
+            verify_resp = http_requests.post(
+                verification_url,
+                json=verification_payload,
+                headers=common_headers,
+                timeout=30,
+            )
+            log.info(
+                f"验证码触发请求完成 | status={verify_resp.status_code} | phone={phone_number} | body={verify_resp.text}"
+            )
+            verify_resp.raise_for_status()
+        except http_requests.exceptions.RequestException as e:
+            log.error(f"验证码触发失败: {e}")
+            return {"success": False, "error": f"验证码触发失败: {e}"}
+
+        try:
+            with DatabaseExecutor(env=env) as sms_db_executor:
+                verification_code = fetch_sms_verification_code(sms_db_executor, phone_number)
+        except Exception as e:
+            log.error(f"从 dpu_sms_record 获取验证码失败: {e}")
+            return {"success": False, "error": f"从 dpu_sms_record 获取验证码失败: {e}"}
+
+        validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
+        validate_payload = {
+            "phoneNumber": phone_number,
+            "phone": phone_number,
+            "areaCode": "+86",
+            "code": verification_code,
+            "verificationCode": verification_code,
+            "smsCode": verification_code,
+            "offerId": offer_id,
         }
         try:
-            http_requests.post(validate_url, json={"areaCode": "+86", "code": "666666", "phone": phone_number},
-                               headers=common_headers, timeout=30)
+            validate_resp = http_requests.post(
+                validate_url,
+                json=validate_payload,
+                headers=common_headers,
+                timeout=30,
+            )
+            log.info(
+                f"验证码校验请求完成 | status={validate_resp.status_code} | phone={phone_number} | body={validate_resp.text}"
+            )
+            validate_resp.raise_for_status()
         except http_requests.exceptions.RequestException as e:
-            log.error(f"验证码验证失败: {e}")
+            log.error(f"验证码校验失败: {e}")
+            return {"success": False, "error": f"验证码校验失败: {e}"}
 
         # 注册
         register_payload = {
-            "phone": phone_number, "areaCode": "+86", "code": "666666",
+            "phoneNumber": phone_number,
+            "phone": phone_number,
+            "areaCode": "+86",
+            "code": verification_code,
+            "verificationCode": verification_code,
+            "smsCode": verification_code,
             "email": email, "offerId": offer_id,
             "password": "Aa11111111..", "confirmPassword": "Aa11111111..",
             "isAcceptMarketing": True,
@@ -874,6 +974,9 @@ class WebDPUMockService(DPUMockService):
                 "success": True,
                 "phone_number": phone_number,
                 "email": email,
+                "journey": journey,
+                "currency": currency,
+                "verification_code": verification_code,
                 "offer_id": offer_id,
                 "redirect_url": redirect_url if not offline else None,
             }

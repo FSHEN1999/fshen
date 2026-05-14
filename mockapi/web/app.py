@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import system_routes, register_routes, mock_routes, ws_routes
+from web.routes import system_routes, register_routes, mock_routes, ws_routes, ai_routes
 from web.services.log_capture import ws_log_handler
 from web.services.session_manager import session_manager
 
@@ -49,7 +49,14 @@ app = FastAPI(
 # CORS 配置（开发期间允许 Vite dev server 跨域）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_origin_regex=r"https://.*\.ngrok-free\.(dev|app|free\.dev)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,6 +67,7 @@ app.include_router(system_routes.router)
 app.include_router(register_routes.router)
 app.include_router(mock_routes.router)
 app.include_router(ws_routes.router)
+app.include_router(ai_routes.router)
 
 # 静态文件（前端构建产物，部署时启用）
 _static_dir = Path(__file__).parent / "static"
