@@ -1,0 +1,4 @@
+10. [GET] http://127.0.0.1:8000/api/me/entries?visitor_id=f487a7dd-dfd7-45f5-99b8-daef62d5406f => [200] OK
+11. [GET] http://127.0.0.1:8000/api/entries/recent => [200] OK
+
+Note: 9 static requests not shown, run with "static" option to see them.

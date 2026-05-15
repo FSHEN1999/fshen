@@ -10,7 +10,6 @@
 - `config.py`: 配置管理模块 - 从.env文件加载配置，支持环境变量覆盖 | symbols: DatabaseConfig, UIConfig, FileConfig, PollingConfig, Config, _ensure_config
 - `db_helper.py`: 数据库助手模块 - 集中管理所有数据库查询，使用参数化查询防止SQL注入 | symbols: DatabaseHelper
 - `mock_sit.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
-- `mock_uat.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
 - `mockapi/web/services/mock_adapter.py`: Web 适配器：将 DPUMockService 的 input() 调用改为参数传入，返回结构化结果 | symbols: WebDPUMockService
 - `webhook_service.py`: Webhook服务模块 - 统一管理所有webhook请求，支持参数化调用减少重复代码 | symbols: EventType, WebhookService
 

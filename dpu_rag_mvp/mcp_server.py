@@ -5,6 +5,8 @@ from dataclasses import asdict
 from mcp.server.fastmcp import FastMCP
 
 from dpu_rag_mvp.core import automation_catalog, build_index, get_status, search, suggest_automation, topic_portals
+from dpu_rag_mvp.memory import get_memory_status, search_memory, search_memory_cards
+from dpu_rag_mvp.smart import smart_search
 
 
 mcp = FastMCP("dpu-local-rag")
@@ -36,6 +38,30 @@ def rag_search(query: str, limit: int = 8, kind: str = "", rerank: bool = True, 
             candidate_limit=candidate_limit,
         )
     ]
+
+
+@mcp.tool()
+def rag_memory_status() -> dict:
+    """Return lightweight Codex conversation memory index status."""
+    return get_memory_status()
+
+
+@mcp.tool()
+def rag_memory_search(query: str, limit: int = 8, memory_type: str = "") -> list[dict]:
+    """Search lightweight Codex conversation memory chunks."""
+    return [asdict(item) for item in search_memory(query, limit=limit, memory_type=memory_type or None)]
+
+
+@mcp.tool()
+def rag_memory_cards(query: str, limit: int = 8) -> list[dict]:
+    """Search structured Codex conversation decision cards."""
+    return [asdict(item) for item in search_memory_cards(query, limit=limit)]
+
+
+@mcp.tool()
+def rag_smart_search(query: str, limit: int = 8) -> list[dict]:
+    """Route a query across project RAG and conversation memory with DPU-aware expansion."""
+    return [asdict(item) for item in smart_search(query, limit=limit)]
 
 
 @mcp.tool()

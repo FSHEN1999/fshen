@@ -3,3 +3,7 @@
 /workspace.xml
 # Editor-based HTTP Client requests
 /httpRequests/
+# Local DataGrip recovery data sources
+/dataSources.xml
+/dataSources.local.xml
+/db-forest-config.xml

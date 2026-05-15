@@ -1,0 +1,15 @@
+{
+  "environment": "reg",
+  "scenario": "scenario_1 (FP-USD-500k)",
+  "phone_number": "18112860200",
+  "merchant_id": "ffe1985d53184d0fa09c0b2426be6dcc",
+  "application_unique_id": "EFA9C0A3E7B93BD45828",
+  "steps_completed": [
+    "15: underwritten",
+    "16: approved-offer",
+    "17: psp-start",
+    "18: psp-completed",
+    "19: esign"
+  ],
+  "final_status": null
+}

@@ -11,14 +11,17 @@
 - `mockapi/METERSPHERE_INTEGRATION_DESIGN.md`: # MeterSphere 接入设计文档 | ## 1. 一句话结论 | ## 2. 背景与目标 | ## 3. 为什么选 `mockapi/web/app.py`
 - `mockapi/web/app.py`: FastAPI 应用入口 | symbols: lifespan
 - `mockapi/web/models/__init__.py`: Python module
-- `mockapi/web/models/requests.py`: Pydantic 请求模型定义 | symbols: ConnectRequest, RegisterRequest, MockBaseRequest, LinkSp3plRequest, UnderwrittenRequest, ApprovedOfferRequest
+- `mockapi/web/models/requests.py`: Pydantic request models. | symbols: ConnectRequest, RegisterRequest, MockBaseRequest, LinkSp3plRequest, UnderwrittenRequest, ApprovedOfferRequest
 - `mockapi/web/models/responses.py`: 统一响应模型定义 | symbols: ApiResponse, ConnectResponse, RegisterResponse, EnumsResponse
 - `mockapi/web/routes/__init__.py`: Python module
+- `mockapi/web/routes/ai_routes.py`: AI assistant routes. | symbols: chat_with_ai
 - `mockapi/web/routes/mock_routes.py`: Mock 操作路由：15 个 Mock 端点 | symbols: _get_service, mock_link_sp_3pl, mock_underwritten, mock_approved_offer, mock_psp_start, mock_psp_completed
 - `mockapi/web/routes/register_routes.py`: 注册相关路由 | symbols: register_account
 - `mockapi/web/routes/system_routes.py`: 系统路由：环境列表、连接/断开、健康检查、枚举查询 | symbols: health_check, list_environments, list_enums, connect, disconnect, list_sessions
 - `mockapi/web/routes/ws_routes.py`: WebSocket 路由：实时日志推送 | symbols: websocket_logs
 - `mockapi/web/services/__init__.py`: Python module
+- `mockapi/web/services/ai_service.py`: AI assistant service for DPU mockapi. | symbols: QwenConfig, load_qwen_config, _normalize_text, _trim_text, _normalize_history, _compact_json
+- `mockapi/web/services/dpu_knowledge.py`: Curated DPU knowledge for the mockapi AI assistant.
 - `mockapi/web/services/log_capture.py`: 日志捕获器：拦截 Python logging 输出并通过 WebSocket 推送到前端 | symbols: WebSocketLogHandler
 - `mockapi/web/services/mock_adapter.py`: Web 适配器：将 DPUMockService 的 input() 调用改为参数传入，返回结构化结果 | symbols: WebDPUMockService
 - `mockapi/web/services/session_manager.py`: 会话管理器：管理数据库连接和 DDPUMockService 实例的生命周期 | symbols: SessionContext, SessionManager

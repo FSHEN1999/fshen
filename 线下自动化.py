@@ -142,7 +142,7 @@ CURRENT_AMOUNT_CONFIG = FLOW_AMOUNT_CONFIG["USD"]
 OFFLINE_SIGNUP_URL_DICT = {
     "sit": "https://expressfinance-dpu-sit.dowsure.com/en/",
     "dev": "https://expressfinance-dpu-dev.dowsure.com/en/sign-up-step1",
-    "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/sign-up",
+    "uat": "https://expressfinance-uat.business.hsbc.com/zh-Hans/",
     "preprod": "https://expressfinance-preprod.business.hsbc.com/zh-Hans/sign-up",
     "reg": "https://expressfinance-dpu-reg.dowsure.com/en/",
 }

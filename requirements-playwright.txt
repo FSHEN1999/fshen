@@ -1,0 +1,4 @@
+playwright>=1.55.0
+pymysql>=1.1.1
+requests>=2.32.0
+faker>=30.0.0

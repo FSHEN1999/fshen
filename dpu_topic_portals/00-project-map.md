@@ -15,11 +15,13 @@
 - `dpu_rag_mvp/cli.py`: symbols: cmd_build, cmd_status, cmd_search, cmd_catalog, cmd_suggest, cmd_topics
 - `dpu_rag_mvp/config.py`: symbols: _default_project_root
 - `dpu_rag_mvp/core.py`: symbols: SearchHit, AutomationSuggestion, utc_now_iso, ensure_data_dir, get_connection, init_db
-- `dpu_rag_mvp/mcp_server.py`: Return local RAG index status for the current DPU test project. | symbols: rag_status, rag_build_index, rag_search, rag_automation_catalog, rag_suggest_automation, rag_topic_portals
+- `dpu_rag_mvp/mcp_server.py`: Return local RAG index status for the current DPU test project. | symbols: rag_status, rag_build_index, rag_search, rag_memory_status, rag_memory_search, rag_memory_cards
+- `dpu_rag_mvp/memory.py`: symbols: MemoryHit, MemoryCard, _connect, _init_db, _reset_db, _iter_session_markdown
+- `dpu_rag_mvp/query.py`: symbols: QueryRoute, expand_query, route_query
+- `dpu_rag_mvp/smart.py`: symbols: SmartSearchResult, smart_search
 - `dpu_rag_mvp/topic_portals.py`: symbols: TopicDefinition, TopicPortalInfo, _extract_wordprocessingml_text, _read_path_text, _extract_python_symbols, _extract_leading_doc_line
 - `locators.py`: 页面元素定位器 - Page Object Model 组织，按页面分类管理元素定位 | symbols: RegistrationPage, PasswordSetupPage, CompanyInfoPage, DirectorInfoPage, BankAccountPage, ContactInfoPage
 - `mock_sit.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
-- `mock_uat.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
 - `mockapi/AGENTS.md`: # AGENTS.md | ## Project Overview | ## Environment Setup | ### Python Environment
 - `mockapi/web/app.py`: FastAPI 应用入口 | symbols: lifespan
 - `webhook_service.py`: Webhook服务模块 - 统一管理所有webhook请求，支持参数化调用减少重复代码 | symbols: EventType, WebhookService

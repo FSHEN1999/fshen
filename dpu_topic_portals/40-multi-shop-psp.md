@@ -10,7 +10,6 @@
 - `SOP_多店铺PSP绑定脚本.md`: # 多店铺PSP绑定脚本 SOP | ## 一、脚本概述 | ## 二、执行前准备 | ### 2.1 环境配置
 - `migration_test_FP_json 多店铺绑定psp.py`: 多店铺PSP绑定脚本 | symbols: ExecuteSql, __init__, __enter__, __exit__, execute_sql, generate_random_str
 - `mock_sit.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
-- `mock_uat.py`: DPU状态模拟工具 | symbols: ColorFormatter, generate_uuid37, validate_phone_number, get_current_time, get_utc_time, validate_numeric_input
 - `mockapi/METERSPHERE_INTEGRATION_DESIGN.md`: # MeterSphere 接入设计文档 | ## 1. 一句话结论 | ## 2. 背景与目标 | ## 3. 为什么选 `mockapi/web/app.py`
 
 ## 快速检索命令

@@ -11,6 +11,8 @@ def _default_project_root() -> Path:
 PROJECT_ROOT = Path(os.environ.get("LOCAL_RAG_HOME", _default_project_root())).resolve()
 DATA_DIR = PROJECT_ROOT / ".rag_mvp"
 DB_PATH = Path(os.environ.get("LOCAL_RAG_DB", DATA_DIR / "rag.db")).resolve()
+MEMORY_DB_PATH = Path(os.environ.get("LOCAL_RAG_MEMORY_DB", DATA_DIR / "memory.db")).resolve()
+CODEX_SESSION_RAG_DIR = PROJECT_ROOT / "codex_sessions_rag"
 TOPIC_PORTAL_DIRNAME = "dpu_topic_portals"
 TOPIC_PORTAL_DIR = PROJECT_ROOT / TOPIC_PORTAL_DIRNAME
 
@@ -33,6 +35,7 @@ EXCLUDED_DIRS = {
     ".idea",
     ".claude",
     ".rag_mvp",
+    "codex_sessions_rag",
     "node_modules",
     ".vite",
 }

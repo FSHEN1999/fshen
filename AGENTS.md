@@ -53,10 +53,9 @@ Database configurations are defined in `DatabaseConfig._DATABASE_CONFIG` within 
 
 ### Mock Services (Status Simulation)
 
-- **[`mock_sit.py`](mock_sit.py)** - SIT environment mock service (ENV="sit")
-- **[`mock_uat.py`](mock_uat.py)** - UAT environment mock service (ENV="uat")
+- **[`mock_sit.py`](mock_sit.py)** - Unified mock service for all supported environments, including SIT and UAT
 
-Both scripts provide a CLI interface for triggering DPU state transitions. Key operations:
+This script provides a CLI interface for triggering DPU state transitions. Key operations:
 
 1. **Account Registration** - Generates phone numbers, emails, offer IDs
 2. **SP API Authorization** - Mocks Selling Partner API callbacks
@@ -69,12 +68,12 @@ Both scripts provide a CLI interface for triggering DPU state transitions. Key o
 
 **Run command:**
 ```bash
-python mock_uat.py  # or mock_sit.py
+python mock_sit.py
 ```
 
 ### GUI Application
 
-- **[`1.py`](1.py)** - Tkinter-based GUI wrapper around `mock_uat.py`
+- **[`1.py`](1.py)** - Tkinter-based GUI wrapper around the unified `mock_sit.py` flow
 
 Provides a graphical interface for all mock operations with environment switching and connection management.
 

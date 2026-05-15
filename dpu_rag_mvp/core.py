@@ -601,6 +601,21 @@ def _rerank_candidate(
     if rel_path.startswith("dpu_rag_mvp/") and "rag" not in lowered_query:
         score -= 55.0
         reasons.append("rag-internals-penalty")
+    if rel_path.startswith("output/") or "/output/" in lowered_path:
+        score -= 85.0
+        reasons.append("output-artifact-penalty")
+    if rel_path.startswith("codex_sessions_rag/"):
+        score -= 40.0
+        reasons.append("raw-session-penalty")
+    if lowered_path.endswith(".json") and any(token in lowered_query for token in ("代码", "script", "脚本", "mock_sit", "function")):
+        score -= 45.0
+        reasons.append("json-artifact-penalty")
+    if lowered_path in {"mock_sit.py", "mockapi/mock_sit.py"} and "mock_sit" in lowered_query:
+        score += 70.0
+        reasons.append("canonical-mock-sit")
+    if "mockapi/web/services/mock_adapter.py" in lowered_path and any(token in lowered_query for token in ("mockapi", "web", "接口")):
+        score += 45.0
+        reasons.append("canonical-mockapi-adapter")
 
     if any(marker in lowered_content for marker in NOISY_TOOL_OUTPUT_MARKERS):
         score -= 65.0

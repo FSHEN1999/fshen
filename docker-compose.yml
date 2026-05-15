@@ -1,0 +1,36 @@
+name: dpu-services
+
+services:
+  mockapi:
+    build:
+      context: ./mockapi
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    restart: unless-stopped
+
+  mood-treehole-backend:
+    build:
+      context: ./mood-treehole/backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./mood-treehole/backend/.env
+    environment:
+      DATABASE_URL: sqlite:////data/mood_treehole.db
+    volumes:
+      - ./mood-treehole/backend/mood_treehole.db:/data/mood_treehole.db
+    networks:
+      default:
+        aliases:
+          - backend
+    restart: unless-stopped
+
+  mood-treehole-frontend:
+    build:
+      context: ./mood-treehole/frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - mood-treehole-backend
+    ports:
+      - "8088:80"
+    restart: unless-stopped

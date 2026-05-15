@@ -9,5 +9,5 @@ if (-not (Test-Path $syncScript)) {
 
 $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$syncScript`""
 
-schtasks.exe /Create /TN $taskName /SC MINUTE /MO 15 /TR $taskCommand /F | Out-Host
+schtasks.exe /Create /TN $taskName /SC MINUTE /MO 30 /TR $taskCommand /F | Out-Host
 schtasks.exe /Query /TN $taskName /FO LIST /V | Out-Host

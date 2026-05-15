@@ -1,0 +1,471 @@
+PDF: D:\data\project\dpu\用户故事\S22_1335,1336,1363,1364.pdf
+PAGES: 22
+
+============================== PAGE 1 chars=960 ==============================
+ 
+INTERNAL 
+[NEXS-1364] [FP USD LoC] - Capture Residential Address for Passport Created: 22/Apr/26  Updated: 22/Apr/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Candy Deng  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  business_story  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Issue Links:  Cloners 
+clones  NEXS-1336  [CNY LoC] - Capture Residential Addr...  To Do  
+ 
+Epic Link: Line of Credit (LoC) - HK USD - Online Loan Application  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to capture the Residential Address for Passport for FP USD LoC 
+So that send the data to the Lender for approval of the loan request 
+Pre-Condition:  
+1. The <Residential Address> has been added for CNY LoC in NEXS-1175 & NEXS-1177 , and now extend for FP USD LoC 
+
+============================== PAGE 2 chars=1413 ==============================
+ 
+INTERNAL 
+2. The user has submitted the Business Information Page for T1 & T2 & T3 - 1st Application Journey 
+3. The user has submitted the Business Information Page for Increase Limit Journey (underwritten limit >$500k) 
+Acceptance Criteria (AC):  
+AC1 C1 T1 & T2 & T3 - 1st Application Journey - ID Document Type 
+Given <Passport> is added in <ID Document Type>  
+When the user select <Passport> for each 
+All directors / >=25% UBOs in the Personal information page 
+Then the Residential Address will be displayed and mandatory 
+AC2 Increase Limit Journey (underwritten limit >$500k){} - Residential Address 
+Given <Passport> is added in <ID Document Type>  
+When the user is requested to choose <ID Document Type> for each 
+of the spouses of each Director >=25% UBO in the Personal information page 
+Then the Residential Address will be displayed and mandatory 
+  
+AC3 Send Residential Address to the Lender 
+Given the user input Residential Address for Passport in AC1 & AC2 
+When the application send to the Lender  
+Then the Residential Address should be sent to Lender  
+  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------- 
+Below ACs follow the existing built  
+AC4  Residential Address Format & Length 
+
+============================== PAGE 3 chars=717 ==============================
+ 
+INTERNAL 
+Data Type Format Field Length 
+Country/Region Country (Single) - refer to Nationality list N/A 
+Address Line 1 Free Text 100 
+Address Line 2 (Optional) Free Text 100 
+City (Optional) Free Text 50 
+Postal Code (Optional) Free Text 20 
+AC5 Submitting W/O Residential Address 
+Given the Residential Address is mandatory 
+When the user attempt to submit the page 
+Then the user receive an error message indicating that <This field can't be left blank> 
+And the empty box will be highlighted 
+And the user receive <the section is not yet completed> marked for corresponding individual at the top of page with a hyperlink 
+And the user can click on the hyperlink to go directly to that specific section  
+ 
+ 
+  
+
+============================== PAGE 4 chars=916 ==============================
+ 
+INTERNAL 
+[NEXS-1363] [FP USD LoC] - Extend ID Document Type to Include the Upload of Passport Created: 22/Apr/26  Updated: 22/Apr/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Candy Deng  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  business_story  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Issue Links:  Cloners 
+clones  NEXS-1335  [CNY LoC] - Extend ID Document Type t...  To Do  
+ 
+Epic Link: Line of Credit (LoC) - HK USD - Online Loan Application  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to extend the <ID Document Type> to include support for the upload of the <Passport> for FP 
+USD LoC 
+So that send the relevant documents to the Lender for approval of the loan request 
+Pre-Condition:  
+
+============================== PAGE 5 chars=1560 ==============================
+ 
+INTERNAL 
+1. The <Passport> has been added for CNY LoC in NEXS-1175 & NEXS-1176 , and now extend for FP USD LoC 
+2. The user has submitted the Business Information Page for T1 & T2 & T3 - 1st Application Journey 
+3. The user has submitted the Business Information Page for Increase Limit Journey (underwritten limit >$500k) 
+Acceptance Criteria (AC):  
+AC1a T1 & T2 & T3 - 1st Application Journey - ID Document Type 
+Given the user is requested to choose <ID Document Type> for each 
+All directors / >=25% UBOs in the Personal information page 
+When the user view <ID document type> area 
+Then the user should see <Passport> is added in additional to the existing document types (<PRC Resident Identity Card> ,  <Hong Kong 
+Identity Card> ,<Mainland Travel Permit for Hong Kong and Macau Residents>  
+  
+AC1b T1 & T2 & T3 - 1st Application Journey - Copy Update 
+Given the user is in the Personal information page 
+When the user is in upload area 
+Then the user should be instructed the upload ID Doc same as their Hong Kong company’s NNC1 or NAR1 
+AC2 Increase Limit Journey (underwritten limit >$500k) - ID Document Type 
+Given the user is requested to choose <ID Document Type> for each 
+of the spouses of each Director/>=25% UBO in the Personal information page 
+When the user view <ID document type> area 
+Then the user should see <Passport> is added in additional to the existing document types (<PRC Resident Identity Card> ,  <Hong Kong 
+Identity Card> ,<Mainland Travel Permit for Hong Kong and Macau Residents>  
+  
+AC3 Send Passport to the Lender 
+
+============================== PAGE 6 chars=1408 ==============================
+ 
+INTERNAL 
+Given the user uploaded Passport in AC1 & AC2 
+When the application send to the Lender  
+Then the Passport should be sent to Lender  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------- 
+Below ACs follow the existing built as <Passport> in CNY LoC 
+AC4 Upload Passport 
+Given <Passport> is added in <ID Document Type>  
+When the user select <Passport> 
+Then the user should be instructed to upload <Passport Photo Page> 
+AC5 Upload one file for  <Passport Photo Page> 
+Given the user click the <browser to select> button 
+When the user select one file for  <Passport Photo Page> 
+Then the user should be able to successfully upload it to the platform 
+AC6 Upload multiple files for  <Passport Photo Page> 
+Given the user click the <browser to select> button 
+When the user select multiple files for  <Passport Photo Page> 
+Then the user should see a message indicating one file is allowed for uploads 
+AC7 Drag-and-Drop one file for  <Passport Photo Page> 
+Given the user is on the upload area 
+When the user drag a file over the upload area/drop area for  <Passport Photo Page> 
+Then the user should be able to successfully upload it to the platform 
+AC8 Drag-and-Drop multiple files for  <Passport Photo Page> 
+Given the user is on the upload area 
+
+============================== PAGE 7 chars=1394 ==============================
+ 
+INTERNAL 
+When the user drag multiple files over the upload area/drop area for  <Passport Photo Page> 
+Then the user should see a message indicating one file is allowed for uploads 
+AC9 Supported File Format for  <Passport Photo Page> 
+Given the user upload a file 
+When the user open the file selection window 
+Then only files in the supported format (jpg, png, jpeg, bmp) should be visible in the selection window 
+And the user upload a file in one of the supported formats 
+And the file can be uploaded successfully 
+AC10 Unsupported File Format for  <Passport Photo Page> 
+Given the user upload a file 
+When the file is NOT in the supported format (jpg, png, jpeg, bmp) 
+Then the user should see a message indicating the file uploaded is in unsupported format 
+AC11 Accepted File Size  
+Given the user upload a file of 
+When the file size is in the given size (<=10MB) 
+Then the file can be uploaded successfully 
+AC12 File Size exceeds Limit 
+Given the user upload a file 
+When the file size is not in the given size (>10MB) 
+Then the user should see a message indicating the file uploaded exceeds the 10MB size limit  
+AC13 Re-upload 
+Given the user request for re-upload 
+When the user click on <Remove> button 
+Then the upload area should then be presented to the user 
+And the user upload the new file 
+And the user should be able to see the existing file is replaced with a new one 
+
+============================== PAGE 8 chars=866 ==============================
+ 
+INTERNAL 
+AC14 View Uploaded File  
+Given the user upload or re-upload a file 
+When the user click on <View> button 
+Then the user should be able to view the uploaded file 
+AC15 Submitting W/O <Passport Photo Page> 
+Given the user yet to upload <Passport Photo Page> for any of Spouses of Legal representative / >=25% UBOs 
+When the user click the <Next> button to submit the page 
+And the empty box will be highlighted 
+And the user receive <the section is not yet completed> marked for corresponding individual at the top of page with a hyperlink 
+And the user can click on the hyperlink  to go directly to that specific section  
+AC16 Upload Failure 
+Given the user upload a file 
+When DPU fail to upload the file due to system error 
+Then DPU should display an error message to user indicating that An error occurred in the upload. Please try again 
+   
+ 
+ 
+  
+
+============================== PAGE 9 chars=1061 ==============================
+ 
+INTERNAL 
+[NEXS-1336] [CNY LoC] - Capture Residential Address for Hong Kong Identity Card Created: 15/Apr/26  Updated: 22/Apr/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Candy Deng  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  business_story  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  Screenshot 2026-04-15 091426.png     image-2026-04-15-12-27-26-854.png      
+Issue Links:  Cloners 
+clones  NEXS-1177  [CNY LoC] [￥1.5M - ￥10M] - Connected ...  In Progress  
+is cloned by  NEXS-1337  [CNY LoC] - Upload Product FactSheet  To Do  
+is cloned by  NEXS-1364  [FP USD LoC] - Capture Residential A...  To Do  
+ 
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to capture the Residential Address for Hong Kong Identity Card 
+So that send the data to the Lender for approval of the loan request 
+
+
+============================== PAGE 10 chars=604 ==============================
+ 
+INTERNAL 
+Pre-Condition:  
+1. The user has submitted the Business Information Page for T2 & T3 - 1st Application Journey 
+2. The user has submitted the Business Information Page for Increase Limit Journey (underwritten limit >¥ 1.5M) 
+Acceptance Criteria (AC):  
+AC1 C1 T2 & T3 - 1st Application Journey - Residential Address 
+Given <Hong Kong Identity Card> is added in <ID Document Type>  
+When the user select <Hong Kong Identity Card> for each 
+Legal representative/ All directors / >=25% UBOs in the Connected parties information page 
+Then the Residential Address will be displayed and mandatory 
+
+============================== PAGE 11 chars=384 ==============================
+ 
+INTERNAL 
+ 
+AC2 Increase Limit Journey (underwritten limit >¥ 1.5M) - Residential Address 
+Given <Hong Kong Identity Card> is added in <ID Document Type>  
+When the user is requested to choose <ID Document Type> for each 
+of the spouses of each Legal representative/ >=25% UBO in the Connected parties information page 
+Then the Residential Address will be displayed and mandatory 
+
+
+============================== PAGE 12 chars=271 ==============================
+ 
+INTERNAL 
+ 
+AC3 Send Residential Address to the Lender 
+Given the user input Residential Address for Hong Kong Identity Card in AC1 & AC2 
+When the application send to the Lender  
+Then the Residential Address should be sent to Lender  
+AC4 Apply HKID to FP USD LoC   
+
+
+============================== PAGE 13 chars=1192 ==============================
+ 
+INTERNAL 
+Given the user is from AMZ or offline journey 
+When the user apply for FP USD LoC 
+Then all the ACs in this story should be applied for FP USD LoC 
+  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------- 
+Below ACs follow the existing built  
+AC4  Residential Address Format & Length 
+Data Type Format Field Length 
+Country/Region Country (Single) - refer to Nationality list N/A 
+Address Line 1 Free Text 100 
+Address Line 2 (Optional) Free Text 100 
+City (Optional) Free Text 50 
+Postal Code (Optional) Free Text 20 
+AC5 Submitting W/O Residential Address 
+Given the Residential Address is mandatory 
+When the user attempt to submit the page 
+Then the user receive an error message indicating that <This field can't be left blank> 
+And the empty box will be highlighted 
+And the user receive <the section is not yet completed> marked for corresponding individual at the top of page with a hyperlink 
+And the user can click on the hyperlink to go directly to that specific section  
+
+============================== PAGE 14 chars=18 ==============================
+ 
+INTERNAL 
+ 
+ 
+  
+
+============================== PAGE 15 chars=987 ==============================
+ 
+INTERNAL 
+[NEXS-1335] [CNY LoC] - Extend ID Document Type to Include the Upload of Hong Kong Identity Card Created: 15/Apr/26  Updated: 
+22/Apr/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Candy Deng  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  business_story  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  image-2026-04-15-09-14-42-970.png     image-2026-04-15-09-16-58-989.png      
+Issue Links:  Cloners 
+clones  NEXS-1176  [CNY LoC] - [￥1.5M - ￥10M] - Connecte...  Done - Ready for UAT  
+is cloned by  NEXS-1363  [FP USD LoC] - Extend ID Document Typ...  To Do  
+ 
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As the Data Processing Unit (DPU), I would like to extend the <ID Document Type> to include support for the upload of the <Hong Kong 
+Identity Card> 
+
+
+============================== PAGE 16 chars=739 ==============================
+ 
+INTERNAL 
+So that send the relevant documents to the Lender for approval of the loan request 
+Pre-Condition:  
+1. The user has submitted the Business Information Page for T2 & T3 - 1st Application Journey 
+2. The user has submitted the Business Information Page for Increase Limit Journey (underwritten limit >¥ 1.5M) 
+Acceptance Criteria (AC):  
+AC1 T2 & T3 - 1st Application Journey - ID Document Type 
+Given the user is requested to choose <ID Document Type> for each 
+Legal representative/ All directors / >=25% UBOs in the Connected parties information page 
+When the user view <ID document type> area 
+Then the user should see <Hong Kong Identity Card> is added in additional to the existing document types (<PRC Resident Identity 
+
+============================== PAGE 17 chars=386 ==============================
+ 
+INTERNAL 
+Card> ,  <Mainland Travel Permit for Hong Kong and Macau Residents> or <Passport>) 
+ 
+  
+AC2 Increase Limit Journey (underwritten limit >¥ 1.5M) - ID Document Type 
+Given the user is requested to choose <ID Document Type> for each 
+of the spouses of each Legal representative/ >=25% UBO in the Connected parties information page 
+When the user view <ID document type> area 
+
+
+============================== PAGE 18 chars=231 ==============================
+ 
+INTERNAL 
+Then the user should see <Hong Kong Identity Card> is added in additional to the existing document types (<PRC Resident Identity 
+Card> ,  <Mainland Travel Permit for Hong Kong and Macau Residents> or <Passport>) 
+ 
+  
+
+
+============================== PAGE 19 chars=1400 ==============================
+ 
+INTERNAL 
+AC3 Send Hong Kong Identity Card to the Lender 
+Given the user uploaded Hong Kong Identity Card in AC1 & AC2 
+When the application send to the Lender  
+Then the Hong Kong Identity Card should be sent to Lender  
+AC4 Apply HKID to FP USD LoC   
+Given the user is from AMZ or offline journey 
+When the user apply for FP USD LoC 
+Then all the ACs in this story should be applied for FP USD LoC 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------- 
+Below ACs follow the existing built as <PRC Resident Identity Card> 
+AC4 Upload Hong Kong Identity Card 
+Given <Hong Kong Identity Card> is added in <ID Document Type>  
+When the user select <Hong Kong Identity Card> 
+Then the user should be instructed to upload <ID document front side> and <ID document back side> 
+AC5 Upload one file for ID Document  
+Given the user click the <browser to select> button 
+When the user select one file for ID document front side/back side 
+Then the user should be able to successfully upload it to the platform 
+AC6 Upload multiple files for ID Document  
+Given the user click the <browser to select> button 
+When the user select multiple files for ID document front side/back side 
+Then the user should see a message indicating one file is allowed for uploads 
+
+============================== PAGE 20 chars=1455 ==============================
+ 
+INTERNAL 
+AC7 Drag-and-Drop one file for ID Document 
+Given the user is on the upload area 
+When the user drag a file over the upload area/drop area for ID document front side/ back side 
+Then the user should be able to successfully upload it to the platform 
+AC8 Drag-and-Drop multiple files for ID Document 
+Given the user is on the upload area 
+When the user drag multiple files over the upload area/drop area for ID document front side/ back side 
+Then the user should see a message indicating one file is allowed for uploads 
+AC9 Supported File Format for ID Document  
+Given the user upload a file 
+When the user open the file selection window 
+Then only files in the supported format (jpg, png, jpeg, bmp) should be visible in the selection window 
+And the user upload a file in one of the supported formats 
+And the file can be uploaded successfully 
+AC10 Unsupported File Format for ID Document  
+Given the user upload a file 
+When the file is NOT in the supported format (jpg, png, jpeg, bmp) 
+Then the user should see a message indicating the file uploaded is in unsupported format 
+AC11 Accepted File Size  
+Given the user upload a file of 
+When the file size is in the given size (<=10MB) 
+Then the file can be uploaded successfully 
+AC12 File Size exceeds Limit 
+Given the user upload a file 
+When the file size is not in the given size (>10MB) 
+Then the user should see a message indicating the file uploaded exceeds the 10MB size limit  
+
+============================== PAGE 21 chars=1539 ==============================
+ 
+INTERNAL 
+AC13 Re-upload 
+Given the user request for re-upload 
+When the user click on <Remove> button 
+Then the upload area should then be presented to the user 
+And the user upload the new file 
+And the user should be able to see the existing file is replaced with a new one 
+AC14 View Uploaded File  
+Given the user upload or re-upload a file 
+When the user click on <View> button 
+Then the user should be able to view the uploaded file 
+AC15 Submitting W/O <The front of identify card> 
+Given the user yet to upload <The front of identify card> for an individual 
+Then the user receive an error message indicating that <This field can't be left blank> 
+And the empty box will be highlighted 
+And the user receive <the section is not yet completed> marked for that individual the top of page with a hyperlink 
+And the user can click on the hyperlink  to go directly to that specific section 
+AC16 Submitting W/O <The back of identify card> 
+Given the user yet to upload <The back of identify card> for an individual 
+When the user click the <Next> button to submit the page 
+And the empty box will be highlighted 
+And the user receive <the section is not yet completed> marked for that individual the top of page with a hyperlink 
+And the user can click on the hyperlink  to go directly to that specific section  
+AC17 Upload Failure 
+Given the user upload a file 
+When DPU fail to upload the file due to system error 
+Then DPU should display an error message to user indicating that An error occurred in the upload. Please try again 
+
+============================== PAGE 22 chars=18 ==============================
+ 
+INTERNAL 
+   
+  

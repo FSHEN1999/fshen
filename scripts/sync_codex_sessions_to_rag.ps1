@@ -30,6 +30,12 @@ try {
         throw "DPU RAG build failed with exit code $LASTEXITCODE"
     }
 
+    "[$(Get-Date -Format o)] Rebuild lightweight Codex memory index" | Tee-Object -FilePath $logFile -Append
+    & $python -m dpu_rag_mvp memory-build 2>&1 | Tee-Object -FilePath $logFile -Append
+    if ($LASTEXITCODE -ne 0) {
+        throw "Codex memory build failed with exit code $LASTEXITCODE"
+    }
+
     "[$(Get-Date -Format o)] Sync complete" | Tee-Object -FilePath $logFile -Append
 }
 finally {

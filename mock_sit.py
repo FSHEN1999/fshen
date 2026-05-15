@@ -8,6 +8,7 @@ DPU状态模拟工具
 import json
 import logging
 import os
+import re
 import socket
 import time
 import uuid
@@ -123,6 +124,55 @@ def input_with_validation(
         if validator(user_input):
             return user_input
         log.error(error_msg)
+
+
+def extract_sms_verification_code(raw_placeholders: Any, content: str = "") -> Optional[str]:
+    """从dpu_sms_record的placeholders或content中提取6位验证码"""
+    if raw_placeholders is not None:
+        try:
+            payload = raw_placeholders if isinstance(raw_placeholders, dict) else json.loads(str(raw_placeholders))
+            code = payload.get("verificationCode")
+            if code:
+                return str(code).strip()
+        except Exception:
+            pass
+
+    if content:
+        match = re.search(r"(?<!\d)(\d{6})(?!\d)", str(content))
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def fetch_sms_verification_code(db_executor: "DatabaseExecutor", phone_number: str, timeout: int = 45, interval: int = 2) -> str:
+    """按手机号轮询dpu_sms_record，获取最新验证码"""
+    deadline = time.time() + timeout
+    last_error = None
+    sql = f"""
+        SELECT placeholders, content
+        FROM dpu_sms_record
+        WHERE phone_number = '{phone_number}'
+        ORDER BY COALESCE(send_time, create_time) DESC, id DESC
+        LIMIT 1
+    """
+
+    while time.time() < deadline:
+        try:
+            row = db_executor.execute_query(sql)
+            if row:
+                code = extract_sms_verification_code(row.get("placeholders"), row.get("content", ""))
+                if code:
+                    log.info(f"已从dpu_sms_record获取验证码: phone={phone_number}, code={code}")
+                    return code
+                last_error = f"找到短信记录但未提取到验证码: {row}"
+            else:
+                last_error = f"未找到手机号 {phone_number} 的短信记录"
+        except Exception as e:
+            last_error = str(e)
+        time.sleep(interval)
+
+    raise RuntimeError(f"获取验证码超时: phone={phone_number}, last_error={last_error}")
 
 
 def calculate_future_date(days: int = 90) -> str:
@@ -529,6 +579,16 @@ class DPUMockService:
         return self.db_executor.execute_sql(sql)
 
     @property
+    def credit_offer_application_unique_id(self) -> Optional[str]:
+        """从dpu_credit_offer查询application_unique_id"""
+        sql = f"""
+            SELECT application_unique_id FROM dpu_credit_offer
+            WHERE merchant_id = '{self.merchant_id}'
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_sql(sql)
+
+    @property
     def lender_approved_offer_id(self) -> str:
         """生成lender_approved_offer_id"""
         return f"lender-{self.application_unique_id}" if self.application_unique_id else "lender-default"
@@ -721,7 +781,7 @@ class DPUMockService:
     @classmethod
     def _create_offer_id(cls, journey: str, currency: str, api_config: ApiConfig) -> Optional[str]:
         """创建offer_id（按流程生成对应额度，创建后自动访问redirect_url使offer_id生效）"""
-        journey_amount = {"200K": 15000, "500K": 1666666, "2000K": 1666667}
+        journey_amount = {"200K": 15000, "500K": 1666666, "2000K": 16666667}
         yearly_amount = journey_amount.get(journey.upper())
         if not yearly_amount:
             log.error(f"不支持的流程: {journey}")
@@ -828,8 +888,8 @@ class DPUMockService:
                 log.error("创建offer_id失败，重新注册...")
                 return cls.register_new_account(offline=False)
 
-        # 验证码验证
-        validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
+        # 先触发短信验证码落库，再从dpu_sms_record读取
+        verification_url = f"{base_url}/dpu-user/auth/verification-codes"
         headers = {
             "accept": "application/json, text/plain, */*",
             "content-type": "application/json",
@@ -838,12 +898,15 @@ class DPUMockService:
             "funder-resource": "FUNDPARK",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36"
         }
-        payload = {"areaCode": "+86", "code": "666666", "phone": phone_number}
+        verification_payload = {"areaCode": "+86", "code": "SIGNUP_VERIFICATION", "phone": phone_number}
         try:
-            requests.post(validate_url, json=payload, headers=headers, timeout=30)
+            verify_resp = requests.post(verification_url, json=verification_payload, headers=headers, timeout=30)
+            log.info(
+                f"验证码触发请求完成 | status={verify_resp.status_code} | phone={phone_number} | body={verify_resp.text}"
+            )
+            verify_resp.raise_for_status()
         except requests.exceptions.RequestException as e:
-            # ========== 优化点4：增强验证码验证失败日志 ==========
-            error_detail = f"验证码验证失败: {str(e)}"
+            error_detail = f"验证码触发失败: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 error_detail += f"\n  - 状态码: {e.response.status_code}"
                 try:
@@ -853,12 +916,49 @@ class DPUMockService:
                 except:
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
+            raise
+
+        with DatabaseExecutor(env=ENV) as sms_db_executor:
+            verification_code = fetch_sms_verification_code(sms_db_executor, phone_number)
+
+        validate_url = f"{base_url}/dpu-user/auth/validateSmsCode-sign"
+        validate_payload = {
+            "phoneNumber": phone_number,
+            "phone": phone_number,
+            "areaCode": "+86",
+            "code": verification_code,
+            "verificationCode": verification_code,
+            "smsCode": verification_code,
+            "offerId": offer_id
+        }
+        try:
+            validate_resp = requests.post(validate_url, json=validate_payload, headers=headers, timeout=30)
+            log.info(
+                f"验证码校验请求完成 | status={validate_resp.status_code} | phone={phone_number} | body={validate_resp.text}"
+            )
+            validate_resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            error_detail = f"验证码校验失败: {str(e)}"
+            if hasattr(e, 'response') and e.response is not None:
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                try:
+                    resp_json = e.response.json()
+                    error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
+                    error_detail += f"\n  - 错误信息: {resp_json.get('message', 'N/A')}"
+                    error_detail += f"\n  - 响应体: {e.response.text}"
+                except Exception:
+                    error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
+            log.error(error_detail)
+            raise
 
         # 注册请求
         register_payload = {
+            "phoneNumber": phone_number,
             "phone": phone_number,
             "areaCode": "+86",
-            "code": "666666",
+            "code": verification_code,
+            "verificationCode": verification_code,
+            "smsCode": verification_code,
             "email": email,
             "offerId": offer_id,
             "password": "Aa11111111..",
@@ -891,7 +991,7 @@ class DPUMockService:
             )
             resp_register.raise_for_status()
             token = resp_register.json().get("data", {}).get("token", "未获取到token")
-            print(f"✅ 注册成功！手机号: {phone_number} | Token: {token}")
+            print(f"注册成功 | 手机号: {phone_number} | 验证码: {verification_code} | Token: {token}")
             with open(api_config.txt_path, 'a', encoding='utf-8') as f:
                 if offline:
                     f.write(f"\n{journey}\n{phone_number}\n线下\n")
@@ -908,10 +1008,11 @@ class DPUMockService:
                     error_detail += f"\n  - TraceId: {resp_json.get('traceId', 'N/A')}"
                     error_detail += f"\n  - Code: {resp_json.get('code', 'N/A')}"
                     error_detail += f"\n  - Message: {resp_json.get('message', 'N/A')}"
+                    error_detail += f"\n  - 响应体: {e.response.text}"
                 except:
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
-            return cls.register_new_account()
+            return cls.register_new_account(offline=offline)
 
     # 功能1已注释：模拟SPAPI授权回调
     # def mock_spapi_auth(self) -> None:
@@ -1142,8 +1243,16 @@ class DPUMockService:
             "3": DPUStatus.REJECTED.value
         }
         approved_status = status_map[status_input]
-        failure_reason = self._select_failure_reason(
-            ReturnedFailureReason) if approved_status == DPUStatus.RETURNED.value else None
+        failure_reason = None
+        if approved_status == DPUStatus.RETURNED.value:
+            failure_reason = self._select_failure_reason(ReturnedFailureReason)
+        elif approved_status == DPUStatus.REJECTED.value:
+            rejection_reason_map = {
+                "1": "fraud",
+                "2": "others"
+            }
+            prompt = "请选择拒绝原因：\n" + "\n".join([f"{k}-{v}" for k, v in rejection_reason_map.items()]) + "\n"
+            failure_reason = rejection_reason_map[input_with_validation(prompt, lambda x: x in rejection_reason_map)]
 
         request_body = {
             "data": {
@@ -1241,6 +1350,62 @@ class DPUMockService:
                 except:
                     log.error(e.response.text)
             log.info("=" * 60)
+
+    def mock_application_abandon_status(self) -> None:
+        """模拟申请abandon状态通知"""
+        dpu_application_id = self.credit_offer_application_unique_id or self.application_unique_id
+        if not self.merchant_id:
+            log.error("未获取到merchant_id，无法发送abandon通知")
+            return
+        if not dpu_application_id:
+            log.error("未获取到dpuApplicationId，无法发送abandon通知")
+            return
+
+        reason_map = {
+            "1": ("SellerCancelled", "卖家取消"),
+            "2": ("OfferExpired", "报价过期"),
+            "3": ("ApplicationInfoNotSubmitted", "申请信息未提交"),
+            "4": ("LenderOfferNotReturned", "资方报价未返回")
+        }
+        prompt = "请选择abandonReason：\n" + "\n".join(
+            [f"{key}-{value}（{label}）" for key, (value, label) in reason_map.items()]
+        ) + "\n"
+        abandon_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)][0]
+
+        request_body = {
+            "data": {
+                "eventType": "application.status",
+                "eventId": generate_uuid37(),
+                "eventMessage": "Application approval process completed successfully",
+                "enquiryUrl": "https://api.lender.com/enquiry/12345",
+                "datetime": get_current_time("%Y-%m-%dT%H:%M:%S"),
+                "details": {
+                    "merchantId": self.merchant_id,
+                    "dpuApplicationId": dpu_application_id,
+                    "status": "Abandoned",
+                    "abandonReason": abandon_reason,
+                    "lastUpdatedOn": get_current_time(),
+                    "lastUpdatedBy": "system"
+                }
+            }
+        }
+
+        log.info("=" * 60)
+        log.info("【Abandon状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        log.info("  Content-Type: application/json")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(request_body, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        if self._send_webhook_request(request_body):
+            log.info(
+                f"Abandon状态通知发送成功 | dpuApplicationId={dpu_application_id} | abandonReason={abandon_reason}")
+        else:
+            log.error(f"Abandon状态通知发送失败 | dpuApplicationId={dpu_application_id}")
 
     def mock_esign_status(self) -> None:
         """模拟电子签状态更新"""
@@ -2428,9 +2593,9 @@ def main():
             f"SELECT merchant_id, prefer_finance_product_currency FROM dpu_users WHERE phone_number = '{phone_number}' LIMIT 1"
         )
         if user_info:
-            log.info(f"📱 手机号: {phone_number}")
-            log.info(f"🆔 Merchant ID: {user_info['merchant_id']}")
-            log.info(f"💰 偏好融资产品货币: {user_info['prefer_finance_product_currency']}")
+            log.info(f"手机号: {phone_number}")
+            log.info(f"Merchant ID: {user_info['merchant_id']}")
+            log.info(f"偏好融资产品货币: {user_info['prefer_finance_product_currency']}")
         else:
             log.warning(f"⚠️ 未找到手机号 {phone_number} 的用户信息")
 
@@ -2445,6 +2610,7 @@ def main():
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
 10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
 13 - 系统事件通知       14 - psp开始（hsbc）      15 - psp完成（hsbc）
+16 - abandon(application.status)
 q - 退出
 """
         operation_map = {
@@ -2462,13 +2628,18 @@ q - 退出
             "12": mock_service.mock_multi_shop_3pl_redirect,
             "13": mock_service.mock_system_event_notification,
             "14": mock_service.mock_psp_start_status_hsbc,
-            "15": mock_service.mock_psp_completed_status_hsbc
+            "15": mock_service.mock_psp_completed_status_hsbc,
+            "16": mock_service.mock_application_abandon_status
         }
 
         # 菜单循环
         while True:
             log.info(menu)
-            operator = input("请输入操作编号：\n").strip().lower()
+            try:
+                operator = input("请输入操作编号：\n").strip().lower()
+            except EOFError:
+                log.info("输入结束，程序已退出")
+                break
             if operator == "q":
                 log.info("程序已退出")
                 break

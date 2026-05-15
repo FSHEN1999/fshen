@@ -1,0 +1,148 @@
+================================================================================
+FP-USD 500K 完整流程测试报告
+================================================================================
+测试环境: reg
+测试时间: 2026-04-29 22:37:54 - 22:38:15
+总耗时: 21秒
+
+账号信息:
+- 手机号: 18112860200
+- 邮箱: 18112860200y@163doushabao.com
+- Merchant ID: ffe1985d53184d0fa09c0b2426be6dcc
+- Offer ID: amzn1.lending.offer.us.6nhhqfr83n3mq58vlo3eb0TESTOFFER
+
+流程步骤执行记录:
+================================================================================
+
+Step 1: 账号注册
+--------------------------------------------------------------------------------
+[2026-04-29 22:37:54] Step 1: 开始 - 注册账号 - 手机号: 18112860200
+[2026-04-29 22:37:55] Step 1.1: 完成 - Offer ID: amzn1.lending.offer.us.6nhhqfr83n3mq58vlo3eb0TESTOFFER
+[2026-04-29 22:37:57] Step 1.2: 完成 - 注册响应: 200
+[2026-04-29 22:38:02] Step 1: 完成 - Merchant ID: ffe1985d53184d0fa09c0b2426be6dcc
+
+✓ 注册成功
+
+Step 2: 核保 (Underwriting)
+--------------------------------------------------------------------------------
+[2026-04-29 22:38:03] Step 2: 开始 - underwritten
+[2026-04-29 22:38:03] Step 2: 完成
+
+Webhook Payload:
+{
+  "eventType": "underwritten",
+  "eventTime": "2026-04-29T14:38:03Z",
+  "data": {
+    "applicationUniqueId": "<application_id>",
+    "underwrittenAmount": 500000,
+    "underwrittenCurrency": "USD",
+    "underwrittenStatus": "APPROVED"
+  }
+}
+
+✓ 核保完成 - APPROVED, 500000 USD
+
+Step 3: 审批 (Approval)
+--------------------------------------------------------------------------------
+[2026-04-29 22:38:05] Step 3: 开始 - approved_offer
+[2026-04-29 22:38:05] Step 3: 完成
+
+Webhook Payload:
+{
+  "eventType": "approved_offer",
+  "eventTime": "2026-04-29T14:38:05Z",
+  "data": {
+    "applicationUniqueId": "<application_id>",
+    "approvedAmount": 500000,
+    "approvedCurrency": "USD",
+    "approvedStatus": "APPROVED"
+  }
+}
+
+✓ 审批完成 - APPROVED, 500000 USD
+
+Step 4: PSP验证启动
+--------------------------------------------------------------------------------
+[2026-04-29 22:38:07] Step 4: 开始 - psp_verification
+[2026-04-29 22:38:08] Step 4: 完成
+
+Webhook Payload:
+{
+  "eventType": "psp_verification",
+  "eventTime": "2026-04-29T14:38:07Z",
+  "data": {
+    "applicationUniqueId": "<application_id>",
+    "pspVerificationStatus": "PROCESSING"
+  }
+}
+
+✓ PSP验证已启动
+
+Step 5: PSP验证完成
+--------------------------------------------------------------------------------
+[2026-04-29 22:38:10] Step 5: 开始 - psp_verification
+[2026-04-29 22:38:11] Step 5: 完成
+
+Webhook Payload:
+{
+  "eventType": "psp_verification",
+  "eventTime": "2026-04-29T14:38:10Z",
+  "data": {
+    "applicationUniqueId": "<application_id>",
+    "pspVerificationStatus": "SUCCESS"
+  }
+}
+
+✓ PSP验证已完成
+
+Step 6: 电子签名 (E-signature)
+--------------------------------------------------------------------------------
+[2026-04-29 22:38:13] Step 6: 开始 - esign
+[2026-04-29 22:38:13] Step 6: 完成
+
+Webhook Payload:
+{
+  "eventType": "esign",
+  "eventTime": "2026-04-29T14:38:13Z",
+  "data": {
+    "applicationUniqueId": "<application_id>",
+    "esignStatus": "SUCCESS"
+  }
+}
+
+✓ 电子签名已完成
+
+================================================================================
+测试结果总结
+================================================================================
+
+✓ 所有步骤执行成功
+
+流程完整性: 100%
+- 注册: ✓
+- 核保: ✓
+- 审批: ✓
+- PSP启动: ✓
+- PSP完成: ✓
+- 电子签名: ✓
+
+测试环境: reg (https://dpu-gateway-reg.dowsure.com)
+测试类型: FP-USD 500K 完整流程
+测试方式: 自动化webhook调用
+
+注意事项:
+1. 所有webhook请求均返回成功状态
+2. 每个步骤之间间隔2秒，确保系统处理完成
+3. 注册使用标准参数：验证码666666，密码Aa11111111..
+4. 申请金额：500,000 USD
+5. 所有状态均为APPROVED/SUCCESS
+
+验证建议:
+- 登录reg环境后台查看merchant_id: ffe1985d53184d0fa09c0b2426be6dcc 的完整状态
+- 检查dpu_application表的application_status字段
+- 检查dpu_credit_offer表的e_sign_status和approved_limit_amount字段
+- 验证所有webhook事件是否正确记录在系统日志中
+
+================================================================================
+报告生成时间: 2026-04-29 22:40:00
+================================================================================

@@ -19,6 +19,17 @@ output/playwright/
 output/*.json
 output/*_latest_run.txt
 output/datagrip_recovery_*/
+output/**/node_modules/
+output/**/.pnpm/
+output/metersphere_assets/
+output/*.js
+output/*.css
+.idea/dataSources/
+.idea/dataSources.local.xml
+.idea/data_source_mapping.xml
+node_modules/
+dist/
+build/
 boss-auto-apply/.git/
 boss-auto-apply/.venv/
 boss-auto-apply/config.yaml

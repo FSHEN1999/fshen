@@ -1,0 +1,140 @@
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+String baseUrl = "https://dpu-gateway-reg.dowsure.com";
+String token = String.valueOf(vars.get("token") == null ? "" : vars.get("token")).trim();
+String merchantId = String.valueOf(vars.get("merchantId") == null ? "" : vars.get("merchantId")).trim();
+String dpuApplicationId = String.valueOf(vars.get("dpuApplicationId") == null ? "" : vars.get("dpuApplicationId")).trim();
+String dpuMerchantAccountId = String.valueOf(vars.get("dpuMerchantAccountId") == null ? "" : vars.get("dpuMerchantAccountId")).trim();
+String preferredCurrency = String.valueOf(vars.get("preferredCurrency") == null ? "USD" : vars.get("preferredCurrency")).trim();
+String approvedAmount = String.valueOf(vars.get("approvedAmount") == null ? "500000" : vars.get("approvedAmount")).trim();
+String signedAmount = String.valueOf(vars.get("signedAmount") == null ? approvedAmount : vars.get("signedAmount")).trim();
+String lenderApprovedOfferId = String.valueOf(vars.get("lenderApprovedOfferId") == null ? "" : vars.get("lenderApprovedOfferId")).trim();
+String phone = String.valueOf(vars.get("phone") == null ? "" : vars.get("phone")).trim();
+if (preferredCurrency.length() == 0) { preferredCurrency = "USD"; }
+if (lenderApprovedOfferId.length() == 0 && dpuApplicationId.length() > 0) { lenderApprovedOfferId = "lender-" + dpuApplicationId; vars.put("lenderApprovedOfferId", lenderApprovedOfferId); }
+if (token.length() == 0) { throw new Exception("missing token before embedded webhook chain"); }
+if (merchantId.length() == 0) { throw new Exception("missing merchantId before embedded webhook chain"); }
+if (dpuApplicationId.length() == 0) { throw new Exception("missing dpuApplicationId before embedded webhook chain"); }
+if (dpuMerchantAccountId.length() == 0) { throw new Exception("missing dpuMerchantAccountId before embedded webhook chain"); }
+if (lenderApprovedOfferId.length() == 0) { throw new Exception("missing lenderApprovedOfferId before embedded webhook chain"); }
+
+String isoNow() {
+    return DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC).format(Instant.now());
+}
+String eventId() { return UUID.randomUUID().toString(); }
+String reqId(String id) { return "req_" + id.replace("-", ""); }
+String q(String s) {
+    if (s == null) { return ""; }
+    return s.replace("\\", "\\\\").replace("\"", "\\\"");
+}
+String headerDate() {
+    return DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.ofHours(8)).format(Instant.now());
+}
+
+RequestConfig config = RequestConfig.custom()
+    .setConnectTimeout(10000)
+    .setConnectionRequestTimeout(10000)
+    .setSocketTimeout(30000)
+    .build();
+CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(config).build();
+
+void postWebhook(String label, String body) throws Exception {
+    log.info("[scenario_1][step15-embedded][" + label + "] START phone=" + phone);
+    HttpPost post = new HttpPost(baseUrl + "/dpu-openapi/webhook-notifications");
+    post.setHeader("Authorization", "Bearer " + token);
+    post.setHeader("content-type", "application/json");
+    post.setHeader("finance-product", "LINE_OF_CREDIT");
+    post.setHeader("funder-resource", "FUNDPARK");
+    post.setHeader("product-currency", preferredCurrency);
+    post.setEntity(new StringEntity(body, "UTF-8"));
+    CloseableHttpResponse response = client.execute(post);
+    try {
+        int code = response.getStatusLine().getStatusCode();
+        String respBody = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity(), "UTF-8");
+        log.info("[scenario_1][step15-embedded][" + label + "] responseCode=" + code);
+        log.info("[scenario_1][step15-embedded][" + label + "] responseBody=" + (respBody.length() > 2000 ? respBody.substring(0, 2000) : respBody));
+        if (code != 200) {
+            throw new Exception(label + " HTTP status not 200: " + code + ", body=" + (respBody.length() > 500 ? respBody.substring(0, 500) : respBody));
+        }
+    } finally {
+        response.close();
+    }
+    log.info("[scenario_1][step15-embedded][" + label + "] END phone=" + phone);
+}
+
+try {
+    log.info("[scenario_1][step15-embedded] START build=${sceneBuildId} phone=" + phone);
+    String chargeBases = "CNY".equals(preferredCurrency) ? "Fixed" : "Float";
+    String approvedEvent = eventId();
+    String offerStartDate = LocalDate.now().toString();
+    String offerEndDate = LocalDate.now().plusDays(90).toString();
+    String approvedBody = "{\"data\":{"
+        + "\"eventType\":\"approvedoffer.completed\"," 
+        + "\"eventId\":\"" + q(approvedEvent) + "\"," 
+        + "\"eventMessage\":\"Application approval process completed successfully\"," 
+        + "\"enquiryUrl\":\"https://api.lender.com/enquiry/12345\"," 
+        + "\"datetime\":\"" + isoNow() + "\"," 
+        + "\"details\":{"
+        + "\"merchantId\":\"" + q(merchantId) + "\"," 
+        + "\"dpuApplicationId\":\"" + q(dpuApplicationId) + "\"," 
+        + "\"originalRequestId\":\"" + reqId(approvedEvent) + "\"," 
+        + "\"status\":\"APPROVED\"," 
+        + "\"failureReason\":null," 
+        + "\"lenderApprovedOfferId\":\"" + q(lenderApprovedOfferId) + "\"," 
+        + "\"offer\":{"
+        + "\"rate\":{\"chargeBases\":\"" + q(chargeBases) + "\",\"baseRateType\":\"SOFR\",\"baseRate\":\"0.05\",\"marginRate\":\"0.02\",\"fixedRate\":\"0.07\"},"
+        + "\"term\":120,\"termUnit\":\"Days\",\"mintenor\":3,\"maxtenor\":24,"
+        + "\"offerEndDate\":\"" + offerEndDate + "\",\"offerStartDate\":\"" + offerStartDate + "\","
+        + "\"approvedLimit\":{\"currency\":\"" + q(preferredCurrency) + "\",\"amount\":\"" + q(approvedAmount) + "\"},"
+        + "\"warterMark\":{\"currency\":\"" + q(preferredCurrency) + "\",\"amount\":0.0},"
+        + "\"signedLimit\":{\"currency\":\"" + q(preferredCurrency) + "\",\"amount\":0.0},"
+        + "\"feeOrCharge\":{\"type\":\"PROCESSING_FEE\",\"feeOrChargeDate\":\"2023-10-16\",\"netAmount\":{\"currency\":\"" + q(preferredCurrency) + "\",\"amount\":0.0}}"
+        + "}}}}";
+    vars.put("approvedOriginalRequestId", reqId(approvedEvent));
+    postWebhook("approved-offer", approvedBody);
+    Thread.sleep(2000);
+
+    String pspStartEvent = eventId();
+    String pspStartBody = "{\"data\":{"
+        + "\"eventType\":\"psp.verification.started\",\"eventId\":\"" + q(pspStartEvent) + "\","
+        + "\"eventMessage\":\"psp verification started event\",\"enquiryUrl\":\"https://api.example.com/enquiry/123\",\"datetime\":\"" + isoNow() + "\","
+        + "\"details\":{\"merchantId\":\"" + q(merchantId) + "\",\"lastUpdatedOn\":\"" + headerDate() + "\",\"lastUpdatedBy\":\"system\","
+        + "\"applicationId\":\"" + q(dpuApplicationId) + "\",\"pspId\":\"pspId123457\",\"pspName\":\"AirWallex\","
+        + "\"merchantAccountId\":\"" + q(dpuMerchantAccountId) + "\",\"lenderApprovedOfferId\":\"" + q(lenderApprovedOfferId) + "\",\"result\":\"PROCESSING\"}}}";
+    postWebhook("psp-start", pspStartBody);
+    Thread.sleep(2000);
+
+    String pspCompletedEvent = eventId();
+    String pspCompletedBody = "{\"data\":{"
+        + "\"eventType\":\"psp.verification.completed\",\"eventId\":\"" + q(pspCompletedEvent) + "\","
+        + "\"eventMessage\":\"psp verification completed event\",\"enquiryUrl\":\"https://api.example.com/enquiry/123\",\"datetime\":\"" + isoNow() + "\","
+        + "\"details\":{\"merchantId\":\"" + q(merchantId) + "\",\"lastUpdatedOn\":\"" + headerDate() + "\",\"lastUpdatedBy\":\"system\","
+        + "\"applicationId\":\"" + q(dpuApplicationId) + "\",\"pspId\":\"pspId123457\",\"pspName\":\"AirWallex\","
+        + "\"merchantAccountId\":\"" + q(dpuMerchantAccountId) + "\",\"lenderApprovedOfferId\":\"" + q(lenderApprovedOfferId) + "\",\"result\":\"SUCCESS\"}}}";
+    postWebhook("psp-completed", pspCompletedBody);
+    Thread.sleep(2000);
+
+    String esignEvent = eventId();
+    String esignBody = "{\"data\":{"
+        + "\"eventType\":\"esign.completed\",\"eventId\":\"" + q(esignEvent) + "\","
+        + "\"eventMessage\":\"esign completed event\",\"enquiryUrl\":\"https://api.example.com/enquiry/123\",\"datetime\":\"" + isoNow() + "\","
+        + "\"details\":{\"merchantId\":\"" + q(merchantId) + "\",\"lastUpdatedOn\":\"" + headerDate() + "\",\"lastUpdatedBy\":\"system\","
+        + "\"lenderApprovedOfferId\":\"" + q(lenderApprovedOfferId) + "\",\"result\":\"SUCCESS\","
+        + "\"signedLimit\":{\"amount\":\"" + q(signedAmount) + "\",\"currency\":\"" + q(preferredCurrency) + "\"}}}}";
+    postWebhook("esign", esignBody);
+    Thread.sleep(5000);
+    log.info("[scenario_1][step15-embedded] END build=${sceneBuildId} phone=" + phone);
+} finally {
+    client.close();
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "node",
+      "args": [
+        "C:/Users/PC/.claude/mcp-servers/mcp-community/src/filesystem/dist/index.js",
+        "d:/data/project/dpu"
+      ]
+    },
+    "memory": {
+      "command": "node",
+      "args": [
+        "C:/Users/PC/.claude/mcp-servers/mcp-community/src/memory/dist/index.js"
+      ]
+    }
+  }
+}

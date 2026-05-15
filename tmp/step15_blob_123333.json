@@ -1,0 +1,604 @@
+{
+  "authConfig": {
+    "authType": "NONE",
+    "basicAuth": {
+      "userName": "",
+      "password": "",
+      "valid": false
+    },
+    "digestAuth": {
+      "userName": "",
+      "password": "",
+      "valid": false
+    },
+    "httpauthValid": false
+  },
+  "body": {
+    "bodyType": "JSON",
+    "noneBody": {},
+    "formDataBody": {
+      "formValues": []
+    },
+    "wwwFormBody": {
+      "formValues": []
+    },
+    "jsonBody": {
+      "enableJsonSchema": false,
+      "jsonValue": "{\n  \"data\": {\n    \"eventType\": \"underwrittenLimit.completed\",\n    \"eventId\": \"${eventId}\",\n    \"eventMessage\": \"underwrittenLimit completed event\",\n    \"enquiryUrl\": \"https://api.example.com/enquiry/123\",\n    \"datetime\": \"${datetime_utc}\",\n    \"details\": {\n      \"merchantId\": \"${merchantId}\",\n      \"lastUpdatedOn\": \"${lastUpdatedOn}\",\n      \"lastUpdatedBy\": \"system\",\n      \"dpuMerchantAccountId\": [\n        {\n          \"MerchantAccountId\": \"${dpuMerchantAccountId}\"\n        }\n      ],\n      \"dpuLimitApplicationId\": \"${dpuLimitApplicationId}\",\n      \"originalRequestId\": \"${underwrittenOriginalRequestId}\",\n      \"status\": \"APPROVED\",\n      \"credit\": {\n        \"marginRate\": \"2.5\",\n        \"chargeBases\": \"${chargeBases}\",\n        \"baseRate\": \"3.5\",\n        \"baseRateType\": \"FIXED\",\n        \"creditLimit\": {\n          \"currency\": \"${preferredCurrency}\",\n          \"underwrittenAmount\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"${underwrittenAmount}\"\n          },\n          \"availableLimit\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          },\n          \"signedLimit\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          },\n          \"watermark\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          }\n        },\n        \"eSign\": \"PENDING\"\n      },\n      \"failureReason\": null,\n      \"lenderLoanId\": \"${lenderLoanId}\",\n      \"lenderRepaymentScheduled\": \"${lenderRepaymentScheduled}\",\n      \"lenderCreditId\": \"${lenderCreditId}\",\n      \"lenderRepaymentId\": \"${lenderRepaymentId}\"\n    }\n  }\n}",
+      "jsonSchemaTableData": []
+    },
+    "xmlBody": {
+      "value": ""
+    },
+    "rawBody": {
+      "value": ""
+    },
+    "binaryBody": {
+      "description": "",
+      "file": null
+    },
+    "bodyClassByType": "io.metersphere.api.dto.request.http.body.JsonBody",
+    "bodyDataByType": {
+      "enableJsonSchema": false,
+      "jsonValue": "{\n  \"data\": {\n    \"eventType\": \"underwrittenLimit.completed\",\n    \"eventId\": \"${eventId}\",\n    \"eventMessage\": \"underwrittenLimit completed event\",\n    \"enquiryUrl\": \"https://api.example.com/enquiry/123\",\n    \"datetime\": \"${datetime_utc}\",\n    \"details\": {\n      \"merchantId\": \"${merchantId}\",\n      \"lastUpdatedOn\": \"${lastUpdatedOn}\",\n      \"lastUpdatedBy\": \"system\",\n      \"dpuMerchantAccountId\": [\n        {\n          \"MerchantAccountId\": \"${dpuMerchantAccountId}\"\n        }\n      ],\n      \"dpuLimitApplicationId\": \"${dpuLimitApplicationId}\",\n      \"originalRequestId\": \"${underwrittenOriginalRequestId}\",\n      \"status\": \"APPROVED\",\n      \"credit\": {\n        \"marginRate\": \"2.5\",\n        \"chargeBases\": \"${chargeBases}\",\n        \"baseRate\": \"3.5\",\n        \"baseRateType\": \"FIXED\",\n        \"creditLimit\": {\n          \"currency\": \"${preferredCurrency}\",\n          \"underwrittenAmount\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"${underwrittenAmount}\"\n          },\n          \"availableLimit\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          },\n          \"signedLimit\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          },\n          \"watermark\": {\n            \"currency\": \"${preferredCurrency}\",\n            \"amount\": \"0.00\"\n          }\n        },\n        \"eSign\": \"PENDING\"\n      },\n      \"failureReason\": null,\n      \"lenderLoanId\": \"${lenderLoanId}\",\n      \"lenderRepaymentScheduled\": \"${lenderRepaymentScheduled}\",\n      \"lenderCreditId\": \"${lenderCreditId}\",\n      \"lenderRepaymentId\": \"${lenderRepaymentId}\"\n    }\n  }\n}",
+      "jsonSchema": null
+    }
+  },
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer ${token}",
+      "enable": true,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700000"
+    },
+    {
+      "key": "accept",
+      "value": "application/json, text/plain, */*",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700001"
+    },
+    {
+      "key": "accept-language",
+      "value": "en",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700002"
+    },
+    {
+      "key": "content-type",
+      "value": "application/json",
+      "enable": true,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700003"
+    },
+    {
+      "key": "finance-product",
+      "value": "LINE_OF_CREDIT",
+      "enable": true,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700004"
+    },
+    {
+      "key": "funder-resource",
+      "value": "FUNDPARK",
+      "enable": true,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700005"
+    },
+    {
+      "key": "origin",
+      "value": "https://expressfinance-dpu-reg.dowsure.com",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700006"
+    },
+    {
+      "key": "priority",
+      "value": "u=1,i",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700007"
+    },
+    {
+      "key": "product-currency",
+      "value": "USD",
+      "enable": true,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700008"
+    },
+    {
+      "key": "referer",
+      "value": "https://expressfinance-dpu-reg.dowsure.com/",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700009"
+    },
+    {
+      "key": "sec-ch-ua",
+      "value": "Google Chrome;v=147, Not.A/Brand;v=8, Chromium;v=147",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299700010"
+    },
+    {
+      "key": "sec-ch-ua-mobile",
+      "value": "?0",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800000"
+    },
+    {
+      "key": "sec-ch-ua-platform",
+      "value": "Windows",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800001"
+    },
+    {
+      "key": "sec-fetch-dest",
+      "value": "empty",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800002"
+    },
+    {
+      "key": "sec-fetch-mode",
+      "value": "cors",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800003"
+    },
+    {
+      "key": "sec-fetch-site",
+      "value": "same-site",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800004"
+    },
+    {
+      "key": "user-agent",
+      "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+      "enable": false,
+      "description": "",
+      "notBlankValue": true,
+      "valid": true,
+      "id": "177693231299800005"
+    }
+  ],
+  "otherConfig": {
+    "connectTimeout": 60000,
+    "responseTimeout": 60000,
+    "certificateAlias": "",
+    "followRedirects": true,
+    "autoRedirects": false
+  },
+  "path": "/dpu-openapi/webhook-notifications",
+  "query": [],
+  "rest": [],
+  "url": "/dpu-openapi/webhook-notifications",
+  "polymorphicName": "MsHTTPElement",
+  "resourceId": null,
+  "stepId": "177693217240600025",
+  "uniqueId": "177693217240600025",
+  "activeTab": "HEADER",
+  "responseActiveTab": "BODY",
+  "protocol": "HTTP",
+  "method": "POST",
+  "name": "underwritten",
+  "unSaved": true,
+  "customizeRequest": false,
+  "customizeRequestEnvEnable": true,
+  "children": [
+    {
+      "polymorphicName": "MsCommonElement",
+      "assertionConfig": {
+        "enableGlobal": false,
+        "assertions": [
+          {
+            "assertionType": "RESPONSE_BODY",
+            "enable": true,
+            "name": "assert webhook data={}",
+            "id": "1777099177342",
+            "projectId": null,
+            "assertionBodyType": "JSON_PATH",
+            "jsonPathAssertion": {
+              "assertions": [
+                {
+                  "id": "1777099177341",
+                  "enable": true,
+                  "expression": "$.data",
+                  "condition": "EQUALS",
+                  "expectedValue": "{}",
+                  "valid": true
+                }
+              ]
+            },
+            "xpathAssertion": {
+              "responseFormat": "XML",
+              "assertions": []
+            },
+            "documentAssertion": null,
+            "regexAssertion": {
+              "assertions": []
+            },
+            "bodyAssertionClassByType": "io.metersphere.project.api.assertion.body.MsJSONPathAssertion",
+            "bodyAssertionDataByType": {
+              "assertions": [
+                {
+                  "id": "1777099177341",
+                  "enable": true,
+                  "expression": "$.data",
+                  "condition": "EQUALS",
+                  "expectedValue": "{}",
+                  "valid": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "postProcessorConfig": {
+        "enableGlobal": false,
+        "processors": [
+          {
+            "processorType": "SCRIPT",
+            "name": "脚本名称",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import re\n\ndef extract_value(raw):\n    s = str(raw).strip()\n    if s == \"\" or s == \"None\" or s == \"[]\":\n        return \"\"\n    m = re.search(r'=\\s*([^}\\]]+)', s)\n    if m:\n        return m.group(1).strip()\n    return s\n\nmerchant_id = extract_value(vars.get(\"merchantId\"))\npreferred_currency = extract_value(vars.get(\"preferredCurrency\")) or \"USD\"\ndpu_merchant_account_id = extract_value(vars.get(\"dpuMerchantAccountId\"))\ndpu_limit_application_id = extract_value(vars.get(\"dpuLimitApplicationId\"))\n\nvars.put(\"merchantId\", merchant_id)\nvars.put(\"preferredCurrency\", preferred_currency)\nvars.put(\"dpuMerchantAccountId\", dpu_merchant_account_id)\nvars.put(\"dpuLimitApplicationId\", dpu_limit_application_id)\n\nlog.info(\"save merchantId=\" + merchant_id)\nlog.info(\"save preferredCurrency=\" + preferred_currency)\nlog.info(\"save dpuMerchantAccountId=\" + dpu_merchant_account_id)\nlog.info(\"save dpuLimitApplicationId=\" + dpu_limit_application_id)",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "debug-response-step15",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "# scenario_1 debug response log\ncode = str(prev.getResponseCode())\nbody = prev.getResponseDataAsString()\nlog.info(\"[scenario_1][step 15][underwritten] responseCode=\" + code)\nlog.info(\"[scenario_1][step 15][underwritten] responseBody=\" + str(body)[:2000])\nif code != \"200\":\n    raise Exception(\"scenario_1 step 16 HTTP status not 200: \" + code + \", body=\" + str(body)[:500])\n",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true,
+            "id": "1777099177344"
+          },
+          {
+            "processorType": "SQL",
+            "name": "SQL step15 embedded dpuApplicationId",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT application_unique_id\nFROM dpu_seller_center.dpu_application\nWHERE merchant_id = '${merchantId}'\nORDER BY created_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "dpuApplicationId",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "prepare-step15-embedded-webhook-vars",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import re\n\ndef extract_value(raw):\n    s = str(raw).strip()\n    if s == \"\" or s == \"None\" or s == \"[]\":\n        return \"\"\n    m = re.search(r'=\\s*([^}\\]]+)', s)\n    if m:\n        return m.group(1).strip()\n    return s\n\nmerchant_id = extract_value(vars.get(\"merchantId\"))\ndpu_application_id = extract_value(vars.get(\"dpuApplicationId\"))\ndpu_merchant_account_id = extract_value(vars.get(\"dpuMerchantAccountId\"))\ndpu_limit_application_id = extract_value(vars.get(\"dpuLimitApplicationId\"))\npreferred_currency = extract_value(vars.get(\"preferredCurrency\")) or \"USD\"\napproved_amount = str(vars.get(\"approvedAmount\") or \"500000\")\nsigned_amount = str(vars.get(\"signedAmount\") or approved_amount)\n\nif merchant_id == \"\":\n    raise Exception(\"step15 embedded webhook chain missing merchantId\")\nif dpu_application_id == \"\":\n    raise Exception(\"step15 embedded webhook chain missing dpuApplicationId\")\nif dpu_merchant_account_id == \"\":\n    raise Exception(\"step15 embedded webhook chain missing dpuMerchantAccountId\")\n\nlender_approved_offer_id = \"lender-\" + dpu_application_id\nvars.put(\"merchantId\", merchant_id)\nvars.put(\"dpuApplicationId\", dpu_application_id)\nvars.put(\"dpuMerchantAccountId\", dpu_merchant_account_id)\nvars.put(\"dpuLimitApplicationId\", dpu_limit_application_id)\nvars.put(\"preferredCurrency\", preferred_currency)\nvars.put(\"approvedAmount\", approved_amount)\nvars.put(\"signedAmount\", signed_amount)\nvars.put(\"lenderApprovedOfferId\", lender_approved_offer_id)\nlog.info(\"[scenario_1][step15-embedded] prepared merchantId=\" + merchant_id)\nlog.info(\"[scenario_1][step15-embedded] prepared dpuApplicationId=\" + dpu_application_id)\nlog.info(\"[scenario_1][step15-embedded] prepared dpuMerchantAccountId=\" + dpu_merchant_account_id)\nlog.info(\"[scenario_1][step15-embedded] prepared lenderApprovedOfferId=\" + lender_approved_offer_id)\n",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "step15-embedded-approved-psp-esign-webhooks",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import java.time.Instant;\nimport java.time.LocalDate;\nimport java.time.ZoneOffset;\nimport java.time.format.DateTimeFormatter;\nimport java.util.UUID;\nimport org.apache.http.client.config.RequestConfig;\nimport org.apache.http.client.methods.CloseableHttpResponse;\nimport org.apache.http.client.methods.HttpPost;\nimport org.apache.http.entity.StringEntity;\nimport org.apache.http.impl.client.CloseableHttpClient;\nimport org.apache.http.impl.client.HttpClients;\nimport org.apache.http.util.EntityUtils;\n\nString baseUrl = \"https://dpu-gateway-reg.dowsure.com\";\nString token = String.valueOf(vars.get(\"token\") == null ? \"\" : vars.get(\"token\")).trim();\nString merchantId = String.valueOf(vars.get(\"merchantId\") == null ? \"\" : vars.get(\"merchantId\")).trim();\nString dpuApplicationId = String.valueOf(vars.get(\"dpuApplicationId\") == null ? \"\" : vars.get(\"dpuApplicationId\")).trim();\nString dpuMerchantAccountId = String.valueOf(vars.get(\"dpuMerchantAccountId\") == null ? \"\" : vars.get(\"dpuMerchantAccountId\")).trim();\nString preferredCurrency = String.valueOf(vars.get(\"preferredCurrency\") == null ? \"USD\" : vars.get(\"preferredCurrency\")).trim();\nString approvedAmount = String.valueOf(vars.get(\"approvedAmount\") == null ? \"500000\" : vars.get(\"approvedAmount\")).trim();\nString signedAmount = String.valueOf(vars.get(\"signedAmount\") == null ? approvedAmount : vars.get(\"signedAmount\")).trim();\nString lenderApprovedOfferId = String.valueOf(vars.get(\"lenderApprovedOfferId\") == null ? \"\" : vars.get(\"lenderApprovedOfferId\")).trim();\nString phone = String.valueOf(vars.get(\"phone\") == null ? \"\" : vars.get(\"phone\")).trim();\nif (preferredCurrency.length() == 0) { preferredCurrency = \"USD\"; }\nif (lenderApprovedOfferId.length() == 0 && dpuApplicationId.length() > 0) { lenderApprovedOfferId = \"lender-\" + dpuApplicationId; vars.put(\"lenderApprovedOfferId\", lenderApprovedOfferId); }\nif (token.length() == 0) { throw new Exception(\"missing token before embedded webhook chain\"); }\nif (merchantId.length() == 0) { throw new Exception(\"missing merchantId before embedded webhook chain\"); }\nif (dpuApplicationId.length() == 0) { throw new Exception(\"missing dpuApplicationId before embedded webhook chain\"); }\nif (dpuMerchantAccountId.length() == 0) { throw new Exception(\"missing dpuMerchantAccountId before embedded webhook chain\"); }\nif (lenderApprovedOfferId.length() == 0) { throw new Exception(\"missing lenderApprovedOfferId before embedded webhook chain\"); }\n\nString isoNow() {\n    return DateTimeFormatter.ofPattern(\"yyyy-MM-dd'T'HH:mm:ss'Z'\").withZone(ZoneOffset.UTC).format(Instant.now());\n}\nString eventId() { return UUID.randomUUID().toString(); }\nString reqId(String id) { return \"req_\" + id.replace(\"-\", \"\"); }\nString q(String s) {\n    if (s == null) { return \"\"; }\n    return s.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\");\n}\nString headerDate() {\n    return DateTimeFormatter.ofPattern(\"yyyy-MM-dd HH:mm:ss\").withZone(ZoneOffset.ofHours(8)).format(Instant.now());\n}\n\nRequestConfig config = RequestConfig.custom()\n    .setConnectTimeout(10000)\n    .setConnectionRequestTimeout(10000)\n    .setSocketTimeout(30000)\n    .build();\nCloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(config).build();\n\nvoid postWebhook(String label, String body) throws Exception {\n    log.info(\"[scenario_1][step15-embedded][\" + label + \"] START phone=\" + phone);\n    HttpPost post = new HttpPost(baseUrl + \"/dpu-openapi/webhook-notifications\");\n    post.setHeader(\"Authorization\", \"Bearer \" + token);\n    post.setHeader(\"content-type\", \"application/json\");\n    post.setHeader(\"finance-product\", \"LINE_OF_CREDIT\");\n    post.setHeader(\"funder-resource\", \"FUNDPARK\");\n    post.setHeader(\"product-currency\", preferredCurrency);\n    post.setEntity(new StringEntity(body, \"UTF-8\"));\n    CloseableHttpResponse response = client.execute(post);\n    try {\n        int code = response.getStatusLine().getStatusCode();\n        String respBody = response.getEntity() == null ? \"\" : EntityUtils.toString(response.getEntity(), \"UTF-8\");\n        log.info(\"[scenario_1][step15-embedded][\" + label + \"] responseCode=\" + code);\n        log.info(\"[scenario_1][step15-embedded][\" + label + \"] responseBody=\" + (respBody.length() > 2000 ? respBody.substring(0, 2000) : respBody));\n        if (code != 200) {\n            throw new Exception(label + \" HTTP status not 200: \" + code + \", body=\" + (respBody.length() > 500 ? respBody.substring(0, 500) : respBody));\n        }\n    } finally {\n        response.close();\n    }\n    log.info(\"[scenario_1][step15-embedded][\" + label + \"] END phone=\" + phone);\n}\n\ntry {\n    log.info(\"[scenario_1][step15-embedded] START build=${sceneBuildId} phone=\" + phone);\n    String chargeBases = \"CNY\".equals(preferredCurrency) ? \"Fixed\" : \"Float\";\n    String approvedEvent = eventId();\n    String offerStartDate = LocalDate.now().toString();\n    String offerEndDate = LocalDate.now().plusDays(90).toString();\n    String approvedBody = \"{\\\"data\\\":{\"\n        + \"\\\"eventType\\\":\\\"approvedoffer.completed\\\",\" \n        + \"\\\"eventId\\\":\\\"\" + q(approvedEvent) + \"\\\",\" \n        + \"\\\"eventMessage\\\":\\\"Application approval process completed successfully\\\",\" \n        + \"\\\"enquiryUrl\\\":\\\"https://api.lender.com/enquiry/12345\\\",\" \n        + \"\\\"datetime\\\":\\\"\" + isoNow() + \"\\\",\" \n        + \"\\\"details\\\":{\"\n        + \"\\\"merchantId\\\":\\\"\" + q(merchantId) + \"\\\",\" \n        + \"\\\"dpuApplicationId\\\":\\\"\" + q(dpuApplicationId) + \"\\\",\" \n        + \"\\\"originalRequestId\\\":\\\"\" + reqId(approvedEvent) + \"\\\",\" \n        + \"\\\"status\\\":\\\"APPROVED\\\",\" \n        + \"\\\"failureReason\\\":null,\" \n        + \"\\\"lenderApprovedOfferId\\\":\\\"\" + q(lenderApprovedOfferId) + \"\\\",\" \n        + \"\\\"offer\\\":{\"\n        + \"\\\"rate\\\":{\\\"chargeBases\\\":\\\"\" + q(chargeBases) + \"\\\",\\\"baseRateType\\\":\\\"SOFR\\\",\\\"baseRate\\\":\\\"0.05\\\",\\\"marginRate\\\":\\\"0.02\\\",\\\"fixedRate\\\":\\\"0.07\\\"},\"\n        + \"\\\"term\\\":120,\\\"termUnit\\\":\\\"Days\\\",\\\"mintenor\\\":3,\\\"maxtenor\\\":24,\"\n        + \"\\\"offerEndDate\\\":\\\"\" + offerEndDate + \"\\\",\\\"offerStartDate\\\":\\\"\" + offerStartDate + \"\\\",\"\n        + \"\\\"approvedLimit\\\":{\\\"currency\\\":\\\"\" + q(preferredCurrency) + \"\\\",\\\"amount\\\":\\\"\" + q(approvedAmount) + \"\\\"},\"\n        + \"\\\"warterMark\\\":{\\\"currency\\\":\\\"\" + q(preferredCurrency) + \"\\\",\\\"amount\\\":0.0},\"\n        + \"\\\"signedLimit\\\":{\\\"currency\\\":\\\"\" + q(preferredCurrency) + \"\\\",\\\"amount\\\":0.0},\"\n        + \"\\\"feeOrCharge\\\":{\\\"type\\\":\\\"PROCESSING_FEE\\\",\\\"feeOrChargeDate\\\":\\\"2023-10-16\\\",\\\"netAmount\\\":{\\\"currency\\\":\\\"\" + q(preferredCurrency) + \"\\\",\\\"amount\\\":0.0}}\"\n        + \"}}}}\";\n    vars.put(\"approvedOriginalRequestId\", reqId(approvedEvent));\n    postWebhook(\"approved-offer\", approvedBody);\n    Thread.sleep(2000);\n\n    String pspStartEvent = eventId();\n    String pspStartBody = \"{\\\"data\\\":{\"\n        + \"\\\"eventType\\\":\\\"psp.verification.started\\\",\\\"eventId\\\":\\\"\" + q(pspStartEvent) + \"\\\",\"\n        + \"\\\"eventMessage\\\":\\\"psp verification started event\\\",\\\"enquiryUrl\\\":\\\"https://api.example.com/enquiry/123\\\",\\\"datetime\\\":\\\"\" + isoNow() + \"\\\",\"\n        + \"\\\"details\\\":{\\\"merchantId\\\":\\\"\" + q(merchantId) + \"\\\",\\\"lastUpdatedOn\\\":\\\"\" + headerDate() + \"\\\",\\\"lastUpdatedBy\\\":\\\"system\\\",\"\n        + \"\\\"applicationId\\\":\\\"\" + q(dpuApplicationId) + \"\\\",\\\"pspId\\\":\\\"pspId123457\\\",\\\"pspName\\\":\\\"AirWallex\\\",\"\n        + \"\\\"merchantAccountId\\\":\\\"\" + q(dpuMerchantAccountId) + \"\\\",\\\"lenderApprovedOfferId\\\":\\\"\" + q(lenderApprovedOfferId) + \"\\\",\\\"result\\\":\\\"PROCESSING\\\"}}}\";\n    postWebhook(\"psp-start\", pspStartBody);\n    Thread.sleep(2000);\n\n    String pspCompletedEvent = eventId();\n    String pspCompletedBody = \"{\\\"data\\\":{\"\n        + \"\\\"eventType\\\":\\\"psp.verification.completed\\\",\\\"eventId\\\":\\\"\" + q(pspCompletedEvent) + \"\\\",\"\n        + \"\\\"eventMessage\\\":\\\"psp verification completed event\\\",\\\"enquiryUrl\\\":\\\"https://api.example.com/enquiry/123\\\",\\\"datetime\\\":\\\"\" + isoNow() + \"\\\",\"\n        + \"\\\"details\\\":{\\\"merchantId\\\":\\\"\" + q(merchantId) + \"\\\",\\\"lastUpdatedOn\\\":\\\"\" + headerDate() + \"\\\",\\\"lastUpdatedBy\\\":\\\"system\\\",\"\n        + \"\\\"applicationId\\\":\\\"\" + q(dpuApplicationId) + \"\\\",\\\"pspId\\\":\\\"pspId123457\\\",\\\"pspName\\\":\\\"AirWallex\\\",\"\n        + \"\\\"merchantAccountId\\\":\\\"\" + q(dpuMerchantAccountId) + \"\\\",\\\"lenderApprovedOfferId\\\":\\\"\" + q(lenderApprovedOfferId) + \"\\\",\\\"result\\\":\\\"SUCCESS\\\"}}}\";\n    postWebhook(\"psp-completed\", pspCompletedBody);\n    Thread.sleep(2000);\n\n    String esignEvent = eventId();\n    String esignBody = \"{\\\"data\\\":{\"\n        + \"\\\"eventType\\\":\\\"esign.completed\\\",\\\"eventId\\\":\\\"\" + q(esignEvent) + \"\\\",\"\n        + \"\\\"eventMessage\\\":\\\"esign completed event\\\",\\\"enquiryUrl\\\":\\\"https://api.example.com/enquiry/123\\\",\\\"datetime\\\":\\\"\" + isoNow() + \"\\\",\"\n        + \"\\\"details\\\":{\\\"merchantId\\\":\\\"\" + q(merchantId) + \"\\\",\\\"lastUpdatedOn\\\":\\\"\" + headerDate() + \"\\\",\\\"lastUpdatedBy\\\":\\\"system\\\",\"\n        + \"\\\"lenderApprovedOfferId\\\":\\\"\" + q(lenderApprovedOfferId) + \"\\\",\\\"result\\\":\\\"SUCCESS\\\",\"\n        + \"\\\"signedLimit\\\":{\\\"amount\\\":\\\"\" + q(signedAmount) + \"\\\",\\\"currency\\\":\\\"\" + q(preferredCurrency) + \"\\\"}}}}\";\n    postWebhook(\"esign\", esignBody);\n    Thread.sleep(5000);\n    log.info(\"[scenario_1][step15-embedded] END build=${sceneBuildId} phone=\" + phone);\n} finally {\n    client.close();\n}\n",
+            "scriptLanguage": "BEANSHELL_JSR233",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SQL",
+            "name": "SQL final dpu_credit_offer embedded",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT lender_approved_offer_id, status, approved_limit_amount, approved_limit_currency, signed_limit_amount, signed_limit_currency, e_sign_status\nFROM dpu_seller_center.dpu_credit_offer\nWHERE merchant_id = '${merchantId}'\nORDER BY updated_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "finalCreditOfferRow",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SQL",
+            "name": "SQL final lender_event_count embedded",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT COUNT(*) AS event_count\nFROM dpu_seller_center.dpu_lender_event\nWHERE merchant_id = '${merchantId}'\n  AND event_type IN ('underwrittenLimit.completed', 'approvedoffer.completed', 'psp.verification.started', 'psp.verification.completed', 'esign.completed');",
+            "queryTimeout": 10000,
+            "resultVariable": "finalWebhookEventCount",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "assert-final-db-state-embedded",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import re\n\ndef text_value(value):\n    if value is None:\n        return \"\"\n    return str(value).strip()\n\ndef first_int(value):\n    match = re.search(r'(-?\\d+)', text_value(value))\n    if match:\n        return int(match.group(1))\n    return 0\n\nrow = text_value(vars.get(\"finalCreditOfferRow\"))\nevent_count_raw = text_value(vars.get(\"finalWebhookEventCount\"))\nlender_approved_offer_id = text_value(vars.get(\"lenderApprovedOfferId\"))\nexpected_amount = text_value(vars.get(\"signedAmount\") or vars.get(\"approvedAmount\") or \"500000\")\n\nif row in (\"\", \"None\", \"[]\"):\n    raise Exception(\"Final dpu_credit_offer SQL returned empty result for merchantId=\" + text_value(vars.get(\"merchantId\")))\nif lender_approved_offer_id == \"\":\n    raise Exception(\"lenderApprovedOfferId is empty before final DB assertion\")\nif lender_approved_offer_id not in row:\n    raise Exception(\"Final dpu_credit_offer row does not contain lenderApprovedOfferId=\" + lender_approved_offer_id + \"; row=\" + row)\nif expected_amount != \"\" and expected_amount not in row:\n    raise Exception(\"Final dpu_credit_offer row does not contain expected amount=\" + expected_amount + \"; row=\" + row)\nif \"SUCCESS\" not in row:\n    raise Exception(\"Final dpu_credit_offer row does not show e_sign_status SUCCESS; row=\" + row)\n\nevent_count = first_int(event_count_raw)\nif event_count < 4:\n    raise Exception(\"Expected at least 4 lender events after eSign, got \" + str(event_count) + \"; raw=\" + event_count_raw)\n\nvars.put(\"finalCreditOfferRow\", row)\nvars.put(\"finalWebhookEventCount\", str(event_count))\nlog.info(\"[scenario_1][final-db] finalCreditOfferRow=\" + row)\nlog.info(\"[scenario_1][final-db] finalWebhookEventCount=\" + str(event_count))\n",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          }
+        ]
+      },
+      "preProcessorConfig": {
+        "enableGlobal": false,
+        "processors": [
+          {
+            "processorType": "SCRIPT",
+            "name": "log-step-start-15",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "log.info(\"[scenario_1][step 15][underwritten] START build=${sceneBuildId} phone=\" + str(vars.get(\"phone\")))",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true,
+            "id": "start_20_20260428_011807"
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "脚本名称",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "log.info(\"underwritten phone=\" + str(vars.get(\"phone\")))",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SQL",
+            "name": "前置 SQL 查询",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT merchant_id\nFROM dpu_seller_center.dpu_users\nWHERE phone_number = '${phone}'\nORDER BY created_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "merchantId",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SQL",
+            "name": "前置 SQL 查询",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT COALESCE(prefer_finance_product_currency, 'USD')\nFROM dpu_seller_center.dpu_users\nWHERE phone_number = '${phone}'\nORDER BY created_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "preferredCurrency",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "脚本名称",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import re\n\ndef extract_value(raw):\n    s = str(raw).strip()\n    if s == \"[]\" or s == \"\" or s == \"None\":\n        return \"\"\n    m = re.search(r'=\\s*([^}\\]]+)', s)\n    if m:\n        return m.group(1).strip()\n    return s\n\nmerchant_id_raw = vars.get(\"merchantId\")\npreferred_currency_raw = vars.get(\"preferredCurrency\")\n\nmerchant_id = extract_value(merchant_id_raw)\npreferred_currency = extract_value(preferred_currency_raw) or \"USD\"\n\nvars.put(\"merchantId\", merchant_id)\nvars.put(\"preferredCurrency\", preferred_currency)\n\nlog.info(\"merchantId(raw)=\" + str(merchant_id_raw))\nlog.info(\"merchantId(clean)=\" + merchant_id)\nlog.info(\"preferredCurrency(raw)=\" + str(preferred_currency_raw))\nlog.info(\"preferredCurrency(clean)=\" + preferred_currency)",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SQL",
+            "name": "前置 SQL 查询",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT limit_application_unique_id\nFROM dpu_seller_center.dpu_limit_application\nWHERE merchant_id = '${merchantId}'\nORDER BY created_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "dpuLimitApplicationId",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SQL",
+            "name": "前置 SQL 查询",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "SELECT authorization_id\nFROM dpu_seller_center.dpu_auth_token\nWHERE merchant_id = '${merchantId}'\n  AND authorization_party = 'SP'\n  AND status = 'ACTIVE'\n  AND authorization_id IS NOT NULL\nORDER BY created_at DESC\nLIMIT 1;",
+            "queryTimeout": 10000,
+            "resultVariable": "dpuMerchantAccountId",
+            "variableNames": "",
+            "dataSourceId": "177683680147900000",
+            "dataSourceName": "reg",
+            "extractParams": []
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "脚本名称",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import re\r\n\r\ndef extract_value(raw):\r\n    s = str(raw).strip()\r\n    if s == \"[]\" or s == \"\" or s == \"None\":\r\n        return \"\"\r\n    m = re.search(r'=\\s*([^}\\]]+)', s)\r\n    if m:\r\n        return m.group(1).strip()\r\n    return s\r\n\r\ndpu_merchant_account_id_raw = vars.get(\"dpuMerchantAccountId\")\r\ndpu_limit_application_id_raw = vars.get(\"dpuLimitApplicationId\")\r\n\r\ndpu_merchant_account_id = extract_value(dpu_merchant_account_id_raw)\r\ndpu_limit_application_id = extract_value(dpu_limit_application_id_raw)\r\n\r\nvars.put(\"dpuMerchantAccountId\", dpu_merchant_account_id)\r\nvars.put(\"dpuLimitApplicationId\", dpu_limit_application_id)\r\n\r\nlog.info(\"dpuMerchantAccountId(raw)=\" + str(dpu_merchant_account_id_raw))\r\nlog.info(\"dpuMerchantAccountId(clean)=\" + dpu_merchant_account_id)\r\nlog.info(\"dpuLimitApplicationId(raw)=\" + str(dpu_limit_application_id_raw))\r\nlog.info(\"dpuLimitApplicationId(clean)=\" + dpu_limit_application_id)",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "脚本名称",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "import uuid\nfrom datetime import datetime, timezone\n\npreferred_currency = vars.get(\"preferredCurrency\")\nif preferred_currency is None or preferred_currency == \"\":\n    preferred_currency = \"USD\"\n\nevent_id = str(uuid.uuid4())\ndatetime_utc = datetime.now(timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%SZ\")\nlast_updated_on = datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")\ncharge_bases = \"Fixed\" if preferred_currency == \"CNY\" else \"Float\"\n\nvars.put(\"eventId\", event_id)\nvars.put(\"underwrittenOriginalRequestId\", \"req_\" + event_id.replace(\"-\", \"\"))\nvars.put(\"datetime_utc\", datetime_utc)\nvars.put(\"lastUpdatedOn\", last_updated_on)\nvars.put(\"chargeBases\", charge_bases)\n\nsuffix = str(vars.get(\"dpuLimitApplicationId\") or event_id.replace(\"-\", \"\"))\nvars.put(\"lenderCreditId\", \"lcredit_\" + suffix)\nvars.put(\"lenderLoanId\", \"lloan_\" + suffix)\nvars.put(\"lenderRepaymentScheduled\", \"lrs_\" + suffix)\nvars.put(\"lenderRepaymentId\", \"lrepay_\" + suffix)\n\nif vars.get(\"underwrittenAmount\") is None or str(vars.get(\"underwrittenAmount\")) == \"\":\n    vars.put(\"underwrittenAmount\", \"500000\")",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true
+          },
+          {
+            "processorType": "SCRIPT",
+            "name": "debug-webhook-vars-step15",
+            "enable": true,
+            "projectId": null,
+            "stepId": null,
+            "script": "# scenario_1 webhook request variable log\nlog.info(\"[scenario_1][webhook step 15] eventType=underwrittenLimit.completed\")\nlog.info(\"[scenario_1][webhook step 15] phone=\" + str(vars.get(\"phone\")))\nlog.info(\"[scenario_1][webhook step 15] merchantId=\" + str(vars.get(\"merchantId\")))\nlog.info(\"[scenario_1][webhook step 15] preferredCurrency=\" + str(vars.get(\"preferredCurrency\")))\nlog.info(\"[scenario_1][webhook step 15] eventId=\" + str(vars.get(\"eventId\")))\nlog.info(\"[scenario_1][webhook step 15] dpuMerchantAccountId=\" + str(vars.get(\"dpuMerchantAccountId\")))\nlog.info(\"[scenario_1][webhook step 15] dpuLimitApplicationId=\" + str(vars.get(\"dpuLimitApplicationId\")))\nlog.info(\"[scenario_1][webhook step 15] dpuApplicationId=\" + str(vars.get(\"dpuApplicationId\")))\nlog.info(\"[scenario_1][webhook step 15] lenderApprovedOfferId=\" + str(vars.get(\"lenderApprovedOfferId\")))\nlog.info(\"[scenario_1][webhook step 15] underwrittenOriginalRequestId=\" + str(vars.get(\"underwrittenOriginalRequestId\")))\nlog.info(\"[scenario_1][webhook step 15] approvedOriginalRequestId=\" + str(vars.get(\"approvedOriginalRequestId\")))\nlog.info(\"[scenario_1][webhook step 15] underwrittenAmount=\" + str(vars.get(\"underwrittenAmount\")))\nlog.info(\"[scenario_1][webhook step 15] approvedAmount=\" + str(vars.get(\"approvedAmount\")))\nlog.info(\"[scenario_1][webhook step 15] signedAmount=\" + str(vars.get(\"signedAmount\")))\n",
+            "scriptLanguage": "PYTHON",
+            "enableCommonScript": false,
+            "commonScriptInfo": {
+              "id": "",
+              "deleted": false,
+              "name": "",
+              "script": "",
+              "scriptLanguage": "BEANSHELL_JSR233",
+              "params": []
+            },
+            "valid": true,
+            "id": "1777099177343"
+          }
+        ]
+      }
+    }
+  ],
+  "executeLoading": false,
+  "uploadFileIds": [],
+  "linkFileIds": [],
+  "deleteFileIds": [],
+  "unLinkFileIds": [],
+  "isNew": false,
+  "enable": true,
+  "projectId": "771977421840384"
+}

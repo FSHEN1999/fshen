@@ -1,0 +1,191 @@
+PDF: D:\data\project\dpu\用户故事\S22_NEXS-1365.pdf
+PAGES: 11
+
+============================== PAGE 1 chars=1083 ==============================
+ 
+INTERNAL 
+[NEXS-1365] [Multi-Shop] - 3PL Failed/Expired Handing Mechanism Created: 27/Apr/26  Updated: 28/Apr/26  
+Status: To Do 
+Project: Nexus 
+Component/s: None  
+Affects Version/s: None  
+Fix Version/s: None  
+ 
+Type:  Story  Priority:  Major  
+Reporter:  Candy Deng  Assignee:  Candy Deng  
+Resolution:  Unresolved  Votes:  0  
+Labels:  None  
+Remaining Estimate: Not Specified  
+Time Spent: Not Specified  
+Original Estimate: Not Specified  
+ 
+Attachments:  image-2026-04-28-09-13-18-943.png     image-2026-04-28-12-56-26-317.png     image-2026-04-28-13-00-
+47-320.png     image-2026-04-28-13-28-21-112.png     image-2026-04-28-13-29-52-739.png     image-2026-
+04-28-13-37-12-600.png     image-2026-04-28-17-20-11-355.png     image-2026-04-28-17-21-31-567.png      
+Issue Links:  Cloners 
+clones  NEXS-1342  [CNY LoC] - AMZN Loan Portfolio API f...  To Do  
+is cloned by  NEXS-1366  [First-Shop] - 3PL Failed/Expired Han...  To Do  
+ 
+Epic Link: CNY LoC - FundPark & CN Trustee  
+ 
+ Description     
+As the Express Finance, I want to handle the 3PL Failed/Expired Scenarios 
+
+
+============================== PAGE 2 chars=204 ==============================
+ 
+INTERNAL 
+So that provide guidance relevant to the users 
+Pre-Condition:  
+1.  The 3PL Failed/Expired Handling Mechanism should be applied to FP USD/ CNY LoC / DMF muti-shop 
+Acceptance Criteria (AC):  
+
+============================== PAGE 3 chars=14 ==============================
+ 
+INTERNAL 
+ 
+
+
+============================== PAGE 4 chars=839 ==============================
+ 
+INTERNAL 
+  
+上面的流程图3PL Failed的场景应该也需要3PL重新授权的按钮 
+  
+AC1 - [DMF & FP USD & CNY LoC] - 3PL Not Authorised + Manual Offer Creation Success + Manual Offer Created Within 7 Days 
+(Current Date - Manual Offer Creation Date <=7 days)  
+Given the seller is in Shop Management Page 
+When the seller has US shops 
+And 3PL Not Authorised 
+And Manual Offer Creation was Success 
+And Manual Offer Created Within 7 Days (Current Date - Manual Offer Creation Date <=7 days)  
+Then system display - 
+• 3PL column = To be authorise 
+• 3PL to be authorised reminder message 
+• skip this store link  
+• 3PL to be authorised button  
+ 
+AC2a - [DMF & FP USD & CNY LoC] - 3PL Not Authorised + Manual Offer Creation Success + Manual Offer Created Beyond 7 Days 
+(Current Date - Manual Offer Creation Date >7 day)  
+Given the seller is in Shop Management Page 
+
+
+============================== PAGE 5 chars=685 ==============================
+ 
+INTERNAL 
+When the seller has US shops 
+And 3PL Not Authorised 
+And Manual Offer Creation was Success 
+And Manual Offer Created Beyond 7 Days (Current Date - Manual Offer Creation Date >7 days)  
+Then system display - 
+• 3PL column = Expired 
+• 3PL re-authorise error message 
+• skip this store link  
+• 3PL re-authorise button  
+And the system should re-trigger manual offer creation upon clicking on 3PL re-authorise button  
+And the Add store page is displayed - 
+• 3PL re-authorise error message 
+ 
+  
+AC2b - Click "Re-authorise" button 
+Given  3PL Not Authorised + Expired 
+When the seller click "Re-authorise" button 
+Then system should auto trigger manual offer creatiion 
+  
+
+
+============================== PAGE 6 chars=970 ==============================
+ 
+INTERNAL 
+AC3 - [DMF & FP USD & CNY LoC] - 3PL Not Authorised + Manual Offer Creation Failed + Failed Reason is Offer Existed 
+Given the seller is in Shop Management Page 
+When the seller has US shops 
+And 3PL Not Authorised 
+And Manual Offer Creation Failed  
+And Failed Reason is due to "An offer already exists for the seller for the same partner product 
+Then system display - 
+• 3PL column = To be authorise 
+• 3PL to be authorised reminder message 
+• skip this store link  
+• 3PL to be authorised button 
+Remark: If a DPU offer (not created manually in the system) is no longer available in AMZ after a period of time, and the 3PL is not 
+authorised, the seller should contact the servicing agent to have the offer created via BOSS. 
+ 
+AC4a - [DMF & FP USD & CNY LoC] - 3PL Authorised + 3PL Failed 
+Given the seller is in Shop Management Page 
+When the seller has US shops 
+And 3PL Authorised 
+And 3PL Moved to <Failed> after some period 
+Then system display - 
+
+
+============================== PAGE 7 chars=646 ==============================
+ 
+INTERNAL 
+• 3PL column = Failed 
+• 3PL re-authorise error message 
+• skip this store link  
+• 3PL re-authorise button 
+And the system should re-trigger manual offer creation upon clicking on 3PL re-authorise button  
+And the Add store page is displayed - 
+• 3PL re-authorise error message 
+Remark: Re-authorise for 3PL Failed （Shop abnormal） won't trigger manual offer creation to AMZ. 
+ 
+  
+AC5a - [DMF & FP USD & CNY LoC] - 3PL Authorised + 3PL Expired 
+Given the seller is in Shop Management Page 
+When the seller has US shops 
+And 3PL Authorised 
+And 3PL Moved to <Expired> after some period 
+Then system display - 
+• 3PL column = Expired 
+
+
+============================== PAGE 8 chars=824 ==============================
+ 
+INTERNAL 
+• 3PL re-authorise error message 
+• skip this store link  
+• 3PL re-authorise button 
+And the system should re-trigger manual offer creation upon clicking on 3PL re-authorise button  
+And the Add store page is displayed - 
+• 3PL re-authorise error message 
+ 
+  
+AC5b - Click "Re-authorise" button 
+Given 3PL Authorised + 3PL Expired 
+When the seller click "Re-authorise" button 
+Then system should auto trigger manual offer creation 
+  
+AC6 - Go Back to Offer Landing Page with Mission Center, Credit Assessment NOT Started 
+Given the Credit Assessment is not started  
+When 3PL <Expired> or <Failed> 
+And seller goes back to Offer Landing page and view Mission Center 
+Then system display <Add store is not completed. Action required 
+And Shop Management Page is displayed upon seller click on Action required 
+
+
+============================== PAGE 9 chars=323 ==============================
+ 
+INTERNAL 
+ 
+AC7 - Go Back to Offer Landing Page with Mission Center, Credit Assessment Started 
+Given Credit Assessment is started (User click start credit assessment button, but system has not sent the shop to lender) 
+When 3PL <Expired> or <Failed>  
+And seller goes back to Offer Landing page and view Mission Center 
+
+
+============================== PAGE 10 chars=162 ==============================
+ 
+INTERNAL 
+Then system display <Credit assessment paused. Action required> 
+And Shop Management Page is displayed upon seller click on Action required 
+ 
+  
+   
+
+
+============================== PAGE 11 chars=13 ==============================
+ 
+INTERNAL 
+ 
