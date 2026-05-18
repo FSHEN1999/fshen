@@ -125,6 +125,33 @@ const sessionSummary = computed(() => {
   return activityFeed.value.find((item) => item.kind === 'connect')?.payload ?? null
 })
 
+const consoleStatusCards = computed(() => [
+  {
+    label: 'API',
+    value: health.value === 'ok' ? '正常' : '异常',
+    detail: health.value === 'ok' ? 'health check passed' : String(health.value || 'checking'),
+    tone: health.value === 'ok' ? 'success' : 'error',
+  },
+  {
+    label: 'Session',
+    value: activeSessionId.value ? '已连接' : '未连接',
+    detail: activeSessionId.value ? activeSessionId.value : '先连接 session 再执行 mock',
+    tone: activeSessionId.value ? 'success' : 'warning',
+  },
+  {
+    label: 'Env',
+    value: sessionSummary.value?.env || connectionForm.env,
+    detail: sessionSummary.value?.phone_number || '当前选择环境',
+    tone: 'info',
+  },
+  {
+    label: 'Logs',
+    value: wsConnected.value ? '实时' : '未连接',
+    detail: wsError.value || `${eventLogs.value.length} 条缓存日志`,
+    tone: wsConnected.value ? 'success' : 'warning',
+  },
+])
+
 const logStatusText = computed(() => {
   if (!activeSessionId.value) return '未连接会话'
   if (wsConnected.value) return '实时日志已连接'
@@ -746,10 +773,22 @@ function buildAiContext() {
     <section class="hero-panel">
       <div>
         <p class="eyebrow">DPU Mock Console</p>
-        <h1>mock_sit Mock API 控台</h1>
+        <h1>DPU Mock API 操作台</h1>
         <p class="hero-copy">
-          这是一个用于触发和验证 mock API 的前端控制台，支持连接会话、执行 mock 操作，并查看实时日志。
+          连接账号、触发 workflow webhook、查看实时日志；所有操作都绑定当前环境和 session。
         </p>
+        <div class="hero-status-grid" aria-label="console status">
+          <div
+            v-for="card in consoleStatusCards"
+            :key="card.label"
+            class="status-card"
+            :class="`tone-${card.tone}`"
+          >
+            <span>{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+            <code>{{ card.detail }}</code>
+          </div>
+        </div>
       </div>
       <div class="hero-action-stack">
         <div class="hero-action hero-theme-toggle" title="切换深色/浅色模式">
@@ -763,7 +802,7 @@ function buildAiContext() {
         </button>
         <button class="hero-action" type="button" @click="openAiDrawer">
           <el-icon><ChatLineRound /></el-icon>
-          <span>Chat With AI</span>
+          <span>AI 助手</span>
         </button>
       </div>
     </section>
@@ -795,8 +834,8 @@ function buildAiContext() {
           value-format="YYYY-MM-DD HH:mm:ss"
         />
         <el-input-number v-model="logSearchForm.limit" :min="50" :max="2000" :step="50" controls-position="right" />
-        <el-button type="primary" :loading="logSearchLoading" @click="runLogSearch">Search</el-button>
-        <el-button plain @click="resetLogSearch">Reset</el-button>
+        <el-button type="primary" :loading="logSearchLoading" @click="runLogSearch">查询</el-button>
+        <el-button plain @click="resetLogSearch">重置</el-button>
       </div>
 
       <div class="log-results">
@@ -918,13 +957,28 @@ function buildAiContext() {
             <div class="card-head">
               <div class="head-copy">
                 <h2>Mock 操作面板</h2>
-                <p>15 个操作全部接到现有 FastAPI 接口。</p>
+                <p>按当前 session 执行 webhook 模拟操作，执行结果会保留在对应步骤下方。</p>
               </div>
               <el-tag :type="activeSessionId ? 'success' : 'warning'" size="large">
                 {{ activeSessionId ? `session: ${activeSessionId.slice(0, 8)}...` : '未连接 session' }}
               </el-tag>
             </div>
           </template>
+
+          <div class="operation-context">
+            <div>
+              <span>环境</span>
+              <strong>{{ sessionSummary?.env || connectionForm.env }}</strong>
+            </div>
+            <div>
+              <span>手机号</span>
+              <strong>{{ sessionSummary?.phone_number || connectionForm.phone_number || '-' }}</strong>
+            </div>
+            <div>
+              <span>实时日志</span>
+              <strong>{{ logStatusText }}</strong>
+            </div>
+          </div>
 
           <el-collapse v-model="activePanels" class="operation-panels">
             <el-collapse-item v-for="operation in operations" :key="operation.key" :name="operation.key">
@@ -937,6 +991,7 @@ function buildAiContext() {
 
               <div class="operation-body">
                 <p class="operation-description">{{ operation.description }}</p>
+                <code class="endpoint-chip">{{ operation.endpoint }}</code>
                 <el-form label-position="top" class="tight-form">
                   <div class="operation-fields" :class="{ empty: operation.fields.length === 0 }">
                     <template v-if="operation.fields.length">
@@ -969,7 +1024,12 @@ function buildAiContext() {
                     <div v-else class="no-params">这个操作不需要额外参数。</div>
                   </div>
 
-                  <el-button type="primary" :loading="runningOperationKey === operation.key" @click="handleOperationRun(operation)">
+                  <el-button
+                    type="primary"
+                    :disabled="!activeSessionId"
+                    :loading="runningOperationKey === operation.key"
+                    @click="handleOperationRun(operation)"
+                  >
                     执行 {{ operation.title }}
                   </el-button>
                 </el-form>
@@ -1002,6 +1062,29 @@ function buildAiContext() {
             <div class="summary-row"><span>Merchant</span><strong>{{ sessionSummary.merchant_id || '-' }}</strong></div>
           </div>
           <el-empty v-else description="还没有活跃会话" />
+        </el-card>
+
+        <el-card shadow="never" class="surface-card">
+          <template #header>
+            <div class="card-head">
+              <div class="head-copy">
+                <h2>实时日志</h2>
+                <p>{{ logStatusText }}</p>
+              </div>
+              <el-button size="small" plain :disabled="eventLogs.length === 0" @click="clearLogs">清空</el-button>
+            </div>
+          </template>
+
+          <div class="log-panel">
+            <div v-if="eventLogs.length === 0" class="log-empty">连接 session 后显示 WebSocket 实时日志。</div>
+            <div v-for="entry in eventLogs" :key="`${entry.timestamp}-${entry.formatted}`" class="log-entry">
+              <div class="log-entry-head">
+                <el-tag size="small" :type="levelTagType(entry.level)">{{ entry.level || 'INFO' }}</el-tag>
+                <span>{{ entry.timestamp }}</span>
+              </div>
+              <pre>{{ entry.formatted || entry.message || JSON.stringify(entry, null, 2) }}</pre>
+            </div>
+          </div>
         </el-card>
 
         <el-card shadow="never" class="surface-card">
@@ -1045,7 +1128,7 @@ function buildAiContext() {
         />
         <div class="ai-drawer-head">
           <div>
-            <h2>Chat With AI</h2>
+            <h2>AI 助手</h2>
             <p>DPU mock / SQL 辅助助手。</p>
           </div>
           <div class="ai-drawer-actions">

@@ -11,6 +11,14 @@ This is a Python-based testing toolkit for the HSBC DPU (Digital Platform Unit) 
 - **Database Operations**: Direct MySQL database access for state verification and manipulation
 - **UI Automation**: Selenium-based browser automation for end-to-end testing
 
+## Design Guidance
+
+When changing any DPU-facing UI, generated HTML report, dashboard, or user-visible tool surface, read [`DESIGN.md`](DESIGN.md) first.
+
+For the Mock API Vue frontend, also read [`mockapi/frontend/DESIGN.md`](mockapi/frontend/DESIGN.md) before editing `mockapi/frontend/src/App.vue`, `mockapi/frontend/src/style.css`, or related frontend assets.
+
+These design files adapt the useful `awesome-design-md` pattern into local DPU rules: dense operational screens, explicit environment/session/status context, readable logs and payloads, and restrained financial-tool styling. Do not copy public brand identities directly into DPU tools.
+
 ## Environment Setup
 
 ### Python Environment

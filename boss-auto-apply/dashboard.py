@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import json
 import os
@@ -366,17 +368,19 @@ HTML = """<!doctype html>
   <title>BOSS Auto Apply Dashboard</title>
   <style>
     :root {
-      --bg: #f4f7fb;
+      --canvas: #f5f8fb;
       --panel: #ffffff;
-      --panel-2: #f8fbfe;
-      --border: #d6e0ea;
-      --text: #15202b;
-      --muted: #64748b;
-      --accent: #0f766e;
-      --accent-2: #2563eb;
-      --warn: #b45309;
-      --danger: #be123c;
-      --shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --panel-soft: #f1f6f9;
+      --border: #d8e3ec;
+      --text: #152033;
+      --muted: #607086;
+      --primary: #00684a;
+      --primary-soft: #dff4ec;
+      --secondary: #0d5dd3;
+      --warning: #b7791f;
+      --danger: #c0392b;
+      --success: #14804a;
+      --shadow: 0 10px 26px rgba(16, 37, 63, 0.06);
     }
     * { box-sizing: border-box; }
     body {
@@ -384,8 +388,8 @@ HTML = """<!doctype html>
       font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
       color: var(--text);
       background:
-        linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0)),
-        linear-gradient(180deg, #f7fafc, #edf3f8 45%, #f8fbfd);
+        linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,0)),
+        linear-gradient(135deg, #f5f8fb 0%, #edf5f2 48%, #f6f8fb 100%);
     }
     .topbar {
       position: sticky;
@@ -395,9 +399,9 @@ HTML = """<!doctype html>
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 14px 18px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
-      background: rgba(248, 250, 252, 0.92);
+      background: rgba(245, 248, 251, 0.94);
       backdrop-filter: blur(10px);
     }
     .brand {
@@ -405,6 +409,15 @@ HTML = """<!doctype html>
       align-items: center;
       gap: 12px;
       min-width: 0;
+    }
+    .brand::before {
+      content: "";
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
     }
     .brand-title { font-size: 18px; font-weight: 800; letter-spacing: 0; }
     .brand-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -426,29 +439,28 @@ HTML = """<!doctype html>
       border-radius: 999px;
       background: #94a3b8;
     }
-    .dot.live { background: #16a34a; box-shadow: 0 0 0 4px rgba(22,163,74,.12); }
+    .dot.live { background: var(--success); box-shadow: 0 0 0 4px rgba(20,128,74,.13); }
     .actions {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
     }
-    button, input[type="search"] {
-      font: inherit;
-    }
+    button, input[type="search"] { font: inherit; }
     button {
+      min-height: 38px;
       appearance: none;
       border: 1px solid var(--border);
       background: var(--panel);
       color: var(--text);
       border-radius: 8px;
-      padding: 9px 12px;
+      padding: 8px 12px;
       cursor: pointer;
-      box-shadow: var(--shadow);
+      font-weight: 700;
     }
-    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    button.danger { background: #fff1f2; border-color: #fecdd3; color: var(--danger); }
-    button:hover { filter: brightness(0.985); }
+    button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    button.danger { background: #fff5f5; border-color: #f8caca; color: var(--danger); }
+    button:hover { box-shadow: 0 8px 18px rgba(16, 37, 63, 0.08); }
     .layout {
       max-width: 1600px;
       margin: 0 auto;
@@ -459,99 +471,87 @@ HTML = """<!doctype html>
     }
     .sidebar {
       position: sticky;
-      top: 80px;
+      top: 74px;
       align-self: start;
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
-    .panel, .metric, .runner, .mini-box {
+    .panel, .metric, .runner, .mini-box,
+    .section {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: var(--shadow);
     }
-    .panel-head {
+    .panel-head, .section-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 13px 15px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      background: linear-gradient(180deg, #ffffff, var(--panel-soft));
     }
-    .panel-head h3, .panel-head h4 { margin: 0; font-size: 15px; }
-    .panel-body { padding: 14px 15px; }
+    .panel-head h3, .panel-head h4,
+    .section-head h3 { margin: 0; font-size: 15px; }
+    .panel-body { padding: 14px; }
     .metric-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
     .metric {
+      min-height: 82px;
       padding: 12px;
-      min-height: 84px;
+      border-left: 3px solid var(--primary);
     }
     .metric .label { font-size: 12px; color: var(--muted); }
     .metric .value { font-size: 22px; font-weight: 800; margin-top: 5px; line-height: 1.1; }
     .metric .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    .stack { display: grid; gap: 10px; }
     .status-pre, .log-pre {
       margin: 0;
-      padding: 14px 15px;
-      background: #0f172a;
-      color: #dbeafe;
+      padding: 14px;
+      background: #0d2133;
+      color: #dce9f5;
       border-radius: 10px;
       white-space: pre-wrap;
       word-break: break-word;
       overflow: auto;
       min-height: 210px;
       max-height: 360px;
-      font-size: 12px;
-      line-height: 1.5;
+      font: 12px/1.55 "Cascadia Code", Consolas, ui-monospace, monospace;
     }
     .runner-list { display: grid; gap: 8px; }
     .runner {
       padding: 10px 12px;
       font-size: 12px;
-      line-height: 1.4;
+      line-height: 1.45;
+      box-shadow: none;
     }
-    .runner .muted { color: var(--muted); }
+    .runner .muted { color: var(--muted); word-break: break-word; }
     .main {
       display: grid;
       gap: 16px;
       min-width: 0;
     }
-    .section {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .section-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 15px;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, #ffffff, #f8fbfe);
-    }
-    .section-head h3 { margin: 0; font-size: 15px; }
+    .section { overflow: hidden; }
     .section-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     input[type="search"] {
       min-width: 240px;
+      min-height: 38px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 9px 11px;
+      padding: 8px 11px;
       background: #fff;
-      box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.03);
+      outline: 0;
+    }
+    input[type="search"]:focus {
+      border-color: rgba(0,104,74,.72);
+      box-shadow: 0 0 0 4px rgba(0,104,74,.11);
     }
     .section-body { padding: 0; }
-    .table-wrap {
-      overflow: auto;
-      max-height: 380px;
-    }
+    .table-wrap { overflow: auto; max-height: 380px; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -559,7 +559,7 @@ HTML = """<!doctype html>
     }
     th, td {
       border-bottom: 1px solid #e6edf3;
-      padding: 10px 9px;
+      padding: 9px 9px;
       text-align: left;
       vertical-align: top;
       white-space: nowrap;
@@ -567,24 +567,24 @@ HTML = """<!doctype html>
     th {
       position: sticky;
       top: 0;
-      background: #fff;
+      background: #ffffff;
       z-index: 1;
       color: #475569;
-      font-weight: 700;
+      font-weight: 800;
     }
     tbody tr:hover { background: #f8fbfd; }
-    td.wrap { white-space: normal; word-break: break-word; }
+    td.wrap { white-space: normal; word-break: break-word; min-width: 220px; }
     .pill {
       display: inline-flex;
       align-items: center;
       padding: 3px 8px;
       border-radius: 999px;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 800;
     }
     .pill.reply { background: #eff6ff; color: #1d4ed8; }
     .pill.manual { background: #fff1f2; color: var(--danger); }
-    .pill.ok { background: #ecfdf5; color: #047857; }
+    .pill.ok { background: var(--primary-soft); color: var(--primary); }
     .progress {
       height: 10px;
       background: #e7eef6;
@@ -595,7 +595,7 @@ HTML = """<!doctype html>
     .progress > span {
       display: block;
       height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
     }
     .small { font-size: 12px; color: var(--muted); }
     .error-banner {
@@ -619,15 +619,15 @@ HTML = """<!doctype html>
   <header class="topbar">
     <div class="brand">
       <div>
-        <div class="brand-title">BOSS Auto Apply</div>
-        <div class="brand-sub">本地监控前端 - 投递批次、HR回复、人工接管、日志、运行进程一屏看完</div>
+        <div class="brand-title">BOSS 自动投递操作台</div>
+        <div class="brand-sub">投递批次、HR 回复、人工接管、AI 调用、运行进程和日志一屏监控</div>
       </div>
       <span id="liveBadge" class="status-pill"><span class="dot" id="liveDot"></span><span id="liveText">Loading</span></span>
     </div>
     <div class="actions">
-      <button class="primary" onclick="action('/api/start')">Start</button>
-      <button class="danger" onclick="action('/api/stop')">Stop</button>
-      <button onclick="refresh()">Refresh</button>
+      <button class="primary" onclick="action('/api/start')">开始</button>
+      <button class="danger" onclick="action('/api/stop')">停止</button>
+      <button onclick="refresh()">刷新</button>
     </div>
   </header>
 
@@ -636,12 +636,12 @@ HTML = """<!doctype html>
       <div class="metric-grid" id="metrics"></div>
 
       <section class="section">
-        <div class="section-head"><h3>Current Run</h3><span class="small" id="refreshTime">-</span></div>
+        <div class="section-head"><h3>当前运行</h3><span class="small" id="refreshTime">-</span></div>
         <div class="section-body"><pre class="status-pre" id="status">Loading...</pre></div>
       </section>
 
       <section class="section">
-        <div class="section-head"><h3>Runner Processes</h3><span class="small" id="runnerCount">0</span></div>
+        <div class="section-head"><h3>运行进程</h3><span class="small" id="runnerCount">0</span></div>
         <div class="section-body">
           <div class="panel-body">
             <div class="runner-list" id="runnerList"></div>
@@ -650,10 +650,10 @@ HTML = """<!doctype html>
       </section>
 
       <section class="section">
-        <div class="section-head"><h3>Today Summary</h3><span class="small" id="todaySummary">-</span></div>
+        <div class="section-head"><h3>今日汇总</h3><span class="small" id="todaySummary">-</span></div>
         <div class="section-body">
           <div class="panel-body">
-            <div class="small">Success rate</div>
+            <div class="small">成功率</div>
             <div class="progress"><span id="progressBar" style="width:0%"></span></div>
             <div class="small" id="progressText">0 / 0</div>
           </div>
