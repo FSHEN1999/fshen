@@ -9,9 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from router import choose_best, route  # noqa: E402
+from skills.dpu_common import resolve_repo_python  # noqa: E402
 
 
 class RouterTests(unittest.TestCase):
+    def test_resolve_repo_python_returns_existing_interpreter(self) -> None:
+        python_path = resolve_repo_python(Path("/Users/fshen/dpu"))
+        self.assertTrue(python_path.exists())
+
     def test_routes_known_dpu_script_skill(self) -> None:
         routes = route("检查 mock_sit.py 语法", ["mock_sit.py"], execute=True)
         best, ambiguous = choose_best(routes)

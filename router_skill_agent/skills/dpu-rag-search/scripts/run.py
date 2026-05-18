@@ -6,10 +6,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from dpu_common import find_dpu_root
+from dpu_common import find_dpu_root, resolve_repo_python
 
 DPU_ROOT = find_dpu_root(Path(__file__))
-PYTHON = DPU_ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = resolve_repo_python(DPU_ROOT)
 
 
 def run_command(args: list[str]) -> dict[str, object]:
@@ -38,7 +38,18 @@ def main() -> int:
 
     status = run_command(["status"])
     search = run_command(["search", query])
-    print(json.dumps({"dpu_root": str(DPU_ROOT), "status": status, "search": search}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "dpu_root": str(DPU_ROOT),
+                "python": str(PYTHON),
+                "status": status,
+                "search": search,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0 if status["returncode"] == 0 and search["returncode"] == 0 else 1
 
 
