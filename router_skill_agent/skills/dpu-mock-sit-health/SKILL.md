@@ -10,6 +10,8 @@ tags:
   - webhook
   - 体检
   - 模拟
+risk: read_only
+inputs: []
 ---
 
 # DPU mock_sit Health
@@ -21,4 +23,3 @@ It does not trigger real workflow callbacks. It only:
 - compile-checks `mock_sit.py`
 - extracts operation/function names
 - reports whether important flow keywords are present
-

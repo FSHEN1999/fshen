@@ -8,6 +8,12 @@ tags:
   - http
   - 接口
   - 后端
+risk: external_call
+inputs:
+  - name: url
+    type: url
+    required: true
+    description: HTTP health endpoint to request.
 ---
 
 # API Health Check
@@ -22,4 +28,3 @@ Output:
 
 - HTTP status
 - response body
-

@@ -9,6 +9,8 @@ tags:
   - continue
   - 继续任务
   - 每日任务
+risk: read_only
+inputs: []
 ---
 
 # DPU Daily Task Next
@@ -24,4 +26,3 @@ Output:
 - selected daily task file
 - newest section
 - first unchecked task
-

@@ -8,6 +8,8 @@ tags:
   - vue
   - 前端
   - 设计
+risk: safe
+inputs: []
 ---
 
 # Frontend Designer
@@ -21,4 +23,3 @@ The skill should return:
 - component layout
 - states and responsive behavior
 - implementation checklist
-

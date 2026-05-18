@@ -10,6 +10,12 @@ tags:
   - mock_sit
   - 脚本
   - 语法
+risk: read_only
+inputs:
+  - name: script_path
+    type: file
+    required: true
+    description: Python script path relative to the DPU repository root.
 ---
 
 # DPU Script Check
@@ -24,4 +30,3 @@ Output:
 
 - compile result
 - stderr if syntax/import path issues are found
-

@@ -33,7 +33,7 @@ def main() -> int:
         check=False,
     )
     text = TARGET.read_text(encoding="utf-8", errors="replace")
-    functions = re.findall(r"(?m)^def\s+(mock_[a-zA-Z0-9_]+)\s*\(", text)
+    functions = re.findall(r"(?m)^\s*def\s+(mock_[a-zA-Z0-9_]+)\s*\(", text)
     keyword_presence = {keyword: (keyword in text) for keyword in IMPORTANT_KEYWORDS}
 
     print(

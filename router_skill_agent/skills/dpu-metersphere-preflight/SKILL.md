@@ -10,6 +10,8 @@ tags:
   - REG
   - 场景
   - 实跑
+risk: read_only
+inputs: []
 ---
 
 # DPU MeterSphere Preflight
@@ -23,4 +25,3 @@ It reports:
 - known local MeterSphere harness scripts
 - whether likely token/session environment variables are set
 - recommended next command shape
-

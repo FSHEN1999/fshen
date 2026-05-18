@@ -3,13 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from router import ROOT, execute_skill, route
+from router import (
+    AMBIGUITY_MARGIN,
+    DEFAULT_MIN_SCORE,
+    ROOT,
+    choose_best,
+    execute_skill,
+    route,
+)
 
 
 MEMORY_DIR = ROOT / "memory"
@@ -24,6 +30,7 @@ class PlanStep:
     expected: str
     selected_skill: str | None = None
     status: str = "pending"
+    blocked_reason: str | None = None
 
 
 def load_context() -> dict[str, Any]:
@@ -61,7 +68,7 @@ def infer_expected(goal: str) -> str:
     if "health" in lowered or "健康" in goal or "接口" in goal:
         return "script_returncode_zero_and_http_200"
     if "rag" in lowered or "检索" in goal or "上下文" in goal:
-        return "script_returncode_zero"
+        return "script_returncode_zero_and_nonempty_output"
     if "语法" in goal or "compile" in lowered or "py_compile" in lowered:
         return "script_returncode_zero"
     if "每日任务" in goal or "继续任务" in goal:
@@ -83,6 +90,10 @@ def verify(step: PlanStep, execution: dict[str, Any] | None, routes: list[dict[s
     skill_selected = bool(routes)
     checks.append({"name": "skill_selected", "passed": skill_selected})
 
+    if step.blocked_reason:
+        checks.append({"name": "not_blocked", "passed": False, "detail": step.blocked_reason})
+        return {"passed": False, "checks": checks}
+
     if not skill_selected:
         return {"passed": False, "checks": checks}
 
@@ -94,45 +105,55 @@ def verify(step: PlanStep, execution: dict[str, Any] | None, routes: list[dict[s
 
     stdout = str(execution.get("stdout") or "")
     if step.expected == "script_returncode_zero_and_http_200":
-        checks.append({"name": "http_200_in_output", "passed": '"status": 200' in stdout})
+        checks.append({"name": "http_200_in_output", "passed": '"status": 200' in stdout or '"status_code": 200' in stdout})
     elif step.expected == "script_returncode_zero_and_json_output":
         checks.append({"name": "json_like_output", "passed": stdout.strip().startswith("{")})
     elif step.expected == "instruction_loaded":
         checks.append({"name": "skill_instruction_loaded", "passed": "SKILL.md" in stdout or "#" in stdout})
+    elif step.expected == "script_returncode_zero_and_nonempty_output":
+        checks.append({"name": "nonempty_output", "passed": bool(stdout.strip())})
     elif step.expected == "script_returncode_zero":
         checks.append({"name": "script_completed", "passed": returncode_ok})
 
     return {"passed": all(check["passed"] for check in checks), "checks": checks}
 
 
-def run_agent(task: str, run_args: list[str]) -> dict[str, Any]:
+def run_agent(
+    task: str,
+    run_args: list[str],
+    min_score: int = DEFAULT_MIN_SCORE,
+    allow_risk: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
     started = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     context = load_context()
     plan = split_task(task, run_args)
     step_reports: list[dict[str, Any]] = []
 
     for step in plan:
-        routes = route(step.goal)
-        if not routes:
-            step.status = "blocked"
-            step_reports.append(
-                {
-                    "step": asdict(step),
-                    "routes": [],
-                    "execution": None,
-                    "verification": {"passed": False, "checks": [{"name": "skill_selected", "passed": False}]},
-                }
-            )
-            continue
+        routes = route(step.goal, step.input_args, min_score=min_score, allow_risk=allow_risk, execute=True)
+        best, ambiguous = choose_best(routes)
+        execution = None
 
-        step.selected_skill = str(routes[0]["name"])
-        execution = execute_skill(step.selected_skill, step.input_args)
-        verification = verify(step, execution, routes)
-        step.status = "completed" if verification["passed"] else "failed"
+        if best is None:
+            step.status = "blocked"
+            step.blocked_reason = routes[0].get("blocked_reason") if routes else "no skill above threshold"
+        elif ambiguous and not force:
+            step.status = "blocked"
+            step.blocked_reason = f"ambiguous candidates within {AMBIGUITY_MARGIN} points; refine query or pass --force"
+        else:
+            step.selected_skill = str(best["name"])
+            execution = execute_skill(step.selected_skill, step.input_args)
+            verification = verify(step, execution, routes)
+            step.status = "completed" if verification["passed"] else "failed"
+
+        if execution is None:
+            verification = verify(step, execution, routes)
+
         step_reports.append(
             {
                 "step": asdict(step),
-                "routes": routes[:3],
+                "routes": routes[:5],
                 "execution": execution,
                 "verification": verification,
             }
@@ -142,6 +163,12 @@ def run_agent(task: str, run_args: list[str]) -> dict[str, Any]:
         "task": task,
         "started_at": started,
         "architecture": ["Planner", "Router", "SkillExecutor", "MemoryContext", "Verifier"],
+        "router_policy": {
+            "min_score": min_score,
+            "allow_risk": allow_risk,
+            "force": force,
+            "ambiguity_margin": AMBIGUITY_MARGIN,
+        },
         "context": {"recent_run_count": len(context["recent_runs"])},
         "plan": [asdict(step) for step in plan],
         "steps": step_reports,
@@ -152,12 +179,15 @@ def run_agent(task: str, run_args: list[str]) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the practical router+skill agent pipeline.")
+    parser = argparse.ArgumentParser(description="Run the DPU router+skill agent pipeline.")
     parser.add_argument("task", nargs="+", help="User task to plan, route, execute, and verify.")
     parser.add_argument("--run", nargs="*", default=[], help="Arguments passed to a single selected script skill.")
+    parser.add_argument("--min-score", type=int, default=DEFAULT_MIN_SCORE)
+    parser.add_argument("--allow-risk", default=None)
+    parser.add_argument("--force", action="store_true", help="Allow execution when top candidates are ambiguous.")
     args = parser.parse_args()
 
-    report = run_agent(" ".join(args.task), args.run)
+    report = run_agent(" ".join(args.task), args.run, min_score=args.min_score, allow_risk=args.allow_risk, force=args.force)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["status"] == "completed" else 1
 

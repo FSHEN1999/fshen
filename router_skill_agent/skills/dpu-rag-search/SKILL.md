@@ -10,6 +10,12 @@ tags:
   - context
   - 检索
   - 上下文
+risk: read_only
+inputs:
+  - name: query
+    type: text
+    required: true
+    description: Search query for the local DPU RAG index.
 ---
 
 # DPU RAG Search
@@ -24,4 +30,3 @@ Output:
 
 - local RAG status
 - top search results
-

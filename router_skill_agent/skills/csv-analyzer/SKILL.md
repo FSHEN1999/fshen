@@ -7,6 +7,12 @@ tags:
   - analysis
   - 表格
   - 数据
+risk: read_only
+inputs:
+  - name: csv_path
+    type: file
+    required: true
+    description: Path to a CSV file.
 ---
 
 # CSV Analyzer
@@ -22,4 +28,3 @@ Output:
 - row count
 - column names
 - first rows
-
