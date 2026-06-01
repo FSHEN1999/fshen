@@ -2063,9 +2063,10 @@ class DPUMockService:
         failure_reason = ""
         if send_status == "FAIL":
             reason_map = {
-                "1": "Lender and seller country not align(User do have US shop）",
+                "1": "the seller location does not match the lender location",
                 "2": "Active credit approval exists",
-                "3": "An offer already exists for the seller for the same partner product combination"
+                "3": "offer already exists",
+                "4": "others"
             }
             prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]

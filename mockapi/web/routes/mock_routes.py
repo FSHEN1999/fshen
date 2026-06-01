@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from web.models.requests import (
     LinkSp3plRequest, UnderwrittenRequest, ApprovedOfferRequest,
+    UnderwrittenDowsureRequest,
     PspStartRequest, PspCompletedRequest, EsignRequest, DrawdownRequest,
     RepaymentStartRequest, RepaymentRequest,
     MultiShopBindingRequest, SpStatusUpdateRequest, MultiShop3plRedirectRequest,
@@ -169,6 +170,30 @@ async def mock_system_event(req: SystemEventRequest):
         error_code=req.error_code
     )
     msg = f"系统事件通知{'成功' if result.get('success') else '失败'}"
+    return ApiResponse(success=result.get("success", False), message=msg, data=result)
+
+
+@router.get("/dowsure-merchant-accounts", response_model=ApiResponse)
+async def list_dowsure_merchant_accounts(session_id: str):
+    service = _get_service(session_id)
+    result = await asyncio.to_thread(service.get_dowsure_merchant_accounts)
+    return ApiResponse(
+        success=result.get("success", False),
+        message="DOWSURE店铺列表已加载" if result.get("success") else result.get("error", "DOWSURE店铺列表加载失败"),
+        data=result,
+    )
+
+
+@router.post("/underwritten-dowsure", response_model=ApiResponse)
+async def mock_underwritten_dowsure(req: UnderwrittenDowsureRequest):
+    service = _get_service(req.session_id)
+    result = await asyncio.to_thread(
+        service.mock_underwritten_status_dowsure,
+        amount=req.amount,
+        status=req.status,
+        merchant_accounts=[item.model_dump() for item in req.merchant_accounts],
+    )
+    msg = f"DOWSURE核保状态更新{'成功' if result.get('success') else '失败'}"
     return ApiResponse(success=result.get("success", False), message=msg, data=result)
 
 

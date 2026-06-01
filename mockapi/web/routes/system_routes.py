@@ -32,6 +32,7 @@ async def list_enums():
         environments=["sit", "uat", "dev", "preprod", "reg", "local"],
         journeys=["200K", "500K", "2000K"],
         currencies=["USD", "CNY"],
+        funder_resources=["FUNDPARK", "HSBC", "DOWSURE"],
         underwritten_statuses=["APPROVED", "REJECTED"],
         approved_offer_statuses=["APPROVED", "RETURNED", "REJECTED"],
         esign_statuses=["SUCCESS", "FAIL"],
@@ -71,9 +72,10 @@ async def list_enums():
             {"index": 2, "code": "ER002", "label": "操作拒绝"},
         ],
         sp_update_failure_reasons=[
-            {"index": 1, "label": "Lender and seller country not align"},
+            {"index": 1, "label": "the seller location does not match the lender location"},
             {"index": 2, "label": "Active credit approval exists"},
-            {"index": 3, "label": "An offer already exists for the seller"},
+            {"index": 3, "label": "offer already exists"},
+            {"index": 4, "label": "others"},
         ],
         application_abandon_reasons=[
             {"value": "SellerCancelled", "label": "卖家取消"},
@@ -133,5 +135,5 @@ async def query_logs(
         session_id=session_id,
         limit=limit,
     )
-    return ApiResponse(success=True, message=f"??? {len(logs)} ???", data=logs)
+    return ApiResponse(success=True, message=f"共 {len(logs)} 条匹配日志", data=logs)
 

@@ -1,15 +1,17 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Web 适配器：将 DPUMockService 的 input() 调用改为参数传入，返回结构化结果"""
 import sys
 import json
 import random
 import logging
+import uuid
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 from urllib.parse import urlencode
 
 # 确保能导入项目根目录的 mock_sit 模块
-_project_root = str(Path(__file__).parent.parent.parent)
+_project_root = str(Path(__file__).resolve().parents[3])
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
@@ -70,6 +72,417 @@ class WebDPUMockService(DPUMockService):
             log.info(f"根据 merchant_id 自动查询到 platform_seller_id: {seller_id}")
         return seller_id
 
+    @staticmethod
+    def _sql_literal(value: Optional[str]) -> str:
+        """Quote a small SQL literal for legacy execute_sql helpers."""
+        if value is None:
+            return "NULL"
+        return "'" + str(value).replace("\\", "\\\\").replace("'", "''") + "'"
+
+    @staticmethod
+    def _lookup_user_token(db_executor: DatabaseExecutor, phone_number: str) -> str:
+        """Fetch the latest user token when signup does not return one."""
+        if not phone_number:
+            return ""
+        phone_literal = WebDPUMockService._sql_literal(phone_number)
+        sql = (
+            "SELECT token FROM dpu_users "
+            f"WHERE phone_number = {phone_literal} "
+            "AND token IS NOT NULL AND token != '' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        token = db_executor.execute_sql(sql)
+        return str(token or "").strip()
+
+    def _build_manual_offer_lookup_sql(
+        self,
+        selling_partner_id: Optional[str] = None,
+        merchant_id: Optional[str] = None,
+        ready_only: bool = True,
+        limit: int = 1,
+    ) -> Optional[str]:
+        conditions = []
+        if selling_partner_id:
+            conditions.append(f"platform_seller_id = {self._sql_literal(selling_partner_id)}")
+        if merchant_id:
+            conditions.append(f"merchant_id = {self._sql_literal(merchant_id)}")
+        if not conditions:
+            return None
+
+        ready_condition = (
+            "AND idempotency_key IS NOT NULL AND idempotency_key != '' "
+            "AND platform_offer_id IS NOT NULL AND platform_offer_id != '' "
+            if ready_only
+            else ""
+        )
+        return (
+            "SELECT id, merchant_id, merchant_account_id, platform_seller_id, "
+            "idempotency_key, platform_offer_id, send_status, created_at, updated_at "
+            "FROM dpu_seller_center.dpu_manual_offer "
+            f"WHERE ({' OR '.join(conditions)}) "
+            f"{ready_condition}"
+            "ORDER BY created_at DESC "
+            f"LIMIT {int(limit)}"
+        )
+
+    def _get_manual_offer_debug_rows(
+        self,
+        selling_partner_id: Optional[str] = None,
+        merchant_id: Optional[str] = None,
+    ) -> list[dict]:
+        sql = self._build_manual_offer_lookup_sql(
+            selling_partner_id=selling_partner_id,
+            merchant_id=merchant_id,
+            ready_only=False,
+            limit=5,
+        )
+        if not sql:
+            return []
+
+        try:
+            rows = self.db_executor.execute_query_all(sql)
+        except AttributeError:
+            first_row = self.db_executor.execute_query(sql)
+            rows = [first_row] if first_row else []
+        except Exception as exc:
+            return [{"error": str(exc), "sql": sql}]
+
+        if not rows:
+            return []
+        if isinstance(rows, dict):
+            return [rows]
+        return rows
+
+    def _wait_for_manual_offer(
+        self,
+        selling_partner_id: Optional[str] = None,
+        merchant_id: Optional[str] = None,
+        timeout_seconds: int = 30,
+        interval_seconds: int = 2,
+    ) -> Optional[dict]:
+        """Poll dpu_manual_offer until platform_offer_id and idempotency_key are available."""
+        deadline = time.time() + timeout_seconds
+        sql = self._build_manual_offer_lookup_sql(
+            selling_partner_id=selling_partner_id,
+            merchant_id=merchant_id,
+            ready_only=True,
+            limit=1,
+        )
+        if not sql:
+            return None
+
+        while time.time() < deadline:
+            row = self.db_executor.execute_query(sql)
+            if row and row.get("idempotency_key") and row.get("platform_offer_id"):
+                resolved_seller_id = row.get("platform_seller_id")
+                if resolved_seller_id:
+                    self.generated_selling_partner_id = resolved_seller_id
+                return row
+            time.sleep(interval_seconds)
+        return None
+
+    def _ensure_sp_auth_active_from_manual_offer(self, seller_id: Optional[str] = None) -> dict:
+        """Normalize SP auth rows so each seller ends with one canonical ACTIVE token."""
+        resolved_seller_id = self._resolve_platform_seller_id(seller_id)
+        manual_offer = self._wait_for_manual_offer(
+            selling_partner_id=resolved_seller_id,
+            merchant_id=self.merchant_id,
+            timeout_seconds=1,
+            interval_seconds=1,
+        )
+        if not manual_offer:
+            return {
+                "success": False,
+                "error": "No ready dpu_manual_offer found for SP auth fallback",
+                "seller_id": resolved_seller_id,
+                "merchant_id": self.merchant_id,
+            }
+
+        seller_id = manual_offer.get("platform_seller_id") or resolved_seller_id
+        merchant_account_id = manual_offer.get("merchant_account_id")
+        if not seller_id or not merchant_account_id:
+            return {
+                "success": False,
+                "error": "manual offer missing platform_seller_id or merchant_account_id",
+                "manual_offer": manual_offer,
+            }
+
+        token_rows = self.db_executor.execute_query_all(
+            "SELECT id, merchant_account_id, authorization_id, status, state, reason, "
+            "scene_code, processing_stage, auth_start_time, auth_complete_time, created_at, updated_at "
+            "FROM dpu_seller_center.dpu_auth_token "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND authorization_party = 'SP' "
+            f"AND (authorization_id = {self._sql_literal(seller_id)} "
+            "OR authorization_id IS NULL OR authorization_id = '') "
+            "ORDER BY created_at DESC, id DESC"
+        )
+        if not token_rows:
+            return {
+                "success": False,
+                "error": "No SP token rows found for normalization",
+                "seller_id": seller_id,
+                "merchant_account_id": merchant_account_id,
+            }
+
+        def _token_rank(row: dict) -> tuple:
+            return (
+                1 if row.get("authorization_id") == seller_id and row.get("status") == "ACTIVE" else 0,
+                1 if row.get("scene_code") else 0,
+                1 if row.get("auth_complete_time") else 0,
+                1 if row.get("auth_start_time") else 0,
+                row.get("updated_at") or row.get("created_at"),
+                row.get("id"),
+            )
+
+        canonical_token = max(token_rows, key=_token_rank)
+        canonical_id = canonical_token["id"]
+
+        normalize_canonical_sql = (
+            "UPDATE dpu_seller_center.dpu_auth_token "
+            f"SET merchant_account_id = {self._sql_literal(merchant_account_id)}, "
+            f"authorization_id = {self._sql_literal(seller_id)}, "
+            "status = 'ACTIVE', "
+            "reason = NULL, "
+            "auth_complete_time = COALESCE(auth_complete_time, NOW()), "
+            "updated_at = NOW() "
+            f"WHERE id = {self._sql_literal(canonical_id)}"
+        )
+        self.db_executor.execute_sql(normalize_canonical_sql)
+
+        suppress_duplicate_sql = (
+            "UPDATE dpu_seller_center.dpu_auth_token "
+            "SET status = 'REVOKED', "
+            "reason = 'mockapi normalized duplicate SP token', "
+            "updated_at = NOW() "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND authorization_party = 'SP' "
+            f"AND id <> {self._sql_literal(canonical_id)} "
+            f"AND (authorization_id = {self._sql_literal(seller_id)} "
+            "OR authorization_id IS NULL OR authorization_id = '') "
+            "AND status IN ('NEW', 'FAIL', 'PENDING', 'ACTIVE')"
+        )
+        self.db_executor.execute_sql(suppress_duplicate_sql)
+
+        active_token = self.db_executor.execute_query(
+            "SELECT id, state, status, authorization_id, merchant_account_id "
+            "FROM dpu_seller_center.dpu_auth_token "
+            f"WHERE id = {self._sql_literal(canonical_id)} "
+            "LIMIT 1"
+        )
+        if not active_token:
+            return {
+                "success": False,
+                "error": "SP token was not ACTIVE after fallback update",
+                "seller_id": seller_id,
+                "merchant_account_id": merchant_account_id,
+            }
+
+        inserted_shops = []
+        for country_code in ("US", "CA"):
+            exists_sql = (
+                "SELECT id FROM dpu_seller_center.dpu_shops "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                "AND emarketplace = 'AMAZON' "
+                "AND emarketplace_data_type = 'SP' "
+                f"AND shop_reference_id = {self._sql_literal(seller_id)} "
+                f"AND country_code = {self._sql_literal(country_code)} "
+                "AND is_deleted = 0 "
+                "LIMIT 1"
+            )
+            if self.db_executor.execute_sql(exists_sql):
+                continue
+            insert_shop_sql = (
+                "INSERT INTO dpu_seller_center.dpu_shops ("
+                "id, merchant_id, emarketplace, emarketplace_data_type, auth_id, "
+                "shop_reference_id, merchant_account_id, shop_status, country_code, "
+                "created_at, updated_at, create_by, update_by, is_deleted"
+                ") VALUES ("
+                "REPLACE(UUID(), '-', ''), "
+                f"{self._sql_literal(self.merchant_id)}, "
+                "'AMAZON', 'SP', "
+                f"{self._sql_literal(canonical_id)}, "
+                f"{self._sql_literal(seller_id)}, "
+                f"{self._sql_literal(merchant_account_id)}, "
+                "'ACTIVE', "
+                f"{self._sql_literal(country_code)}, "
+                "NOW(), NOW(), 'mockapi', 'mockapi', 0)"
+            )
+            self.db_executor.execute_sql(insert_shop_sql)
+            inserted_shops.append(country_code)
+
+        repoint_shop_sql = (
+            "UPDATE dpu_seller_center.dpu_shops "
+            f"SET auth_id = {self._sql_literal(canonical_id)}, "
+            f"merchant_account_id = {self._sql_literal(merchant_account_id)}, "
+            "updated_at = NOW() "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND emarketplace = 'AMAZON' "
+            "AND emarketplace_data_type = 'SP' "
+            f"AND shop_reference_id = {self._sql_literal(seller_id)} "
+            "AND is_deleted = 0"
+        )
+        self.db_executor.execute_sql(repoint_shop_sql)
+
+        latest_token = self.db_executor.execute_query(
+            "SELECT id, state, status, authorization_id, merchant_account_id, reason, created_at, updated_at "
+            "FROM dpu_seller_center.dpu_auth_token "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND authorization_party = 'SP' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        shop_rows = self.db_executor.execute_query_all(
+            "SELECT id, auth_id, shop_reference_id, merchant_account_id, shop_status, country_code "
+            "FROM dpu_seller_center.dpu_shops "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND emarketplace = 'AMAZON' "
+            "AND emarketplace_data_type = 'SP' "
+            f"AND shop_reference_id = {self._sql_literal(seller_id)} "
+            "AND is_deleted = 0 "
+            "ORDER BY country_code"
+        )
+        return {
+            "success": bool(active_token and active_token.get("status") == "ACTIVE"),
+            "seller_id": seller_id,
+            "merchant_account_id": merchant_account_id,
+            "manual_offer": manual_offer,
+            "canonical_token_id": canonical_id,
+            "active_token": active_token,
+            "latest_sp_token": latest_token,
+            "inserted_shops": inserted_shops,
+            "shops": shop_rows,
+        }
+
+    @staticmethod
+    def _build_api_config(env: str) -> ApiConfig:
+        base_url_dict = {
+            "sit": "https://sit.api.expressfinance.business.hsbc.com",
+            "dev": "https://dpu-gateway-dev.dowsure.com",
+            "uat": "https://uat.api.expressfinance.business.hsbc.com",
+            "preprod": "https://preprod.api.expressfinance.business.hsbc.com",
+            "reg": "https://dpu-gateway-reg.dowsure.com",
+            "local": "http://192.168.11.3:8080",
+        }
+        base_url = base_url_dict[env]
+        redirect_url_base = (
+            f"{base_url}/dpu-merchant/amazon/redirect"
+            if env in ("uat", "preprod")
+            else f"https://dpu-gateway-{env}.dowsure.com/dpu-merchant/amazon/redirect"
+        )
+        return ApiConfig(
+            base_url=base_url,
+            create_offerid_url=f"{base_url}/dpu-merchant/mock/generate-shop-performance",
+            redirect_url=redirect_url_base,
+            register_url=f"{base_url}/dpu-user/auth/signup",
+            login_url=f"{base_url}/en/login",
+            spapi_auth_url=f"{base_url}/dpu-merchant/amz/sp/shop/auth",
+            multi_shop_sp_auth_url=f"{base_url}/dpu-auth/amazon-sp/auth",
+            link_sap_3pl_url=f"{base_url}/dpu-merchant/mock/link-sp-3pl-shops",
+            create_psp_auth_url=f"{base_url}/dpu-openapi/test/create-psp-auth-token",
+            webhook_url=f"{base_url}/dpu-openapi/webhook-notifications",
+            update_offer_url=f"{base_url}/dpu-auth/amazon-sp/updateOffer",
+            txt_path=str(SCRIPT_DIR / f"register_{env}.txt"),
+        )
+
+    @staticmethod
+    def _build_portal_base_url(env: str) -> str:
+        portal_base_url_dict = {
+            "sit": "https://expressfinance-dpu-sit.dowsure.com",
+            "dev": "https://expressfinance-dpu-dev.dowsure.com",
+            "uat": "https://expressfinance-uat.business.hsbc.com",
+            "preprod": "https://expressfinance-preprod.business.hsbc.com",
+            "reg": "https://expressfinance-dpu-reg.dowsure.com",
+            "local": "http://localhost:5173",
+        }
+        return portal_base_url_dict[env]
+
+    @staticmethod
+    def _format_http_body_for_log(text: str, max_chars: int = 4000) -> str:
+        """Pretty-print JSON response bodies and keep long payloads bounded for the UI log."""
+        if text is None:
+            return ""
+        body = str(text)
+        try:
+            body = json.dumps(json.loads(body), indent=2, ensure_ascii=False)
+        except (TypeError, json.JSONDecodeError):
+            pass
+        if len(body) > max_chars:
+            return f"{body[:max_chars]}\n...<truncated {len(body) - max_chars} chars>"
+        return body
+
+    @staticmethod
+    def _format_http_headers_for_log(headers: dict, max_chars: int = 2000) -> str:
+        header_text = json.dumps(dict(headers or {}), indent=2, ensure_ascii=False)
+        if len(header_text) > max_chars:
+            return f"{header_text[:max_chars]}\n...<truncated {len(header_text) - max_chars} chars>"
+        return header_text
+
+    @staticmethod
+    def _format_redirect_body_for_log(text: str, max_chars: int = 500) -> str:
+        """Do not flood operation results with redirected HTML pages."""
+        if text is None:
+            return ""
+        body = str(text)
+        stripped = body.lstrip().lower()
+        if stripped.startswith("<!doctype html") or stripped.startswith("<html"):
+            return f"<HTML response omitted; {len(body)} chars>"
+        if len(body) > max_chars:
+            return f"{body[:max_chars]}\n...<truncated {len(body) - max_chars} chars>"
+        return body
+
+    @staticmethod
+    def _interpret_api_success(response: http_requests.Response) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Treat business-level error payloads as failures even when HTTP status is 200."""
+        http_success = 200 <= response.status_code < 300
+        try:
+            payload = response.json()
+        except ValueError:
+            return http_success, None, None
+
+        if not isinstance(payload, dict):
+            return http_success, payload, None
+
+        # Some auth bootstrap APIs return authStatus=UNAUTHORIZED together with an authorization URL.
+        # That means the request succeeded and produced the next-step consent entrypoint.
+        if (
+            str(payload.get("code")) == "200"
+            and isinstance(payload.get("data"), dict)
+            and payload["data"].get("authorizationUrl")
+        ):
+            return http_success, payload, None
+
+        business_success = True
+        if "isSuccess" in payload:
+            business_success = bool(payload.get("isSuccess"))
+        elif "success" in payload:
+            business_success = bool(payload.get("success"))
+        elif "code" in payload:
+            business_success = str(payload.get("code")) == "200"
+
+        error_message = None
+        if not business_success:
+            error_message = str(
+                payload.get("message")
+                or payload.get("detail")
+                or payload.get("title")
+                or "Business response indicated failure"
+            )
+        return http_success and business_success, payload, error_message
+
+    @staticmethod
+    def _summarize_webhook_request(data: dict) -> str:
+        details = (data or {}).get("data", {}).get("details", {})
+        summary = {
+            "eventType": (data or {}).get("data", {}).get("eventType"),
+            "merchantId": details.get("merchantId"),
+            "status": details.get("status") or details.get("result") or details.get("drawdownStatus"),
+            "dpuLimitApplicationId": details.get("dpuLimitApplicationId"),
+            "dpuApplicationId": details.get("dpuApplicationId"),
+            "dpuMerchantAccountId": details.get("dpuMerchantAccountId"),
+            "creditLimit": details.get("credit", {}).get("creditLimit") if isinstance(details.get("credit"), dict) else None,
+        }
+        return json.dumps({k: v for k, v in summary.items() if v is not None}, indent=2, ensure_ascii=False)
+
     def _do_post_webhook(self, data: dict, label: str) -> dict:
         """统一的 webhook POST 发送 + 日志 + 结果封装"""
         log.info("=" * 60)
@@ -93,10 +506,31 @@ class WebDPUMockService(DPUMockService):
             if success:
                 log.info(f"{label}成功")
             else:
-                log.error(f"{label}失败 | 状态码={response.status_code}")
-            return {"success": success, "status_code": response.status_code, "response": response.text}
+                body_for_log = self._format_http_body_for_log(response.text)
+                headers_for_log = self._format_http_headers_for_log(response.headers)
+                request_summary = self._summarize_webhook_request(data)
+                log.error(
+                    f"{label}失败 | 状态码={response.status_code}\n"
+                    f"请求URL: {self.api_config.webhook_url}\n"
+                    f"请求摘要:\n{request_summary}\n"
+                    f"响应Headers:\n{headers_for_log}\n"
+                    f"响应Body:\n{body_for_log}"
+                )
+            return {
+                "success": success,
+                "status_code": response.status_code,
+                "response": response.text,
+                "response_body": self._format_http_body_for_log(response.text),
+            }
         except http_requests.exceptions.RequestException as e:
-            log.error(f"【{label}】请求异常: {e}")
+            detail = [f"【{label}】请求异常: {type(e).__name__}: {e}", f"请求URL: {self.api_config.webhook_url}"]
+            if getattr(e, "response", None) is not None:
+                detail.extend([
+                    f"响应状态码: {e.response.status_code}",
+                    f"响应Headers:\n{self._format_http_headers_for_log(e.response.headers)}",
+                    f"响应Body:\n{self._format_http_body_for_log(e.response.text)}",
+                ])
+            log.error("\n".join(detail))
             return {"success": False, "error": str(e)}
 
     def _do_post_custom(self, url: str, label: str, json_data: dict = None,
@@ -124,12 +558,37 @@ class WebDPUMockService(DPUMockService):
             if headers:
                 kwargs["headers"] = headers
             response = http_requests.post(url, **kwargs)
+            success, response_payload, business_error = self._interpret_api_success(response)
+            response_body = self._format_http_body_for_log(response.text)
             log.info(f"【{label}】响应状态码: {response.status_code}")
-            log.info(f"【{label}】响应Body: {response.text}")
-            success = response.status_code == 200
-            return {"success": success, "status_code": response.status_code, "response": response.text}
+            log.info(f"【{label}】响应Body: {response_body}")
+            if not success:
+                error_suffix = f"\n业务错误: {business_error}" if business_error else ""
+                log.error(
+                    f"{label}失败 | 状态码={response.status_code}\n"
+                    f"请求URL: {url}\n"
+                    f"响应Payload:\n{json.dumps(response_payload, indent=2, ensure_ascii=False) if isinstance(response_payload, dict) else response_body}\n"
+                    f"响应Headers:\n{self._format_http_headers_for_log(response.headers)}\n"
+                    f"响应Body:\n{response_body}"
+                    f"{error_suffix}"
+                )
+            return {
+                "success": success,
+                "status_code": response.status_code,
+                "response": response.text,
+                "response_body": response_body,
+                "response_json": response_payload if isinstance(response_payload, dict) else None,
+                "error_message": business_error,
+            }
         except http_requests.exceptions.RequestException as e:
-            log.error(f"【{label}】请求异常: {e}")
+            detail = [f"【{label}】请求异常: {type(e).__name__}: {e}", f"请求URL: {url}"]
+            if getattr(e, "response", None) is not None:
+                detail.extend([
+                    f"响应状态码: {e.response.status_code}",
+                    f"响应Headers:\n{self._format_http_headers_for_log(e.response.headers)}",
+                    f"响应Body:\n{self._format_http_body_for_log(e.response.text)}",
+                ])
+            log.error("\n".join(detail))
             return {"success": False, "error": str(e)}
 
     # ======================== 1. SP-3PL 关联 ========================
@@ -155,6 +614,16 @@ class WebDPUMockService(DPUMockService):
         return result
 
     # ======================== 2. 核保 ========================
+
+    def get_dowsure_merchant_accounts(self) -> dict:
+        """Return SP merchant accounts that can be used by the DOWSURE underwritten webhook."""
+        accounts = self._get_sp_merchant_accounts_for_dowsure()
+        return {
+            "success": True,
+            "merchant_id": self.merchant_id,
+            "accounts": accounts,
+            "count": len(accounts),
+        }
 
     def mock_underwritten_status(self, amount: int = None, status: str = None) -> dict:
         """模拟核保状态更新"""
@@ -190,6 +659,89 @@ class WebDPUMockService(DPUMockService):
         return result
 
     # ======================== 3. 审批 ========================
+
+    def mock_underwritten_status_dowsure(
+        self,
+        amount: int = None,
+        status: str = None,
+        merchant_accounts: Optional[list[dict]] = None,
+    ) -> dict:
+        """Send the DOWSURE underwritten webhook without interactive input."""
+        if status is None:
+            return super().mock_underwritten_status_dowsure()
+
+        if status not in {"APPROVED", "REJECTED"}:
+            return {"success": False, "error": f"Unsupported DOWSURE underwritten status: {status}"}
+
+        if not merchant_accounts:
+            merchant_accounts = [
+                {
+                    "merchantAccountId": item["merchantAccountId"],
+                    "merchantAccountLimit": item.get("merchantAccountLimit"),
+                }
+                for item in self._get_sp_merchant_accounts_for_dowsure()
+            ]
+
+        clean_accounts = []
+        for item in merchant_accounts:
+            merchant_account_id = str(item.get("merchantAccountId") or "").strip()
+            if not merchant_account_id:
+                continue
+            merchant_account_limit = item.get("merchantAccountLimit")
+            clean_accounts.append({
+                "merchantAccountId": merchant_account_id,
+                "merchantAccountLimit": None if merchant_account_limit is None else float(merchant_account_limit),
+            })
+
+        if not clean_accounts:
+            return {"success": False, "error": "No SP merchant accounts found for DOWSURE underwritten webhook"}
+
+        total_underwritten_amount = sum(
+            item["merchantAccountLimit"]
+            for item in clean_accounts
+            if item["merchantAccountLimit"] is not None
+        )
+        underwritten_amount = total_underwritten_amount if amount is None else float(amount)
+        underwritten_status = status
+        data = self._build_common_webhook_data(
+            "underwrittenLimit.completed",
+            underwritten_status,
+            {
+                "dpuMerchantAccountId": clean_accounts,
+                "dpuLimitApplicationId": self.dpu_limit_application_id,
+                "originalRequestId": "req_50111101",
+                "status": underwritten_status,
+                "failureReason": None,
+                "lenderLoanId": "lloan_6001",
+                "lenderRepaymentScheduled": "lrs_7001",
+                "lenderCreditId": "lcredit_8001",
+                "lenderRepaymentId": "lrepay_9001",
+                "credit": {
+                    "marginRate": "2.5",
+                    "baseRate": "3.5",
+                    "baseRateType": "FIXED",
+                    "eSign": "PENDING",
+                    "creditLimit": {
+                        "currency": self.preferred_currency,
+                        "underwrittenAmount": {
+                            "currency": self.preferred_currency,
+                            "amount": f"{underwritten_amount:.2f}",
+                        },
+                        "availableLimit": {"currency": self.preferred_currency, "amount": "0.00"},
+                        "signedLimit": {"currency": self.preferred_currency, "amount": "0.00"},
+                        "watermark": {"currency": self.preferred_currency, "amount": "0.00"},
+                    },
+                },
+            },
+        )
+        result = self._do_post_webhook(data, "DOWSURE核保状态")
+        result.update({
+            "amount": underwritten_amount,
+            "total_merchant_account_limit": total_underwritten_amount,
+            "status": underwritten_status,
+            "merchant_accounts": clean_accounts,
+        })
+        return result
 
     def mock_approved_offer_status(self, amount: int = None, status: str = None,
                                     failure_reason_index: int = None,
@@ -494,10 +1046,11 @@ class WebDPUMockService(DPUMockService):
         if state is None:
             return super().mock_multi_shop_binding()
 
-        self.generated_selling_partner_id = f"spshouquanfs{random.randint(10000, 99999)}"
+        generated_selling_partner_id = f"spshouquanfs{random.randint(10000, 99999)}"
+        auth_token = ""
         params = {
             "state": state,
-            "selling_partner_id": self.generated_selling_partner_id,
+            "selling_partner_id": generated_selling_partner_id,
             "mws_auth_token": "1235",
             "spapi_oauth_code": "123123"
         }
@@ -508,20 +1061,551 @@ class WebDPUMockService(DPUMockService):
         log.info("=" * 60)
 
         try:
-            http_requests.get(self.api_config.multi_shop_sp_auth_url, params=params, timeout=30)
+            response = http_requests.get(
+                self.api_config.multi_shop_sp_auth_url,
+                params=params,
+                headers={
+                    "Authorization": f"Bearer {(auth_token or '').strip()}",
+                    "content-type": "application/json",
+                    "finance-product": "LINE_OF_CREDIT",
+                    "funder-resource": "FUNDPARK",
+                    "product-currency": self.preferred_currency or "USD",
+                },
+                timeout=30,
+            )
+            response_body = self._format_redirect_body_for_log(response.text)
+            log.info(f"请求URL: {full_auth_url}")
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Body: {response_body}")
+            response.raise_for_status()
         except http_requests.exceptions.RequestException as e:
-            log.warning(f"SP绑定请求异常（非致命）: {e}")
+            self.generated_selling_partner_id = None
+            error_detail = f"SP绑定失败: {type(e).__name__}: {e}\n  - 请求URL: {full_auth_url}"
+            error_response_body = None
+            if getattr(e, "response", None) is not None:
+                error_response_body = self._format_redirect_body_for_log(e.response.text)
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                error_detail += f"\n  - 响应Body: {error_response_body}"
+            log.error(error_detail)
+            return {
+                "success": False,
+                "error": str(e),
+                "selling_partner_id": None,
+                "auth_url": full_auth_url,
+                "auth_token_source": "dpu_users.token",
+                "response_body": error_response_body,
+                "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+            }
 
+        self.generated_selling_partner_id = generated_selling_partner_id
         log.info(f"【多店铺】SP绑定成功 | SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】SP授权URL：{full_auth_url}")
 
         return {
             "success": True,
             "selling_partner_id": self.generated_selling_partner_id,
-            "auth_url": full_auth_url
+            "auth_url": full_auth_url,
+            "auth_token_source": "dpu_users.token",
+            "status_code": response.status_code,
+            "response_body": response_body,
         }
 
+
     # ======================== 11. SP 状态更新 ========================
+
+    @staticmethod
+    def register_and_run_multishop_flow_web(
+        env: str,
+        journey: str = "500K",
+        currency: str = "USD",
+        offline: bool = False,
+        funder_resource: str = "FUNDPARK",
+        sp_status: str = "SUCCESS",
+    ) -> dict:
+        """Register a new account and run the multi-shop flow via amazon-sp/auth plus DB verification."""
+        register_result = WebDPUMockService.register_new_account_web(
+            env=env,
+            journey=journey,
+            currency=currency,
+            offline=offline,
+            funder_resource=funder_resource,
+        )
+        if not register_result.get("success"):
+            return {
+                "success": False,
+                "stage": "register",
+                "error": register_result.get("error", "Register failed"),
+                "register_result": register_result,
+            }
+
+        session_ctx = None
+        steps = []
+        try:
+            try:
+                from web.services.session_manager import session_manager
+            except ModuleNotFoundError:
+                from mockapi.web.services.session_manager import session_manager
+
+            session_ctx = session_manager.create_session(env, register_result["phone_number"])
+            service = session_ctx.service
+
+            state = service.db_executor.execute_sql("SELECT UUID() AS state")
+            if not state:
+                state = str(uuid.uuid4())
+
+            auth_token = (register_result.get("token") or "").strip()
+            auth_token_source = "signup_response.token"
+            if not auth_token:
+                auth_token = WebDPUMockService._lookup_user_token(
+                    service.db_executor,
+                    register_result.get("phone_number", ""),
+                )
+                auth_token_source = "dpu_users.token"
+            if not auth_token:
+                return {
+                    "success": False,
+                    "stage": "auth_token",
+                    "error": "Signup did not return token and no token was found in dpu_users",
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": "missing",
+                    "steps": steps,
+                }
+
+            generated_selling_partner_id = f"spshouquanfs{random.randint(10000, 99999)}"
+            service.generated_selling_partner_id = generated_selling_partner_id
+
+            sp_auth_url = f"{service.api_config.base_url}/dpu-merchant/shop-authorization/v2/sp-auth-url"
+            sp_auth_payload = {
+                "state": state,
+                "sceneCode": "SHOP_BIND" if offline else "SHOP_BIND_NO_OFFER",
+                "sourceCode": funder_resource,
+                "redirectUrl": f"{WebDPUMockService._build_portal_base_url(env)}/redirect-loading?state={state}",
+            }
+            try:
+                sp_auth_response = http_requests.post(
+                    sp_auth_url,
+                    json=sp_auth_payload,
+                    headers={
+                        "Authorization": f"Bearer {auth_token}",
+                        "content-type": "application/json",
+                        "finance-product": "LINE_OF_CREDIT",
+                        "funder-resource": funder_resource,
+                        "product-currency": currency,
+                        "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
+                        "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+                    },
+                    timeout=30,
+                )
+                sp_auth_response_body = service._format_redirect_body_for_log(sp_auth_response.text)
+                sp_auth_success, sp_auth_payload_result, sp_auth_error = service._interpret_api_success(sp_auth_response)
+                sp_auth_response.raise_for_status()
+                if not sp_auth_success:
+                    raise RuntimeError(sp_auth_error or "sp-auth-url business failed")
+            except http_requests.exceptions.RequestException as exc:
+                return {
+                    "success": False,
+                    "stage": "sp_auth_url",
+                    "error": str(exc),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps + [{
+                        "step": "SP auth-url",
+                        "endpoint": sp_auth_url,
+                        "payload": sp_auth_payload,
+                        "result": {
+                            "success": False,
+                            "status_code": exc.response.status_code if getattr(exc, "response", None) is not None else None,
+                            "response_body": None if getattr(exc, "response", None) is None else service._format_redirect_body_for_log(exc.response.text),
+                            "auth_token_source": auth_token_source,
+                        },
+                    }],
+                }
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "stage": "sp_auth_url",
+                    "error": str(exc),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps + [{
+                        "step": "SP auth-url",
+                        "endpoint": sp_auth_url,
+                        "payload": sp_auth_payload,
+                        "result": {
+                            "success": False,
+                            "status_code": sp_auth_response.status_code,
+                            "response_body": sp_auth_response_body,
+                            "response_json": sp_auth_payload_result if isinstance(sp_auth_payload_result, dict) else None,
+                            "auth_token_source": auth_token_source,
+                        },
+                    }],
+                }
+
+            steps.append({
+                "step": "SP auth-url",
+                "endpoint": sp_auth_url,
+                "payload": sp_auth_payload,
+                "result": {
+                    "success": True,
+                    "status_code": sp_auth_response.status_code,
+                    "response_body": sp_auth_response_body,
+                    "response_json": sp_auth_payload_result if isinstance(sp_auth_payload_result, dict) else None,
+                    "selling_partner_id": generated_selling_partner_id,
+                    "auth_token_source": auth_token_source,
+                },
+            })
+
+            sp_auth_result_url = f"{service.api_config.base_url}/dpu-merchant/shop-authorization/v2/sp-shop-auth-result?state={state}"
+            try:
+                sp_auth_result_response = http_requests.get(
+                    sp_auth_result_url,
+                    headers={
+                        "Authorization": f"Bearer {auth_token}",
+                        "finance-product": "LINE_OF_CREDIT",
+                        "product-currency": currency,
+                        "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
+                        "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+                    },
+                    timeout=30,
+                )
+                sp_auth_result_body = service._format_redirect_body_for_log(sp_auth_result_response.text)
+                sp_auth_result_success, sp_auth_result_payload, sp_auth_result_error = service._interpret_api_success(sp_auth_result_response)
+                sp_auth_result_response.raise_for_status()
+                if not sp_auth_result_success:
+                    raise RuntimeError(sp_auth_result_error or "sp-shop-auth-result business failed")
+            except http_requests.exceptions.RequestException as exc:
+                return {
+                    "success": False,
+                    "stage": "sp_shop_auth_result",
+                    "error": str(exc),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps + [{
+                        "step": "SP auth-result",
+                        "endpoint": sp_auth_result_url,
+                        "payload": {"state": state},
+                        "result": {
+                            "success": False,
+                            "status_code": exc.response.status_code if getattr(exc, "response", None) is not None else None,
+                            "response_body": None if getattr(exc, "response", None) is None else service._format_redirect_body_for_log(exc.response.text),
+                            "auth_token_source": auth_token_source,
+                        },
+                    }],
+                }
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "stage": "sp_shop_auth_result",
+                    "error": str(exc),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps + [{
+                        "step": "SP auth-result",
+                        "endpoint": sp_auth_result_url,
+                        "payload": {"state": state},
+                        "result": {
+                            "success": False,
+                            "status_code": sp_auth_result_response.status_code,
+                            "response_body": sp_auth_result_body,
+                            "response_json": sp_auth_result_payload if isinstance(sp_auth_result_payload, dict) else None,
+                            "auth_token_source": auth_token_source,
+                        },
+                    }],
+                }
+
+            steps.append({
+                "step": "SP auth-result",
+                "endpoint": sp_auth_result_url,
+                "payload": {"state": state},
+                "result": {
+                    "success": True,
+                    "status_code": sp_auth_result_response.status_code,
+                    "response_body": sp_auth_result_body,
+                    "response_json": sp_auth_result_payload if isinstance(sp_auth_result_payload, dict) else None,
+                    "auth_token_source": auth_token_source,
+                },
+            })
+
+            db_state_sql = (
+                "SELECT state FROM dpu_auth_token "
+                f"WHERE merchant_id = '{session_ctx.merchant_id}' "
+                "AND authorization_party = 'SP' "
+                f"AND state = '{state}' "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            db_state = None
+            for _ in range(15):
+                db_state = service.db_executor.execute_sql(db_state_sql)
+                if db_state:
+                    break
+                time.sleep(1)
+            if not db_state:
+                return {
+                    "success": False,
+                    "stage": "wait_sp_state",
+                    "error": "Timeout waiting dpu_auth_token.state after sp-auth-url",
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps,
+                }
+
+            auth_params = {
+                "mws_auth_token": "1235",
+                "selling_partner_id": generated_selling_partner_id,
+                "spapi_oauth_code": "123123",
+                "state": db_state,
+            }
+            auth_get_url = f"{service.api_config.multi_shop_sp_auth_url}?{urlencode(auth_params)}"
+            try:
+                auth_get_response = http_requests.get(
+                    service.api_config.multi_shop_sp_auth_url,
+                    params=auth_params,
+                    headers={
+                        "Authorization": f"Bearer {auth_token}",
+                        "content-type": "application/json",
+                        "finance-product": "LINE_OF_CREDIT",
+                        "funder-resource": funder_resource,
+                        "product-currency": currency,
+                    },
+                    timeout=30,
+                )
+                auth_get_body = service._format_redirect_body_for_log(auth_get_response.text)
+                auth_get_response.raise_for_status()
+            except http_requests.exceptions.RequestException as exc:
+                return {
+                    "success": False,
+                    "stage": "amazon_sp_auth",
+                    "error": str(exc),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": db_state,
+                    "steps": steps + [{
+                        "step": "SP auth",
+                        "endpoint": service.api_config.multi_shop_sp_auth_url,
+                        "payload": auth_params,
+                        "result": {
+                            "success": False,
+                            "status_code": exc.response.status_code if getattr(exc, "response", None) is not None else None,
+                            "response_body": None if getattr(exc, "response", None) is None else service._format_redirect_body_for_log(exc.response.text),
+                            "auth_url": auth_get_url,
+                            "auth_token_source": auth_token_source,
+                        },
+                    }],
+                }
+
+            steps.append({
+                "step": "SP auth",
+                "endpoint": service.api_config.multi_shop_sp_auth_url,
+                "payload": auth_params,
+                "result": {
+                    "success": True,
+                    "status_code": auth_get_response.status_code,
+                    "response_body": auth_get_body,
+                    "selling_partner_id": generated_selling_partner_id,
+                    "auth_url": auth_get_url,
+                    "auth_token_source": auth_token_source,
+                },
+            })
+
+            if not offline:
+                return {
+                    "success": True,
+                    "stage": "completed",
+                    "summary": "Registered, created session, generated state, and completed Amazon SP auth callback. Online registration already carries 3P, so the flow stops here.",
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps,
+                }
+
+            manual_offer_row = service._wait_for_manual_offer(
+                selling_partner_id=generated_selling_partner_id,
+                merchant_id=session_ctx.merchant_id,
+                timeout_seconds=120 if offline else 30,
+            )
+            if not manual_offer_row and not offline:
+                link_result = service._do_post_custom(
+                    service.api_config.link_sap_3pl_url,
+                    "SP-3PL关联补偿",
+                    params={"phone": session_ctx.phone_number},
+                )
+                steps.append({
+                    "step": "SP-3PL fallback link",
+                    "endpoint": service.api_config.link_sap_3pl_url,
+                    "payload": {"phone": session_ctx.phone_number},
+                    "result": link_result,
+                })
+                manual_offer_row = service._wait_for_manual_offer(
+                    selling_partner_id=generated_selling_partner_id,
+                    merchant_id=session_ctx.merchant_id,
+                    timeout_seconds=20,
+                )
+            if not manual_offer_row:
+                manual_offer_debug_rows = service._get_manual_offer_debug_rows(
+                    selling_partner_id=generated_selling_partner_id,
+                    merchant_id=session_ctx.merchant_id,
+                )
+                return {
+                    "success": False,
+                    "stage": "wait_manual_offer",
+                    "error": (
+                        "Timeout waiting ready dpu_manual_offer after amazon-sp/auth. "
+                        "Expected the backend to auto-generate platform_offer_id."
+                    ),
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": db_state,
+                    "manual_offer_debug_rows": manual_offer_debug_rows,
+                    "steps": steps,
+                }
+
+            ready_selling_partner_id = manual_offer_row.get("platform_seller_id") or generated_selling_partner_id
+            service.generated_selling_partner_id = ready_selling_partner_id
+            steps.append({
+                "step": "manual offer ready",
+                "endpoint": "dpu_manual_offer",
+                "payload": {
+                    "selling_partner_id": generated_selling_partner_id,
+                    "merchant_id": session_ctx.merchant_id,
+                },
+                "result": {
+                    "success": True,
+                    "requested_selling_partner_id": generated_selling_partner_id,
+                    "selling_partner_id": ready_selling_partner_id,
+                    "merchant_id": manual_offer_row.get("merchant_id"),
+                    "platform_offer_id": manual_offer_row.get("platform_offer_id"),
+                    "idempotency_key": manual_offer_row.get("idempotency_key"),
+                    "auth_token_source": auth_token_source,
+                },
+            })
+
+            sp_update_result = service.mock_sp_status_update(
+                platform_seller_id=ready_selling_partner_id,
+                status=sp_status,
+            )
+            steps.append({
+                "step": "SP status update",
+                "endpoint": "/api/mock/sp-status-update",
+                "payload": {
+                    "session_id": session_ctx.session_id,
+                    "platform_seller_id": ready_selling_partner_id,
+                    "status": sp_status,
+                },
+                "result": sp_update_result,
+            })
+            if not sp_update_result.get("success"):
+                return {
+                    "success": False,
+                    "stage": "sp_status_update",
+                    "register_result": register_result,
+                    "session": {
+                        "session_id": session_ctx.session_id,
+                        "env": session_ctx.env,
+                        "phone_number": session_ctx.phone_number,
+                        "merchant_id": session_ctx.merchant_id,
+                    },
+                    "auth_token_source": auth_token_source,
+                    "state": state,
+                    "steps": steps,
+                }
+
+            redirect_result = service.mock_multi_shop_3pl_redirect()
+            steps.append({
+                "step": "3PL redirect",
+                "endpoint": "/api/mock/multi-shop-3pl-redirect",
+                "payload": {"session_id": session_ctx.session_id},
+                "result": redirect_result,
+            })
+
+            return {
+                "success": redirect_result.get("success", False),
+                "stage": "completed" if redirect_result.get("success") else "multi_shop_3pl_redirect",
+                "summary": "Registered, created session, generated state, ran SP auth, verified manual offer, updated SP status, and called 3PL redirect.",
+                "register_result": register_result,
+                "session": {
+                    "session_id": session_ctx.session_id,
+                    "env": session_ctx.env,
+                    "phone_number": session_ctx.phone_number,
+                    "merchant_id": session_ctx.merchant_id,
+                },
+                "auth_token_source": auth_token_source,
+                "state": state,
+                "steps": steps,
+            }
+        except Exception as exc:
+            return {
+                "success": False,
+                "stage": "unexpected_exception",
+                "error": str(exc),
+                "register_result": register_result,
+                "session": None if session_ctx is None else {
+                    "session_id": session_ctx.session_id,
+                    "env": session_ctx.env,
+                    "phone_number": session_ctx.phone_number,
+                    "merchant_id": session_ctx.merchant_id,
+                },
+                "auth_token_source": None if session_ctx is None else "signup_response.token",
+                "steps": steps,
+            }
 
     def mock_sp_status_update(self, platform_seller_id: str = None, status: str = None,
                                failure_reason_index: int = None) -> dict:
@@ -559,9 +1643,10 @@ class WebDPUMockService(DPUMockService):
         failure_reason = ""
         if send_status == "FAIL" and failure_reason_index is not None:
             reason_map = {
-                1: "Lender and seller country not align(User do have US shop）",
+                1: "the seller location does not match the lender location",
                 2: "Active credit approval exists",
-                3: "An offer already exists for the seller for the same partner product combination"
+                3: "offer already exists",
+                4: "others"
             }
             failure_reason = reason_map.get(failure_reason_index, "")
 
@@ -582,6 +1667,8 @@ class WebDPUMockService(DPUMockService):
             json_data=payload, headers={"Content-Type": "application/json"}
         )
         result.update({"status": send_status, "platform_seller_id": seller_id})
+        if result.get("success") and send_status == "SUCCESS":
+            result["sp_auth_fallback"] = self._ensure_sp_auth_active_from_manual_offer(seller_id)
         return result
 
     # ======================== 12. 3PL 重定向 ========================
@@ -605,19 +1692,94 @@ class WebDPUMockService(DPUMockService):
         log.info("=" * 60)
 
         try:
-            http_requests.get(self.api_config.redirect_url, params={"offerId": platform_offer_id}, timeout=30)
+            response = http_requests.get(self.api_config.redirect_url, params={"offerId": platform_offer_id}, timeout=30)
+            response_body = self._format_redirect_body_for_log(response.text)
+            log.info(f"请求URL: {full_redirect_url}")
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Body: {response_body}")
+            response.raise_for_status()
         except http_requests.exceptions.RequestException as e:
-            log.warning(f"3PL重定向请求异常（非致命）: {e}")
+            error_detail = f"3PL重定向失败: {type(e).__name__}: {e}\n  - 请求URL: {full_redirect_url}"
+            error_response_body = None
+            if getattr(e, "response", None) is not None:
+                error_response_body = self._format_redirect_body_for_log(e.response.text)
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                error_detail += f"\n  - 响应Body: {error_response_body}"
+            log.error(error_detail)
+            return {
+                "success": False,
+                "error": str(e),
+                "selling_partner_id": seller_id,
+                "platform_offer_id": platform_offer_id,
+                "redirect_url": full_redirect_url,
+                "response_body": error_response_body,
+                "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+            }
 
         log.info(f"【多店铺】SP绑定ID：{seller_id}")
         log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
         log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
 
+        post_payload = {
+            "authToken": "mock",
+            "expireOn": "null",
+            "keyId": "null",
+            "offerId": platform_offer_id,
+            "relayPage": 1,
+            "returnUrl": "null",
+            "signature": "null",
+        }
+        try:
+            post_response = http_requests.post(
+                self.api_config.redirect_url,
+                json=post_payload,
+                headers={"Content-Type": "application/json"},
+                timeout=60,
+            )
+            post_response_body = self._format_redirect_body_for_log(post_response.text)
+            log.info(f"3PL POST URL: {self.api_config.redirect_url}")
+            log.info(f"3PL POST Body: {json.dumps(post_payload, ensure_ascii=False)}")
+            log.info(f"3PL POST status: {post_response.status_code}")
+            log.info(f"3PL POST response: {post_response_body}")
+            post_response.raise_for_status()
+        except http_requests.exceptions.RequestException as e:
+            error_response_body = None
+            if getattr(e, "response", None) is not None:
+                error_response_body = self._format_redirect_body_for_log(e.response.text)
+            log.error(f"3PL POST failed: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "selling_partner_id": seller_id,
+                "platform_offer_id": platform_offer_id,
+                "redirect_url": full_redirect_url,
+                "redirect_get": {
+                    "status_code": response.status_code,
+                    "response_body": response_body,
+                },
+                "redirect_post": {
+                    "payload": post_payload,
+                    "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+                    "response_body": error_response_body,
+                },
+            }
+
         return {
             "success": True,
             "selling_partner_id": seller_id,
             "platform_offer_id": platform_offer_id,
-            "redirect_url": full_redirect_url
+            "redirect_url": full_redirect_url,
+            "status_code": response.status_code,
+            "response_body": response_body,
+            "redirect_get": {
+                "status_code": response.status_code,
+                "response_body": response_body,
+            },
+            "redirect_post": {
+                "payload": post_payload,
+                "status_code": post_response.status_code,
+                "response_body": post_response_body,
+            },
         }
 
     # ======================== 13. 系统事件通知 ========================
@@ -828,7 +1990,8 @@ class WebDPUMockService(DPUMockService):
 
     @staticmethod
     def register_new_account_web(env: str, journey: str = "500K",
-                                  currency: str = "USD", offline: bool = False) -> dict:
+                                  currency: str = "USD", offline: bool = False,
+                                  funder_resource: str = "FUNDPARK") -> dict:
         """注册新账号（Web 版，接受参数而非 input）"""
         if offline:
             journey = "500K"
@@ -887,7 +2050,7 @@ class WebDPUMockService(DPUMockService):
             "content-type": "application/json",
             "product-currency": currency,
             "finance-product": "LINE_OF_CREDIT",
-            "funder-resource": "FUNDPARK",
+            "funder-resource": funder_resource,
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36",
         }
 
@@ -976,6 +2139,8 @@ class WebDPUMockService(DPUMockService):
                 "email": email,
                 "journey": journey,
                 "currency": currency,
+                "funder_resource": funder_resource,
+                "token": token,
                 "verification_code": verification_code,
                 "offer_id": offer_id,
                 "redirect_url": redirect_url if not offline else None,

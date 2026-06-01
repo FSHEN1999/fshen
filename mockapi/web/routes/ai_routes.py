@@ -22,7 +22,6 @@ async def chat_with_ai(req: AiChatRequest):
             history=[item.model_dump() for item in req.history],
             context=context,
         )
-        return ApiResponse(success=result.get("success", False), message="ok", data=result)
+        return ApiResponse(success=True, message=result.get("reply") or "ok", data=result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-

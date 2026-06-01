@@ -27,8 +27,10 @@ async def lifespan(app: FastAPI):
     mock_logger = logging.getLogger("mock_sit")
 
     # 添加 WebSocket 日志处理器（全局广播）
-    root_logger.addHandler(ws_log_handler)
-    mock_logger.addHandler(ws_log_handler)
+    if ws_log_handler not in root_logger.handlers:
+        root_logger.addHandler(ws_log_handler)
+    if ws_log_handler in mock_logger.handlers:
+        mock_logger.removeHandler(ws_log_handler)
 
     logging.getLogger(__name__).info("DPU Mock Web 应用已启动")
     yield
@@ -45,6 +47,22 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def add_utf8_charset(request, call_next):
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    text_types = (
+        "text/html",
+        "text/css",
+        "application/javascript",
+        "text/javascript",
+        "application/json",
+    )
+    if content_type and "charset=" not in content_type.lower() and content_type.startswith(text_types):
+        response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    return response
 
 # CORS 配置（开发期间允许 Vite dev server 跨域）
 app.add_middleware(

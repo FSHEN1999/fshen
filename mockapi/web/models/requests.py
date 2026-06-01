@@ -18,6 +18,11 @@ class RegisterRequest(BaseModel):
     journey: Literal["200K", "500K", "2000K"] = "500K"
     currency: Literal["CNY", "USD"] = "USD"
     offline: bool = False
+    funder_resource: Literal["FUNDPARK", "HSBC", "DOWSURE"] = "FUNDPARK"
+
+
+class RegisterAndRunMultiShopRequest(RegisterRequest):
+    sp_status: Literal["SUCCESS", "FAIL"] = "SUCCESS"
 
 
 class MockBaseRequest(BaseModel):
@@ -31,6 +36,17 @@ class LinkSp3plRequest(MockBaseRequest):
 class UnderwrittenRequest(MockBaseRequest):
     amount: int = Field(..., gt=0)
     status: Literal["APPROVED", "REJECTED"]
+
+
+class DowsureMerchantAccountLimit(BaseModel):
+    merchantAccountId: str = Field(..., min_length=1)
+    merchantAccountLimit: Optional[float] = Field(None, ge=0)
+
+
+class UnderwrittenDowsureRequest(MockBaseRequest):
+    amount: Optional[float] = Field(None, ge=0)
+    status: Literal["APPROVED", "REJECTED"]
+    merchant_accounts: list[DowsureMerchantAccountLimit] = Field(default_factory=list)
 
 
 class ApprovedOfferRequest(MockBaseRequest):
@@ -78,7 +94,7 @@ class MultiShopBindingRequest(MockBaseRequest):
 class SpStatusUpdateRequest(MockBaseRequest):
     platform_seller_id: Optional[str] = None
     status: Literal["SUCCESS", "FAIL"]
-    failure_reason_index: Optional[int] = Field(None, ge=1, le=3)
+    failure_reason_index: Optional[int] = Field(None, ge=1, le=4)
 
 
 class MultiShop3plRedirectRequest(MockBaseRequest):

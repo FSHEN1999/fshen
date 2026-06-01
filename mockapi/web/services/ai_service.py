@@ -114,6 +114,11 @@ def _is_write_sql(sql: str) -> bool:
     return not prefix.startswith(("select", "show", "describe", "desc", "explain", "with"))
 
 
+def _is_direct_sql(message: str) -> bool:
+    statement = _safe_sql(message)
+    return bool(re.match(r"^\s*(select|show|describe|desc|explain|with|update|insert|delete)\b", statement, flags=re.I))
+
+
 def _extract_phone_number(message: str) -> Optional[str]:
     match = re.search(r"\b(\d{8}|\d{11})\b", message)
     return match.group(1) if match else None
@@ -476,6 +481,20 @@ class DPUAIService:
         history = history or []
         context = context or {}
 
+        if _is_direct_sql(message):
+            tool_args = {"sql": message, "env": context.get("selected_env") or context.get("session", {}).get("env")}
+            tool_result = ToolExecutor(context).execute("execute_sql", tool_args)
+            reply = self._format_sql_result(tool_result)
+            return {
+                "success": True,
+                "mode": "tool",
+                "reply": reply,
+                "tool_name": "execute_sql",
+                "tool_args": tool_args,
+                "tool_result": tool_result,
+                "decision": {"mode": "tool", "tool": {"name": "execute_sql", "args": tool_args}},
+            }
+
         if _is_greeting_request(message):
             return {
                 "success": True,
@@ -590,6 +609,25 @@ class DPUAIService:
             f"- **会话ID**：{session.get('session_id')}\n\n"
             "账号已准备就绪，可继续后续业务操作。"
         )
+
+    def _format_sql_result(self, tool_result: dict[str, Any]) -> str:
+        env = tool_result.get("env") or "-"
+        if not tool_result.get("success"):
+            return f"SQL 执行失败（环境：{env}）：{tool_result.get('error') or '未知错误'}"
+
+        if tool_result.get("statement_type") == "write":
+            return (
+                f"SQL 已执行完成（环境：{env}）。\n"
+                f"- 影响行数：{tool_result.get('affected_rows')}\n"
+                f"- lastrowid：{tool_result.get('lastrowid')}"
+            )
+
+        rows = tool_result.get("rows") or []
+        row_count = tool_result.get("row_count", 0)
+        if not rows:
+            return f"SQL 查询完成（环境：{env}），共 0 行。"
+        truncated = "结果已截断。" if tool_result.get("truncated") else ""
+        return f"SQL 查询完成（环境：{env}），共 {row_count} 行，下面显示前 {len(rows)} 行。{truncated}"
 
     def _build_decision_messages(self, message: str, history: list[dict[str, Any]], context: dict[str, Any]) -> list[dict[str, str]]:
         context_summary = {

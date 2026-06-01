@@ -7,6 +7,11 @@ import logging
 from typing import Dict, Optional
 from dataclasses import dataclass, field
 
+try:
+    from web.services.log_capture import format_log_time
+except ModuleNotFoundError:
+    from mockapi.web.services.log_capture import format_log_time
+
 log = logging.getLogger(__name__)
 
 # 会话超时时间（秒），30 分钟无活动自动清理
@@ -52,7 +57,10 @@ class SessionManager:
             sys.path.insert(0, project_root)
 
         from mock_sit import DatabaseExecutor
-        from web.services.mock_adapter import WebDPUMockService
+        try:
+            from web.services.mock_adapter import WebDPUMockService
+        except ModuleNotFoundError:
+            from mockapi.web.services.mock_adapter import WebDPUMockService
 
         session_id = str(uuid.uuid4())
 
@@ -125,8 +133,8 @@ class SessionManager:
                     "env": ctx.env,
                     "phone_number": ctx.phone_number,
                     "merchant_id": ctx.merchant_id,
-                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ctx.created_at)),
-                    "last_active": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ctx.last_active)),
+                    "created_at": format_log_time(ctx.created_at),
+                    "last_active": format_log_time(ctx.last_active),
                 }
                 for ctx in self._sessions.values()
             ]

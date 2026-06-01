@@ -62,6 +62,20 @@ export async function registerAccount(payload) {
   return unwrap(response)
 }
 
+export async function registerAndRunMultiShop(payload) {
+  const response = await client.post('/api/register-and-run-multishop', payload, {
+    timeout: 180000,
+  })
+  return unwrap(response)
+}
+
+export async function fetchDowsureMerchantAccounts(sessionId) {
+  const response = await client.get('/api/mock/dowsure-merchant-accounts', {
+    params: { session_id: sessionId },
+  })
+  return unwrap(response)
+}
+
 export async function runMockOperation(endpoint, payload) {
   const response = await client.post(endpoint, payload)
   return unwrap(response)

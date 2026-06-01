@@ -36,6 +36,7 @@ class EnumsResponse(BaseModel):
     environments: list[str]
     journeys: list[str]
     currencies: list[str]
+    funder_resources: list[str]
     underwritten_statuses: list[str]
     approved_offer_statuses: list[str]
     esign_statuses: list[str]
