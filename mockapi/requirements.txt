@@ -6,3 +6,4 @@ Faker
 python-dotenv
 pydantic
 websockets
+psycopg[binary]

@@ -28,7 +28,7 @@ from pymysql.err import OperationalError
 
 # ============================ 基础配置（集中管理，便于维护）============================
 # 环境配置（支持：sit/local/dev/uat/preprod/reg）
-ENV = "reg"
+ENV = "uat"
 
 # 脚本所在目录（用于统一文件路径，确保从任何目录执行都能找到文件）
 SCRIPT_DIR = Path(__file__).parent.absolute()
@@ -471,6 +471,10 @@ class DPUMockService:
         self.merchant_id = self.get_merchant_id()
         self.preferred_currency = self.get_preferred_currency()
         self.seller_id: Optional[str] = None
+        self.dowsure_application_code: Optional[str] = None
+        self.dowsure_credit_contract_no: Optional[str] = None
+        self.dowsure_loan_code: Optional[str] = None
+        self.dowsure_loan_contract_no: Optional[str] = None
         self.api_config = self._init_api_config()  # 初始化API配置
 
     def _init_api_config(self) -> ApiConfig:
@@ -517,7 +521,18 @@ class DPUMockService:
             WHERE phone_number = '{self.phone_number}' 
             ORDER BY created_at DESC LIMIT 1
         """
-        return self.db_executor.execute_sql(sql)
+        limit_application_unique_id = self.db_executor.execute_sql(sql)
+        if limit_application_unique_id:
+            return limit_application_unique_id
+
+        fallback_sql = f"""
+            SELECT limit_application_unique_id FROM dpu_limit_application_account
+            WHERE merchant_id = '{self.merchant_id}'
+            AND limit_application_unique_id IS NOT NULL
+            AND limit_application_unique_id != ''
+            ORDER BY created_at DESC LIMIT 1
+        """
+        return self.db_executor.execute_sql(fallback_sql)
 
     def get_preferred_currency(self) -> str:
         """根据merchant_id查询用户偏好货币"""
@@ -779,6 +794,13 @@ class DPUMockService:
         return currency_map[input_with_validation(prompt, lambda x: x in currency_map)]
 
     @classmethod
+    def get_funder_resource_by_input(cls) -> str:
+        """获取用户选择的资方"""
+        funder_map = {"1": "FUNDPARK", "2": "HSBC", "3": "DOWSURE"}
+        prompt = "请选择资方：1-FUNDPARK 2-HSBC 3-DOWSURE \n"
+        return funder_map[input_with_validation(prompt, lambda x: x in funder_map)]
+
+    @classmethod
     def _create_offer_id(cls, journey: str, currency: str, api_config: ApiConfig) -> Optional[str]:
         """创建offer_id（按流程生成对应额度，创建后自动访问redirect_url使offer_id生效）"""
         journey_amount = {"200K": 15000, "500K": 1666666, "2000K": 16666667}
@@ -824,7 +846,7 @@ class DPUMockService:
         return offer_id
 
     @classmethod
-    def register_new_account(cls, offline: bool = False) -> str:
+    def register_new_account(cls, offline: bool = False, funder_resource: str = "FUNDPARK") -> str:
         """注册新账号（自动生成手机号、邮箱，返回注册成功的手机号）
 
         offline=True 时，
@@ -836,6 +858,7 @@ class DPUMockService:
         # 获取用户选择的货币
         currency = cls.get_currency_by_input()
         log.info(f"融资产品货币: {currency}")
+        log.info(f"资方: {funder_resource}")
 
         if offline:
             journey = "500K"  # 线下模式默认500K流程
@@ -886,7 +909,7 @@ class DPUMockService:
             offer_id = cls._create_offer_id(journey, currency, api_config)
             if not offer_id:
                 log.error("创建offer_id失败，重新注册...")
-                return cls.register_new_account(offline=False)
+                return cls.register_new_account(offline=False, funder_resource=funder_resource)
 
         # 先触发短信验证码落库，再从dpu_sms_record读取
         verification_url = f"{base_url}/dpu-user/auth/verification-codes"
@@ -895,7 +918,7 @@ class DPUMockService:
             "content-type": "application/json",
             "product-currency": currency,
             "finance-product": "LINE_OF_CREDIT",
-            "funder-resource": "FUNDPARK",
+            "funder-resource": funder_resource,
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36"
         }
         verification_payload = {"areaCode": "+86", "code": "SIGNUP_VERIFICATION", "phone": phone_number}
@@ -984,7 +1007,7 @@ class DPUMockService:
                     "content-type": "application/json",
                     "product-currency": currency,
                     "finance-product": "LINE_OF_CREDIT",
-                    "funder-resource": "FUNDPARK",
+                    "funder-resource": funder_resource,
                     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0 Safari/537.36"
                 },
                 timeout=30
@@ -1012,7 +1035,7 @@ class DPUMockService:
                 except:
                     error_detail += f"\n  - 响应内容: {e.response.text[:500]}"
             log.error(error_detail)
-            return cls.register_new_account(offline=offline)
+            return cls.register_new_account(offline=offline, funder_resource=funder_resource)
 
     # 功能1已注释：模拟SPAPI授权回调
     # def mock_spapi_auth(self) -> None:
@@ -1211,6 +1234,168 @@ class DPUMockService:
                 for key, value in e.response.headers.items():
                     log.error(f"  {key}: {value}")
                 log.error(f"响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def _get_sp_merchant_accounts_for_dowsure(self) -> list:
+        """查询DOWSURE核保可用的SP店铺授权记录"""
+        sql = f"""
+            SELECT authorization_id, created_at
+            FROM dpu_auth_token
+            WHERE merchant_id = '{self.merchant_id}'
+            AND authorization_party = 'SP'
+            AND authorization_id IS NOT NULL
+            ORDER BY created_at DESC
+        """
+        rows = self.db_executor.execute_query_all(sql)
+        accounts = []
+        for row in rows:
+            authorization_id = row.get("authorization_id")
+            if authorization_id:
+                accounts.append({
+                    "merchantAccountId": authorization_id,
+                    "created_at": row.get("created_at")
+                })
+        return accounts
+
+    def _input_dowsure_merchant_account_limits(self) -> tuple[list, float]:
+        """列出SP店铺并让用户逐个输入DOWSURE核保额度，返回店铺额度和总额度"""
+        accounts = self._get_sp_merchant_accounts_for_dowsure()
+        if not accounts:
+            log.error(f"未查询到SP授权店铺，merchant_id: {self.merchant_id}")
+            return [], 0.0
+
+        log.info("=" * 60)
+        log.info("【DOWSURE核保】SP店铺列表（按created_at倒序）")
+        log.info("=" * 60)
+        for index, account in enumerate(accounts, 1):
+            log.info(
+                f"{index}. merchantAccountId={account['merchantAccountId']} | created_at={account.get('created_at')}"
+            )
+        log.info("=" * 60)
+
+        merchant_accounts = []
+        total_underwritten_amount = 0.0
+        for index, account in enumerate(accounts, 1):
+            limit_input = input_with_validation(
+                prompt=(
+                    f"请为第{index}个店铺设置merchantAccountLimit "
+                    f"({account['merchantAccountId']}，输入空/null表示null且不计入总额度)：\n"
+                ),
+                validator=lambda x: x == "" or x.lower() == "null" or validate_numeric_input(x),
+                error_msg="请输入数字，或输入空/null表示null！"
+            )
+            merchant_account_limit = None if limit_input == "" or limit_input.lower() == "null" else float(limit_input)
+            if merchant_account_limit is not None:
+                total_underwritten_amount += merchant_account_limit
+            merchant_accounts.append({
+                "merchantAccountId": account["merchantAccountId"],
+                "merchantAccountLimit": merchant_account_limit
+            })
+        log.info(f"DOWSURE核保总评估额度（所有店铺merchantAccountLimit汇总）: {total_underwritten_amount:.2f}")
+        return merchant_accounts, total_underwritten_amount
+
+    def mock_underwritten_status_dowsure(self) -> None:
+        """模拟DOWSURE核保状态更新"""
+        merchant_accounts, underwritten_amount = self._input_dowsure_merchant_account_limits()
+        if not merchant_accounts:
+            return
+
+        status_input = input_with_validation(
+            prompt="请输入核保状态：1-APPROVED 2-REJECTED\n",
+            validator=lambda x: x in ("1", "2"),
+            error_msg="请输入1或2！"
+        )
+        underwritten_status = DPUStatus.APPROVED.value if status_input == "1" else DPUStatus.REJECTED.value
+
+        data = self._build_common_webhook_data(
+            "underwrittenLimit.completed",
+            underwritten_status,
+            {
+                "dpuMerchantAccountId": merchant_accounts,
+                "dpuLimitApplicationId": self.dpu_limit_application_id,
+                "originalRequestId": "req_50111101",
+                "status": underwritten_status,
+                "failureReason": None,
+                "lenderLoanId": "lloan_6001",
+                "lenderRepaymentScheduled": "lrs_7001",
+                "lenderCreditId": "lcredit_8001",
+                "lenderRepaymentId": "lrepay_9001",
+                "credit": {
+                    "marginRate": "2.5",
+                    "baseRate": "3.5",
+                    "baseRateType": "FIXED",
+                    "eSign": "PENDING",
+                    "creditLimit": {
+                        "currency": self.preferred_currency,
+                        "underwrittenAmount": {
+                            "currency": self.preferred_currency,
+                            "amount": f"{float(underwritten_amount):.2f}"
+                        },
+                        "availableLimit": {"currency": self.preferred_currency, "amount": "0.00"},
+                        "signedLimit": {"currency": self.preferred_currency, "amount": "0.00"},
+                        "watermark": {"currency": self.preferred_currency, "amount": "0.00"}
+                    }
+                }
+            }
+        )
+
+        log.info("=" * 60)
+        log.info("【DOWSURE核保状态】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        log.info("  Authorization: ")
+        log.info("  Content-Type: application/json")
+        log.info("  Cookie: Cookie_1=value")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(data, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(
+                self.api_config.webhook_url,
+                json=data,
+                headers={
+                    "Authorization": "",
+                    "Content-Type": "application/json",
+                    "Cookie": "Cookie_1=value"
+                },
+                timeout=30
+            )
+
+            log.info("\n【DOWSURE核保状态】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"DOWSURE核保状态更新成功 | 状态={underwritten_status} | 额度={underwritten_amount}")
+            else:
+                log.error(f"DOWSURE核保状态更新失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE核保状态】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
                 try:
                     resp_json = e.response.json()
                     log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
@@ -1973,13 +2158,27 @@ class DPUMockService:
         log.info("=" * 60)
         log.info("【多店铺-SP绑定】")
         log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.multi_shop_sp_auth_url}")
+        log.info(f"请求Params: {params}")
 
-        # 发送请求（静默执行）
-        requests.get(
-            self.api_config.multi_shop_sp_auth_url,
-            params=params,
-            timeout=30
-        )
+        try:
+            response = requests.get(
+                self.api_config.multi_shop_sp_auth_url,
+                params=params,
+                timeout=30
+            )
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Body: {response.text}")
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            error_detail = f"【多店铺-SP绑定】请求失败: {type(e).__name__}: {e}"
+            error_detail += f"\n  - 请求URL: {full_auth_url}"
+            if getattr(e, "response", None) is not None:
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                error_detail += f"\n  - 响应Body: {e.response.text[:500]}"
+            log.error(error_detail)
+            self.generated_selling_partner_id = None
+            return
 
         log.info(f"【多店铺】SP绑定成功 | SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】SP授权URL：{full_auth_url}")
@@ -2000,13 +2199,26 @@ class DPUMockService:
         log.info("=" * 60)
         log.info("【多店铺-3PL重定向】")
         log.info("=" * 60)
+        log.info(f"请求URL: {self.api_config.redirect_url}")
+        log.info(f"请求Params: offerId={platform_offer_id}")
 
-        # 发送请求（静默执行）
-        requests.get(
-            self.api_config.redirect_url,
-            params={"offerId": platform_offer_id},
-            timeout=30
-        )
+        try:
+            response = requests.get(
+                self.api_config.redirect_url,
+                params={"offerId": platform_offer_id},
+                timeout=30
+            )
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Body: {response.text[:500]}")
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            error_detail = f"【多店铺-3PL重定向】请求失败: {type(e).__name__}: {e}"
+            error_detail += f"\n  - 请求URL: {full_redirect_url}"
+            if getattr(e, "response", None) is not None:
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                error_detail += f"\n  - 响应Body: {e.response.text[:500]}"
+            log.error(error_detail)
+            return
 
         log.info(f"【多店铺】SP绑定ID：{self.generated_selling_partner_id}")
         log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
@@ -2063,9 +2275,10 @@ class DPUMockService:
         failure_reason = ""
         if send_status == "FAIL":
             reason_map = {
-                "1": "Lender and seller country not align(User do have US shop）",
+                "1": "The lender country doesn't match with the Seller reporting country",
                 "2": "Active credit approval exists",
-                "3": "An offer already exists for the seller for the same partner product combination"
+                "3": "An offer already exists for the seller for the same partner product combination",
+                "4": "others"
             }
             prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
             failure_reason = reason_map[input_with_validation(prompt, lambda x: x in reason_map)]
@@ -2386,6 +2599,347 @@ class DPUMockService:
                     log.error(e.response.text)
             log.info("=" * 60)
 
+    def send_dowsure_credit_result(self) -> None:
+        """发送DOWSURE授信结果"""
+        application_code = input_with_validation(
+            prompt="请输入applicationCode：\n",
+            validator=lambda x: bool(x.strip()),
+            error_msg="applicationCode不能为空！"
+        )
+        amount = float(input_with_validation(
+            prompt="请输入amount：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+
+        url = "https://sandbox-api.dowsure.com/saasapi/v1/test/credit-result"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "applicationCode": application_code,
+            "creditStatus": "APPROVE",
+            "startTime": "2026-05-26 00:00:00",
+            "endTime": "2027-05-26 00:00:00",
+            "term": 12,
+            "termUnit": "MONTH",
+            "apr": 5.4,
+            "creditCode": f"CREDIT_HSEF_TEST_{application_code}",
+            "creditContractNo": "",
+            "amount": amount,
+            "currency": "CNY",
+            "processingFee": 0.00,
+            "reason": "",
+            "isLock": "NO",
+            "creditResultList": []
+        }
+        self.dowsure_application_code = application_code
+        self.dowsure_credit_contract_no = ""
+
+        log.info("=" * 60)
+        log.info("【DOWSURE授信结果】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            log.info("\n【DOWSURE授信结果】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(f"DOWSURE授信结果发送成功 | applicationCode={application_code} | amount={amount:.2f}")
+            else:
+                log.error(f"DOWSURE授信结果发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE授信结果】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def send_dowsure_esign_drawdown_result(self) -> None:
+        """发送DOWSURE eSign和drawdown结果"""
+        if not self.dowsure_application_code:
+            log.error("未找到18-发送授信结果dowsure的applicationCode，请先执行18")
+            return
+
+        amount = float(input_with_validation(
+            prompt="请输入amount：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+        processing_fee = float(input_with_validation(
+            prompt="请输入processingFee：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+
+        url = "https://sandbox-api.dowsure.com/saasapi/v1/test/loan"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176",
+            "Content-Type": "application/json"
+        }
+        loan_code = f"LOAN_{random.randint(10000, 99999)}"
+        payload = {
+            "applicationCode": self.dowsure_application_code,
+            "creditContractNo": self.dowsure_credit_contract_no,
+            "loanCode": loan_code,
+            "loanContractNo": "",
+            "amount": amount,
+            "startTime": "2026-05-27 12:00:00",
+            "endTime": "2027-05-27 12:00:00",
+            "term": 12,
+            "termUnit": "MONTH",
+            "apr": 5.4,
+            "currency": "CNY",
+            "processingFee": processing_fee,
+            "loanStatus": "REPAYMENT"
+        }
+        self.dowsure_loan_code = loan_code
+        self.dowsure_loan_contract_no = ""
+
+        log.info("=" * 60)
+        log.info("【DOWSURE eSign&drawdown结果】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            log.info("\n【DOWSURE eSign&drawdown结果】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(
+                    f"DOWSURE eSign&drawdown结果发送成功 | applicationCode={self.dowsure_application_code} "
+                    f"| amount={amount:.2f} | processingFee={processing_fee:.2f}"
+                )
+            else:
+                log.error(f"DOWSURE eSign&drawdown结果发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE eSign&drawdown结果】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def send_dowsure_repayment_result(self) -> None:
+        """发送DOWSURE还款结果"""
+        if not self.dowsure_application_code or not self.dowsure_loan_code:
+            log.error("未找到19-发送esign&drawdown结果的applicationCode/loanCode，请先执行19")
+            return
+
+        payment_principal = float(input_with_validation(
+            prompt="请输入paymentPrincipal：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+        payment_interest = float(input_with_validation(
+            prompt="请输入paymentInterest：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+        payment_overdue_interest = float(input_with_validation(
+            prompt="请输入paymentOverdueInterest：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+        deal_amount = float(input_with_validation(
+            prompt="请输入dealAmount：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+        surplus_principal = float(input_with_validation(
+            prompt="请输入surplusPrincipal：\n",
+            validator=validate_numeric_input,
+            error_msg="请输入有效数字！"
+        ))
+
+        url = "https://sandbox-api.dowsure.com/saasapi/v1/test/repayment"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "applicationCode": self.dowsure_application_code,
+            "currentTerm": 1,
+            "loanCode": self.dowsure_loan_code,
+            "loanContractNo": "",
+            "serialNo": f"RPM_{random.randint(10000, 99999)}",
+            "paymentPrincipal": payment_principal,
+            "realPaymentPrincipal": payment_principal,
+            "paymentInterest": payment_interest,
+            "realPaymentInterest": payment_interest,
+            "paymentOverdueInterest": payment_overdue_interest,
+            "realPaymentOverdueInterest": payment_overdue_interest,
+            "dealAmount": deal_amount,
+            "surplusPrincipal": surplus_principal,
+            "dealDate": "2026-05-27 00:00:00",
+            "realDate": "2026-05-27 00:00:00"
+        }
+
+        log.info("=" * 60)
+        log.info("【DOWSURE还款结果】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("请求Body（JSON）:")
+        log.info(f"{json.dumps(payload, indent=2, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            log.info("\n【DOWSURE还款结果】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info(
+                    f"DOWSURE还款结果发送成功 | applicationCode={self.dowsure_application_code} "
+                    f"| loanCode={self.dowsure_loan_code} | dealAmount={deal_amount:.2f}"
+                )
+            else:
+                log.error(f"DOWSURE还款结果发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE还款结果】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
+    def retry_dowsure_callback(self) -> None:
+        """重试DOWSURE回调请求"""
+        url = "https://sandbox-api.dowsure.com/saasapi/partner/hsef/internal/result/callback/retry?limit=100"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176"
+        }
+
+        log.info("=" * 60)
+        log.info("【DOWSURE重试请求】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, headers=headers, timeout=30)
+
+            log.info("\n【DOWSURE重试请求】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info("DOWSURE重试请求发送成功")
+            else:
+                log.error(f"DOWSURE重试请求发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE重试请求】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
     def mock_system_event_notification(self):
         """发送系统事件通知（调用HSBC API）"""
         log.info("开始发送系统事件通知")
@@ -2578,9 +3132,13 @@ def main():
 
         # 处理注册/登录
         if register_choice == "1":
-            phone_number = DPUMockService.register_new_account(offline=False)
+            funder_resource = DPUMockService.get_funder_resource_by_input()
+            log.info(f"资方: {funder_resource}")
+            phone_number = DPUMockService.register_new_account(offline=False, funder_resource=funder_resource)
         elif register_choice == "0":
-            phone_number = DPUMockService.register_new_account(offline=True)
+            funder_resource = DPUMockService.get_funder_resource_by_input()
+            log.info(f"资方: {funder_resource}")
+            phone_number = DPUMockService.register_new_account(offline=True, funder_resource=funder_resource)
         else:
             phone_number = input_with_validation(
                 prompt="请输入手机号：\n",
@@ -2596,6 +3154,12 @@ def main():
             log.info(f"手机号: {phone_number}")
             log.info(f"Merchant ID: {user_info['merchant_id']}")
             log.info(f"偏好融资产品货币: {user_info['prefer_finance_product_currency']}")
+            lender_code = db_executor.execute_sql(f"""
+                SELECT lender_code FROM dpu_application
+                WHERE merchant_id = '{user_info['merchant_id']}'
+                ORDER BY created_at DESC LIMIT 1
+            """)
+            log.info(f"资方: {lender_code or '未查询到'}")
         else:
             log.warning(f"⚠️ 未找到手机号 {phone_number} 的用户信息")
 
@@ -2610,7 +3174,8 @@ def main():
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
 10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
 13 - 系统事件通知       14 - psp开始（hsbc）      15 - psp完成（hsbc）
-16 - abandon(application.status)
+16 - abandon(application.status)  17 - 核保(underwritten DOWSURE)  18 - 发送授信结果dowsure
+19 - 发送esign&drawdown结果  20 - 发送还款结果  21 - 重试请求dowsure
 q - 退出
 """
         operation_map = {
@@ -2629,7 +3194,12 @@ q - 退出
             "13": mock_service.mock_system_event_notification,
             "14": mock_service.mock_psp_start_status_hsbc,
             "15": mock_service.mock_psp_completed_status_hsbc,
-            "16": mock_service.mock_application_abandon_status
+            "16": mock_service.mock_application_abandon_status,
+            "17": mock_service.mock_underwritten_status_dowsure,
+            "18": mock_service.send_dowsure_credit_result,
+            "19": mock_service.send_dowsure_esign_drawdown_result,
+            "20": mock_service.send_dowsure_repayment_result,
+            "21": mock_service.retry_dowsure_callback
         }
 
         # 菜单循环

@@ -36,7 +36,19 @@ COMPACT_MESSAGE_PREFIXES = (
 LOW_VALUE_MESSAGES = (
     "数据库连接成功",
     "创建会话:",
+    "数据库连接失效",
 )
+SNAPSHOT_NOISE_MARKERS = (
+    "FROM dpu_application",
+    "Query application list failed",
+    "Refresh session snapshot failed",
+    "Application snapshot refresh paused",
+)
+SNAPSHOT_NOISE_FUNCTIONS = {
+    "_execute_with_retry",
+    "_get_application_rows",
+    "_refresh_application_snapshot",
+}
 
 
 def format_log_time(timestamp: float) -> str:
@@ -370,10 +382,22 @@ class WebSocketLogHandler(logging.Handler):
     @staticmethod
     def _is_low_value_entry(entry: dict) -> bool:
         level = str(entry.get("level", "")).upper()
+        if WebSocketLogHandler._is_snapshot_noise_entry(entry):
+            return True
+        message = str(entry.get("message") or entry.get("formatted") or "").strip()
+        if any(pattern in message for pattern in LOW_VALUE_MESSAGES):
+            return True
         if level in {"ERROR", "CRITICAL", "WARNING"}:
             return False
-        message = str(entry.get("message") or entry.get("formatted") or "").strip()
-        return any(pattern in message for pattern in LOW_VALUE_MESSAGES)
+        return False
+
+    @staticmethod
+    def _is_snapshot_noise_entry(entry: dict) -> bool:
+        func_name = str(entry.get("funcName") or "")
+        if func_name not in SNAPSHOT_NOISE_FUNCTIONS:
+            return False
+        message = str(entry.get("message") or entry.get("formatted") or "")
+        return any(marker in message for marker in SNAPSHOT_NOISE_MARKERS)
 
     @staticmethod
     def _is_compactable_entry(entry: dict) -> bool:

@@ -33,13 +33,42 @@ class WebDPUMockService(DPUMockService):
 
     def __init__(self, phone_number: str, db_executor: DatabaseExecutor):
         # 将类变量覆盖为实例变量，避免多会话并发串扰
+        self.selected_application_unique_id: Optional[str] = None
         self.generated_selling_partner_id: Optional[str] = None
+        self.session_user_token: str = ""
         self.cached_lender_repayment_id: Optional[str] = None
+        self.dowsure_application_code: Optional[str] = None
+        self.dowsure_credit_contract_no: Optional[str] = None
+        self.dowsure_loan_code: Optional[str] = None
+        self.dowsure_loan_contract_no: Optional[str] = None
         self.hsbc_psp_pending_account_id_by_merchant: Dict[str, str] = {}
         self.hsbc_psp_completed_account_ids_in_session: set = set()
         super().__init__(phone_number, db_executor)
 
     # ======================== 辅助方法 ========================
+
+    def select_application(self, application_unique_id: Optional[str]) -> None:
+        """Bind subsequent webhook payloads to the chosen dpu_application."""
+        self.selected_application_unique_id = str(application_unique_id or "").strip() or None
+
+    @property
+    def application_unique_id(self) -> Optional[str]:
+        if self.selected_application_unique_id:
+            return self.selected_application_unique_id
+        return super().application_unique_id
+
+    @property
+    def credit_offer_application_unique_id(self) -> Optional[str]:
+        if not self.selected_application_unique_id:
+            return super().credit_offer_application_unique_id
+
+        sql = (
+            "SELECT application_unique_id FROM dpu_credit_offer "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            f"AND application_unique_id = {self._sql_literal(self.selected_application_unique_id)} "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        return self.db_executor.execute_sql(sql) or self.selected_application_unique_id
 
     def _resolve_platform_seller_id(self, platform_seller_id: Optional[str] = None) -> Optional[str]:
         """解析 SP 状态更新所需 seller_id。
@@ -84,6 +113,14 @@ class WebDPUMockService(DPUMockService):
         """Fetch the latest user token when signup does not return one."""
         if not phone_number:
             return ""
+        try:
+            columns = db_executor.execute_query_all("SHOW COLUMNS FROM dpu_users LIKE 'token'")
+        except Exception as exc:
+            log.warning(f"Lookup user token schema check skipped: {exc}")
+            return ""
+        if not columns:
+            log.warning("Lookup user token skipped: dpu_users.token column is not available in this environment")
+            return ""
         phone_literal = WebDPUMockService._sql_literal(phone_number)
         sql = (
             "SELECT token FROM dpu_users "
@@ -91,7 +128,11 @@ class WebDPUMockService(DPUMockService):
             "AND token IS NOT NULL AND token != '' "
             "ORDER BY created_at DESC LIMIT 1"
         )
-        token = db_executor.execute_sql(sql)
+        try:
+            token = db_executor.execute_sql(sql)
+        except Exception as exc:
+            log.warning(f"Lookup user token skipped: {exc}")
+            return ""
         return str(token or "").strip()
 
     def _build_manual_offer_lookup_sql(
@@ -180,6 +221,1038 @@ class WebDPUMockService(DPUMockService):
                 return row
             time.sleep(interval_seconds)
         return None
+
+    def _resolve_latest_platform_offer_id(self, offer_id: Optional[str] = None) -> Optional[str]:
+        cleaned_offer_id = str(offer_id or "").strip()
+        if cleaned_offer_id and not (cleaned_offer_id.startswith("${") and cleaned_offer_id.endswith("}")):
+            return cleaned_offer_id
+        manual_offer_row = self._wait_for_manual_offer(
+            selling_partner_id=self.generated_selling_partner_id,
+            merchant_id=self.merchant_id,
+            timeout_seconds=5,
+            interval_seconds=1,
+        )
+        if manual_offer_row and manual_offer_row.get("platform_offer_id"):
+            return manual_offer_row.get("platform_offer_id")
+        return None
+
+    def update_shop_performance_cny_boost_web(self, offer_id: Optional[str] = None) -> dict:
+        resolved_offer_id = self._resolve_latest_platform_offer_id(offer_id)
+        if not resolved_offer_id:
+            return {
+                "success": False,
+                "error": "未查询到前置步骤生成的 platform_offer_id，无法更新 dpu_3pl_shop_performance",
+                "offer_id": offer_id,
+            }
+
+        sql = f"""
+UPDATE dpu_3pl_shop_performance
+SET
+    amazon_tenure = 1825,
+    marketplace_country = 'US',
+    primary_product_category = 'Electronics',
+    seller_status = 'NORMAL',
+    report_card_data_date = '2026-05-18 00:00:00',
+    year1_sales_value = 4000000.00,
+    year2_sales_value = 3500000.00,
+    year1_disbursements_value = 3800000.00,
+    year2_disbursements_value = 3200000.00,
+    quarter1_sales_value = 1210000.00,
+    quarter2_sales_value = 1020000.00,
+    quarter3_sales_value = 930000.00,
+    quarter4_sales_value = 870000.00,
+    quarter5_sales_value = 810000.00,
+    quarter6_sales_value = 750000.00,
+    quarter7_sales_value = 700000.00,
+    quarter8_sales_value = 650000.00,
+    quarter1_disbursements_value = 1150000.00,
+    quarter2_disbursements_value = 960000.00,
+    quarter3_disbursements_value = 880000.00,
+    quarter4_disbursements_value = 820000.00,
+    quarter5_disbursements_value = 760000.00,
+    quarter6_disbursements_value = 700000.00,
+    quarter7_disbursements_value = 650000.00,
+    quarter8_disbursements_value = 600000.00,
+    month1_sales_value = 440000.00,
+    month2_sales_value = 400000.00,
+    month3_sales_value = 370000.00,
+    month4_sales_value = 340000.00,
+    month5_sales_value = 310000.00,
+    month6_sales_value = 290000.00,
+    month7_sales_value = 270000.00,
+    month8_sales_value = 250000.00,
+    month9_sales_value = 230000.00,
+    month10_sales_value = 215000.00,
+    month11_sales_value = 200000.00,
+    month12_sales_value = 190000.00,
+    month1_disbursements_value = 420000.00,
+    month2_disbursements_value = 380000.00,
+    month3_disbursements_value = 350000.00,
+    month4_disbursements_value = 320000.00,
+    month5_disbursements_value = 300000.00,
+    month6_disbursements_value = 280000.00,
+    month7_disbursements_value = 260000.00,
+    month8_disbursements_value = 240000.00,
+    month9_disbursements_value = 220000.00,
+    month10_disbursements_value = 200000.00,
+    month11_disbursements_value = 190000.00,
+    month12_disbursements_value = 180000.00,
+    week1_sales_value = 125000.75,
+    week2_sales_value = 118000.00,
+    week3_sales_value = 110000.00,
+    week4_sales_value = 105000.00,
+    week5_sales_value = 98000.00,
+    week6_sales_value = 92000.00,
+    week1_disbursements_value = 118500.20,
+    week2_disbursements_value = 105000.00,
+    week3_disbursements_value = 98000.00,
+    week4_disbursements_value = 112000.00,
+    week5_disbursements_value = 95000.00,
+    week6_disbursements_value = 88000.00,
+    last13week_fba_rate = 85.5,
+    last3month_fba_inventory_value = 120000.00,
+    latest_fba_inventory_value = 115000.00,
+    primary_category_last3month_sales_value = 54000.10,
+    ttm_cancellations = 12,
+    ttm_feedback = 320,
+    ttm_late_shipments = 8,
+    ttm_negative_feedback = 9,
+    ttm_order_defects = 3,
+    ttm_orders = 1520,
+    ttm_returns = 45,
+    ttm_seller_warnings = 1,
+    updated_at = NOW()
+WHERE amazon_3pl_offer_id = {self._sql_literal(resolved_offer_id)}
+"""
+        self.db_executor.execute_sql(sql)
+        return {
+            "success": True,
+            "offer_id": resolved_offer_id,
+            "updated_table": "dpu_3pl_shop_performance",
+            "where": {"amazon_3pl_offer_id": resolved_offer_id},
+            "sql": sql.strip(),
+        }
+
+    def ensure_application_context_web(
+        self,
+        journey: Optional[str] = None,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+        tier_code: Optional[int] = None,
+        offer_id: Optional[str] = None,
+    ) -> dict:
+        """Create or bind the FP application row for the scenario's application step."""
+        application_unique_id = self.application_unique_id
+        limit_application_unique_id = self.dpu_limit_application_id
+        lender_approved_offer_id = self.credit_offer_lender_approved_offer_id
+
+        bootstrap_steps = []
+        if not application_unique_id:
+            bootstrap_result = self._create_fp_application(
+                journey=journey,
+                currency=currency,
+                funder_resource=funder_resource,
+                tier_code=tier_code,
+                offer_id=offer_id,
+            )
+            bootstrap_steps = bootstrap_result.get("steps", [])
+            if not bootstrap_result.get("success"):
+                return {
+                    "success": False,
+                    "merchant_id": self.merchant_id,
+                    "application_unique_id": None,
+                    "limit_application_unique_id": None,
+                    "lender_approved_offer_id": self.lender_approved_offer_id,
+                    "journey": journey,
+                    "currency": currency or self.preferred_currency,
+                    "funder_resource": funder_resource or "FUNDPARK",
+                    "error": bootstrap_result.get("error", "创建申请单上下文失败"),
+                    "steps": bootstrap_steps,
+                }
+            application_unique_id = bootstrap_result.get("application_unique_id") or self.application_unique_id
+            limit_application_unique_id = bootstrap_result.get("limit_application_unique_id") or self.dpu_limit_application_id
+            lender_approved_offer_id = bootstrap_result.get("lender_approved_offer_id") or self.credit_offer_lender_approved_offer_id
+        elif not self.selected_application_unique_id:
+            self.select_application(application_unique_id)
+
+        return {
+            "success": bool(application_unique_id),
+            "merchant_id": self.merchant_id,
+            "application_unique_id": application_unique_id,
+            "limit_application_unique_id": limit_application_unique_id,
+            "lender_approved_offer_id": lender_approved_offer_id or self.lender_approved_offer_id,
+            "journey": journey,
+            "currency": currency or self.preferred_currency,
+            "funder_resource": funder_resource or "FUNDPARK",
+            "error": None if application_unique_id else "未查询到 dpu_application.application_unique_id",
+            "steps": bootstrap_steps,
+        }
+
+    def _run_fp_scene_sql_fallback(self, journey: Optional[str] = None) -> dict:
+        application_unique_id = self.application_unique_id
+        if not application_unique_id:
+            return {"success": False, "error": "缺少 application_unique_id，无法执行 scene SQL fallback"}
+
+        limit_amount = float(self._resolve_limit_selection_amount(journey))
+        currency = self.preferred_currency or "USD"
+        credit_offer_id = self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id or f"lender-{application_unique_id}"
+        auth_row = self.db_executor.execute_query(
+            "SELECT id, merchant_account_id, authorization_id FROM dpu_seller_center.dpu_auth_token "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND authorization_party = 'SP' "
+            "AND status = 'ACTIVE' "
+            "AND authorization_id IS NOT NULL "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        if not auth_row:
+            return {"success": False, "error": "缺少 ACTIVE SP auth token，无法执行 scene SQL fallback"}
+
+        self.db_executor.execute_sql(
+            "UPDATE dpu_seller_center.dpu_application "
+            "SET application_status='SUBMITTED', "
+            "application_submit_datetime=COALESCE(application_submit_datetime, NOW()), "
+            "updated_at=NOW() "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            f"AND application_unique_id = {self._sql_literal(application_unique_id)}"
+        )
+
+        self.db_executor.execute_sql(
+            "INSERT INTO dpu_seller_center.dpu_limit_application ("
+            "id, merchant_id, lender_code, product, limit_application_unique_id, "
+            "status, currency, underwritten_limit, created_at, updated_at, create_by, update_by"
+            ") "
+            "SELECT REPLACE(UUID(),'-',''), "
+            f"{self._sql_literal(self.merchant_id)}, "
+            "'FUNDPARK', 'LINE_OF_CREDIT', "
+            "CONCAT('EFAL', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'), UPPER(SUBSTRING(REPLACE(UUID(),'-',''), 1, 5))), "
+            f"'SUBMITTED', {self._sql_literal(currency)}, {limit_amount:.2f}, NOW(), NOW(), 'SYSTEM', 'SYSTEM' "
+            "FROM DUAL WHERE NOT EXISTS ("
+            "SELECT 1 FROM dpu_seller_center.dpu_limit_application "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)}"
+            ")"
+        )
+
+        self.db_executor.execute_sql(
+            "UPDATE dpu_seller_center.dpu_limit_application "
+            "SET status='SUBMITTED', "
+            f"currency={self._sql_literal(currency)}, "
+            f"underwritten_limit=COALESCE(underwritten_limit, {limit_amount:.2f}), "
+            "updated_at=NOW() "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)}"
+        )
+
+        limit_application_row = self.db_executor.execute_query(
+            "SELECT id, limit_application_unique_id FROM dpu_seller_center.dpu_limit_application "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        if not limit_application_row:
+            return {"success": False, "error": "scene SQL fallback 后仍未获取到 dpu_limit_application 行"}
+
+        self.db_executor.execute_sql(
+            "INSERT INTO dpu_seller_center.dpu_limit_application_account ("
+            "id, merchant_id, limit_application_unique_id, merchant_account_id, "
+            "authorization_id, currency, indicative_limit, underwritten_limit, "
+            "approved_limit, signed_limit, activated_limit, psp_status, "
+            "created_at, updated_at, create_by, update_by, limit_application_id"
+            ") "
+            "SELECT REPLACE(UUID(),'-',''), "
+            f"{self._sql_literal(self.merchant_id)}, "
+            f"{self._sql_literal(limit_application_row['limit_application_unique_id'])}, "
+            f"{self._sql_literal(auth_row['merchant_account_id'])}, "
+            f"{self._sql_literal(auth_row['authorization_id'])}, "
+            f"{self._sql_literal(currency)}, "
+            f"0.00, {limit_amount:.2f}, 0.00, 0.00, 0.00, 'INITIAL', "
+            "NOW(), NOW(), 'SYSTEM', 'SYSTEM', "
+            f"{self._sql_literal(auth_row['id'] if False else limit_application_row['id'])} "
+            "FROM DUAL WHERE NOT EXISTS ("
+            "SELECT 1 FROM dpu_seller_center.dpu_limit_application_account "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)}"
+            ")"
+        )
+
+        self.db_executor.execute_sql(
+            "INSERT INTO dpu_seller_center.dpu_credit_offer ("
+            "id, lender_approved_offer_id, application_id, application_unique_id, "
+            "limit_application_id, finance_product, lender_code, merchant_id, "
+            "status, e_sign_status, approved_limit_currency, approved_limit_amount, "
+            "signed_limit_currency, signed_limit_amount, created_at, updated_at, created_by, updated_by"
+            ") "
+            "SELECT REPLACE(UUID(),'-',''), "
+            f"{self._sql_literal(credit_offer_id)}, "
+            "(SELECT id FROM dpu_seller_center.dpu_application "
+            f" WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            f" AND application_unique_id = {self._sql_literal(application_unique_id)} "
+            " ORDER BY created_at DESC LIMIT 1), "
+            f"{self._sql_literal(application_unique_id)}, "
+            f"{self._sql_literal(limit_application_row['id'])}, "
+            "'LINE_OF_CREDIT', 'FUNDPARK', "
+            f"{self._sql_literal(self.merchant_id)}, "
+            "'SUBMITTED', 'INITIAL', "
+            f"{self._sql_literal(currency)}, {limit_amount:.2f}, "
+            f"{self._sql_literal(currency)}, 0.00, NOW(), NOW(), 'SYSTEM', 'SYSTEM' "
+            "FROM DUAL WHERE NOT EXISTS ("
+            "SELECT 1 FROM dpu_seller_center.dpu_credit_offer "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)}"
+            ")"
+        )
+
+        self.db_executor.execute_sql(
+            "UPDATE dpu_seller_center.dpu_credit_offer "
+            "SET status='SUBMITTED', "
+            f"lender_approved_offer_id=COALESCE(lender_approved_offer_id, {self._sql_literal(credit_offer_id)}), "
+            f"approved_limit_currency={self._sql_literal(currency)}, "
+            f"approved_limit_amount={limit_amount:.2f}, "
+            "updated_at=NOW() "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)}"
+        )
+
+        return {
+            "success": True,
+            "application_unique_id": application_unique_id,
+            "limit_application_unique_id": limit_application_row["limit_application_unique_id"],
+            "lender_approved_offer_id": credit_offer_id,
+            "merchant_account_id": auth_row["merchant_account_id"],
+            "authorization_id": auth_row["authorization_id"],
+            "currency": currency,
+            "limit_amount": limit_amount,
+        }
+
+    def _create_fp_application(
+        self,
+        journey: Optional[str] = None,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+        tier_code: Optional[int] = None,
+        offer_id: Optional[str] = None,
+    ) -> dict:
+        """Create only the application row owned by the UI's create-application step."""
+        if not self.merchant_id:
+            return {"success": False, "error": "未获取到 merchant_id，无法创建申请单上下文", "steps": []}
+
+        steps = []
+        auth_token = str(self.session_user_token or "").strip()
+        if not auth_token:
+            auth_token = self._lookup_user_token(self.db_executor, self.phone_number)
+        if not auth_token:
+            return {"success": False, "error": "未查询到用户 token，无法创建申请单上下文", "steps": steps}
+
+        product_currency = currency or self.preferred_currency or "USD"
+        resource = funder_resource or "FUNDPARK"
+        resolved_tier_code = tier_code if tier_code is not None else ("1" if journey == "200K" else "2")
+        common_headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "content-type": "application/json",
+            "finance-product": "LINE_OF_CREDIT",
+            "funder-resource": resource,
+            "product-currency": product_currency,
+            "referer": f"{self._build_portal_base_url(self.db_executor.env)}/",
+            "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+        }
+
+        create_payload = {"tierCode": resolved_tier_code, "tierSnapshotValue": 0}
+        if offer_id is not None:
+            create_payload["offerId"] = offer_id
+        create_url = f"{self.api_config.base_url}/dpu-merchant/fundpark-application/create"
+        create_result = self._do_post_custom_with_retry(
+            create_url,
+            "创建申请单",
+            json_data=create_payload,
+            headers=common_headers,
+            attempts=3,
+            require_json_data=True,
+        )
+        created_application_unique_id = None
+        if create_result.get("success"):
+            create_payload_result = create_result.get("response_json") or {}
+            if isinstance(create_payload_result, dict):
+                created_application_unique_id = create_payload_result.get("data")
+        steps.append({
+            "step": "fundpark-application.create",
+            "endpoint": create_url,
+            "payload": create_payload,
+            "result": create_result,
+        })
+        if not create_result.get("success"):
+            return {"success": False, "error": "fundpark-application/create 失败", "steps": steps}
+
+        application_unique_id = self._wait_for_application_unique_id(timeout_seconds=120) or created_application_unique_id
+        if not application_unique_id:
+            return {"success": False, "error": "等待 dpu_application.application_unique_id 超时", "steps": steps}
+
+        self.select_application(application_unique_id)
+        return {
+            "success": True,
+            "application_unique_id": application_unique_id,
+            "limit_application_unique_id": self.dpu_limit_application_id,
+            "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+            "currency": product_currency,
+            "funder_resource": resource,
+            "tier_code": resolved_tier_code,
+            "steps": steps,
+        }
+
+    def _bootstrap_fp_application_context(self, journey: Optional[str] = None) -> dict:
+        """Run the remaining FP application preparation needed before tail webhooks."""
+        steps = []
+        for runner in (
+            self.submit_fp_business_profile_web,
+            self.submit_fp_director_info_web,
+            self.select_fp_offer_limit_web,
+            self.activate_fp_offer_quote_web,
+            self.link_fp_sp_3pl_shops_web,
+            self.run_fp_scheduled_tasks_and_poll_submitted_web,
+        ):
+            result = runner(journey)
+            steps.extend(result.get("steps", []))
+            if not result.get("success"):
+                result["steps"] = steps
+                return result
+        return {
+            "success": True,
+            "application_unique_id": self.application_unique_id,
+            "limit_application_unique_id": self.dpu_limit_application_id,
+            "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+            "steps": steps,
+        }
+
+    def _application_headers_or_error(
+        self,
+        steps: list,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+    ) -> tuple[Optional[dict], Optional[dict]]:
+        application_unique_id = self.application_unique_id
+        if not application_unique_id:
+            create_result = self._create_fp_application(journey=None)
+            steps.extend(create_result.get("steps", []))
+            if not create_result.get("success"):
+                return None, create_result
+            application_unique_id = create_result.get("application_unique_id") or self.application_unique_id
+        self.select_application(application_unique_id)
+
+        auth_token = str(self.session_user_token or "").strip()
+        if not auth_token:
+            auth_token = self._lookup_user_token(self.db_executor, self.phone_number)
+        if not auth_token:
+            return None, {"success": False, "error": "未查询到用户 token，无法准备申请单上下文", "steps": steps}
+
+        return {
+            "Authorization": f"Bearer {auth_token}",
+            "content-type": "application/json",
+            "finance-product": "LINE_OF_CREDIT",
+            "funder-resource": funder_resource or "FUNDPARK",
+            "product-currency": currency or self.preferred_currency or "USD",
+            "referer": f"{self._build_portal_base_url(self.db_executor.env)}/",
+            "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+        }, None
+
+    def _build_business_info_payload(
+        self,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+    ) -> dict:
+        if (currency or self.preferred_currency or "").upper() == "CNY" and (funder_resource or "").upper() == "DOWSURE":
+            return {
+                "step": "2",
+                "isDraft": False,
+                "data": {
+                    "bizDetail": {
+                        "enName": "",
+                        "cnName": "广州测试科技有限公司",
+                        "regNo": "91440101MA5D3DC9XJ",
+                        "contactNumber": {
+                            "countryCode": "+86",
+                            "number": self.phone_number,
+                        },
+                        "address": "广州市天河区测试路1号",
+                        "operationAddressFlag": True,
+                        "operationAddress": "",
+                        "id": "bac1c4e04d86407c8927b1fe9e072859",
+                    },
+                },
+                "clear": False,
+            }
+
+        return {
+            "step": "2",
+            "isDraft": False,
+            "data": {
+                "bizDetail": {
+                    "id": None,
+                    "applicationId": None,
+                    "enName": "Testing Co., Ltd.",
+                    "cnName": "",
+                    "regNo": "00000001",
+                    "companyDate": None,
+                    "country": None,
+                    "countryCode": None,
+                    "area": None,
+                    "areaCode": None,
+                    "address": None,
+                    "mailAddressFlag": None,
+                    "mailArea": None,
+                    "mailAreaCode": None,
+                    "mailCountry": None,
+                    "mailCountryCode": None,
+                    "mailOfficeAddress1": None,
+                    "relationshipHsbcGroupFlag": None,
+                    "relationshipHsbcGroupCountry": None,
+                    "relationshipHsbcGroupCountryCode": None,
+                    "companyType": None,
+                    "registeredCountryCode": None,
+                    "contactNumber": None,
+                    "operationAddressFlag": None,
+                    "operationAddress": None,
+                },
+                "bizInfo": {
+                    "topBuyers": ["China", "Hong Kong", "Macao"],
+                    "topSuppliers": ["China"],
+                    "fundingCountry": "Hong Kong",
+                    "industry": "Furniture",
+                    "mainProducts": "Home Improvement",
+                    "initWealth": ["savings"],
+                    "fundSources": ["bizOperations"],
+                    "ongoingWealth": ["operationProfit"],
+                },
+            },
+            "clear": True,
+        }
+
+    def submit_fp_business_profile_web(
+        self,
+        journey: Optional[str] = None,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+    ) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps, currency, funder_resource)
+        if error:
+            return error
+        business_info_url = f"{self.api_config.base_url}/dpu-merchant/fundpark-application/business-info"
+        business_info_payload = self._build_business_info_payload(currency, funder_resource)
+        business_info_result = self._do_post_custom(
+            business_info_url,
+            "提交 business-info",
+            json_data=business_info_payload,
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "fundpark-application.business-info",
+            "endpoint": business_info_url,
+            "payload": business_info_payload,
+            "result": business_info_result,
+        })
+        if not business_info_result.get("success"):
+            return {"success": False, "error": "business-info 失败", "steps": steps}
+        return {"success": True, "application_unique_id": self.application_unique_id, "steps": steps}
+
+    def submit_fp_director_info_web(
+        self,
+        journey: Optional[str] = None,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+        name_cn: Optional[str] = None,
+        address_detail: Optional[str] = None,
+    ) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps, currency, funder_resource)
+        if error:
+            return error
+        director_info_url = f"{self.api_config.base_url}/dpu-merchant/fundpark-application/director-info"
+        director_info_payload = self._build_director_info_payload(currency, funder_resource, name_cn, address_detail)
+        director_info_result = self._do_post_custom(
+            director_info_url,
+            "提交 director-info",
+            json_data=director_info_payload,
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "fundpark-application.director-info",
+            "endpoint": director_info_url,
+            "payload": director_info_payload,
+            "result": director_info_result,
+        })
+        if not director_info_result.get("success"):
+            return {"success": False, "error": "director-info 失败", "steps": steps}
+        return {"success": True, "application_unique_id": self.application_unique_id, "steps": steps}
+
+    def start_reassessment_web(
+        self,
+        journey: Optional[str] = None,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+    ) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps, currency, funder_resource)
+        if error:
+            return error
+
+        reassessment_url = f"{self.api_config.base_url}/dpu-merchant/reassessment/start-reassessment"
+        reassessment_payload = {}
+        reassessment_result = self._do_post_custom(
+            reassessment_url,
+            "开始信用评估",
+            json_data=reassessment_payload,
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "reassessment.start-reassessment",
+            "endpoint": reassessment_url,
+            "payload": reassessment_payload,
+            "result": reassessment_result,
+        })
+        if not reassessment_result.get("success"):
+            return {"success": False, "error": "start-reassessment 失败", "steps": steps}
+        return {"success": True, "application_unique_id": self.application_unique_id, "steps": steps}
+
+    def select_fp_offer_limit_web(self, journey: Optional[str] = None) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps)
+        if error:
+            return error
+        limit_selection = self._resolve_limit_selection_amount(journey)
+        cache_limit_url = f"{self.api_config.base_url}/dpu-merchant/fundpark-application/cache-higher-limit"
+        cache_limit_payload = {"limitSelection": limit_selection}
+        cache_limit_result = self._do_post_custom(
+            cache_limit_url,
+            "缓存高额度选择",
+            json_data=cache_limit_payload,
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "fundpark-application.cache-higher-limit",
+            "endpoint": cache_limit_url,
+            "payload": cache_limit_payload,
+            "result": cache_limit_result,
+        })
+        if not cache_limit_result.get("success"):
+            return {"success": False, "error": "cache-higher-limit 失败", "steps": steps}
+
+        final_offer_select_url = f"{self.api_config.base_url}/dpu-merchant/credit-offer/final-offer-select"
+        final_offer_select_result = self._do_get_custom(
+            final_offer_select_url,
+            "确认最终 offer 选择",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "credit-offer.final-offer-select",
+            "endpoint": final_offer_select_url,
+            "payload": None,
+            "result": final_offer_select_result,
+        })
+        if not final_offer_select_result.get("success"):
+            return {"success": False, "error": "final-offer-select 失败", "steps": steps}
+
+        return {"success": True, "application_unique_id": self.application_unique_id, "limit_selection": limit_selection, "steps": steps}
+
+    def activate_fp_offer_quote_web(self, journey: Optional[str] = None) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps)
+        if error:
+            return error
+        activate_offer_url = f"{self.api_config.base_url}/dpu-merchant/credit-offer/activate-offer"
+        activate_offer_result = self._do_post_custom(
+            activate_offer_url,
+            "激活 offer",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "credit-offer.activate-offer",
+            "endpoint": activate_offer_url,
+            "payload": None,
+            "result": activate_offer_result,
+        })
+        if not activate_offer_result.get("success"):
+            return {"success": False, "error": "activate-offer 失败", "steps": steps}
+
+        credit_offer_url = f"{self.api_config.base_url}/dpu-merchant/credit-offer/create"
+        credit_offer_result = self._do_post_custom(
+            credit_offer_url,
+            "创建 credit offer",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "credit-offer.create",
+            "endpoint": credit_offer_url,
+            "payload": None,
+            "result": credit_offer_result,
+        })
+        if not credit_offer_result.get("success"):
+            return {"success": False, "error": "credit-offer/create 失败", "steps": steps}
+        return {"success": True, "application_unique_id": self.application_unique_id, "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id, "steps": steps}
+
+    def link_fp_sp_3pl_shops_web(self, journey: Optional[str] = None) -> dict:
+        steps = []
+        link_url = f"{self.api_config.base_url}/dpu-merchant/mock/link-sp-3pl-shops"
+        link_result = self._do_post_custom(
+            link_url,
+            "关联 SP/3PL 店铺",
+            params={"phone": self.phone_number},
+        )
+        steps.append({
+            "step": "link-sp-3pl-shops",
+            "endpoint": link_url,
+            "payload": {"phone": self.phone_number},
+            "result": link_result,
+        })
+        if not link_result.get("success"):
+            return {"success": False, "error": "link-sp-3pl-shops 失败", "steps": steps}
+        return {"success": True, "phone_number": self.phone_number, "steps": steps}
+
+    def run_fp_scheduled_tasks_and_poll_submitted_web(self, journey: Optional[str] = None) -> dict:
+        steps = []
+        common_headers, error = self._application_headers_or_error(steps)
+        if error:
+            return error
+        application_unique_id = self.application_unique_id
+        auth_token = str(common_headers.get("Authorization", "")).replace("Bearer ", "", 1).strip()
+        sanction_url = f"{self.api_config.base_url}/dpu-merchant/test/scheduled-tasks/hsbcSanctionTask"
+        sanction_result = self._do_post_custom(
+            sanction_url,
+            "触发 sanction 任务",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "scheduled-tasks.hsbcSanctionTask",
+            "endpoint": sanction_url,
+            "payload": None,
+            "result": sanction_result,
+        })
+        if not sanction_result.get("success"):
+            return {"success": False, "error": "hsbcSanctionTask 失败", "steps": steps}
+
+        first_credit_model_url = f"{self.api_config.base_url}/dpu-merchant/test/scheduled-tasks/first-credit-model"
+        first_credit_model_result = self._do_post_custom(
+            first_credit_model_url,
+            "触发 first-credit-model",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "scheduled-tasks.first-credit-model",
+            "endpoint": first_credit_model_url,
+            "payload": None,
+            "result": first_credit_model_result,
+        })
+        if not first_credit_model_result.get("success"):
+            return {"success": False, "error": "first-credit-model 失败", "steps": steps}
+
+        scheduled_url = f"{self.api_config.base_url}/dpu-merchant/test/scheduled-tasks/first-application-start"
+        scheduled_result = self._do_post_custom(
+            scheduled_url,
+            "触发 first-application-start",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "scheduled-tasks.first-application-start",
+            "endpoint": scheduled_url,
+            "payload": None,
+            "result": scheduled_result,
+        })
+        if not scheduled_result.get("success"):
+            return {"success": False, "error": "first-application-start 失败", "steps": steps}
+
+        application_status_url = f"{self.api_config.base_url}/dpu-merchant/hsbc/application-status"
+        application_status_result = self._do_get_custom(
+            application_status_url,
+            "查询 application-status",
+            headers=common_headers,
+        )
+        steps.append({
+            "step": "hsbc.application-status",
+            "endpoint": application_status_url,
+            "payload": None,
+            "result": application_status_result,
+        })
+
+        app_status_payload = application_status_result.get("response_json") or {}
+        app_status_data = app_status_payload.get("data") if isinstance(app_status_payload, dict) else {}
+        app_status_value = (app_status_data or {}).get("status") or ""
+        application_unique_id = (
+            (app_status_data or {}).get("applicationUniqueId")
+            or self.application_unique_id
+        )
+        app_submitted = application_status_result.get("success") and str(app_status_value).upper() == "SUBMITTED"
+
+        if app_submitted:
+            limit_application_unique_id = self._wait_for_limit_application_unique_id(timeout_seconds=600)
+            if limit_application_unique_id:
+                return {
+                    "success": True,
+                    "application_unique_id": application_unique_id,
+                    "limit_application_unique_id": limit_application_unique_id,
+                    "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+                    "application_status": app_status_value,
+                    "credit_offer_status": "SKIPPED_AFTER_APPLICATION_SUBMITTED",
+                    "steps": steps,
+                }
+
+            fallback_result = self._run_fp_scene_sql_fallback(journey)
+            steps.append({
+                "step": "scene-sql-fallback",
+                "endpoint": "dpu_seller_center SQL",
+                "payload": {
+                    "merchant_id": self.merchant_id,
+                    "application_unique_id": application_unique_id,
+                    "journey": journey,
+                },
+                "result": fallback_result,
+            })
+            if fallback_result.get("success"):
+                return {
+                    "success": True,
+                    "application_unique_id": fallback_result.get("application_unique_id") or application_unique_id,
+                    "limit_application_unique_id": fallback_result.get("limit_application_unique_id"),
+                    "lender_approved_offer_id": fallback_result.get("lender_approved_offer_id") or self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+                    "application_status": app_status_value,
+                    "credit_offer_status": "SUBMITTED_WITH_SCENE_SQL_FALLBACK",
+                    "steps": steps,
+                }
+
+            return {
+                "success": False,
+                "error": "application-status 已到 SUBMITTED，但 limit_application_unique_id 未在等待窗口内落库，且 scene SQL fallback 失败",
+                "application_unique_id": application_unique_id,
+                "limit_application_unique_id": None,
+                "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+                "application_status": app_status_value,
+                "credit_offer_status": "SUBMITTED_LIMIT_ID_MISSING",
+                "steps": steps,
+            }
+
+        # MeterSphere treats this script step as successful once the scheduled
+        # chain completes its HTTP calls, even if `credit-offer/status` is still
+        # warming up. Keep a moderate poll window here so the web endpoint stays
+        # aligned with that behavior instead of hard-failing too early.
+        submitted_status = self._wait_for_credit_offer_submitted(auth_token, timeout_seconds=75)
+        steps.append({
+            "step": "credit-offer.status",
+            "endpoint": f"{self.api_config.base_url}/dpu-merchant/credit-offer/status",
+            "payload": None,
+            "result": submitted_status,
+        })
+
+        limit_application_unique_id = self._wait_for_limit_application_unique_id(timeout_seconds=30)
+
+        if not limit_application_unique_id and not app_submitted and not submitted_status.get("success"):
+            fallback_result = self._run_fp_scene_sql_fallback(journey)
+            steps.append({
+                "step": "scene-sql-fallback",
+                "endpoint": "dpu_seller_center SQL",
+                "payload": {
+                    "merchant_id": self.merchant_id,
+                    "application_unique_id": application_unique_id,
+                    "journey": journey,
+                },
+                "result": fallback_result,
+            })
+            if fallback_result.get("success"):
+                return {
+                    "success": True,
+                    "application_unique_id": fallback_result.get("application_unique_id") or application_unique_id,
+                    "limit_application_unique_id": fallback_result.get("limit_application_unique_id"),
+                    "lender_approved_offer_id": fallback_result.get("lender_approved_offer_id") or self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+                    "application_status": app_status_value or None,
+                    "credit_offer_status": "SCENE_SQL_FALLBACK_AFTER_STATUS_NEW",
+                    "steps": steps,
+                }
+
+            return {
+                "success": False,
+                "error": "scheduled-submit 完成后，credit-offer/status 未就绪且 limit_application_unique_id 未落库",
+                "application_unique_id": application_unique_id,
+                "limit_application_unique_id": None,
+                "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+                "application_status": app_status_value or None,
+                "credit_offer_status": submitted_status.get("status"),
+                "steps": steps,
+            }
+
+        return {
+            "success": True,
+            "application_unique_id": application_unique_id,
+            "limit_application_unique_id": limit_application_unique_id,
+            "lender_approved_offer_id": self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id,
+            "application_status": app_status_value or None,
+            "credit_offer_status": submitted_status.get("status"),
+            "steps": steps,
+        }
+
+    def _wait_for_application_unique_id(self, timeout_seconds: int = 120, interval_seconds: int = 2) -> Optional[str]:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            application_unique_id = self.application_unique_id
+            if application_unique_id:
+                return application_unique_id
+            time.sleep(interval_seconds)
+        return None
+
+    def _wait_for_limit_application_unique_id(self, timeout_seconds: int = 120, interval_seconds: int = 2) -> Optional[str]:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            limit_application_unique_id = self.dpu_limit_application_id
+            if limit_application_unique_id:
+                return limit_application_unique_id
+            time.sleep(interval_seconds)
+        return None
+
+    @staticmethod
+    def _resolve_limit_selection_amount(journey: Optional[str]) -> int:
+        if journey == "200K":
+            return 2000
+        if journey == "2000K":
+            return 2000000
+        return 500000
+
+    def _wait_for_credit_offer_submitted(self, auth_token: str, timeout_seconds: int = 180, interval_seconds: int = 3) -> dict:
+        url = f"{self.api_config.base_url}/dpu-merchant/credit-offer/status"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "finance-product": "LINE_OF_CREDIT",
+            "funder-resource": "FUNDPARK",
+            "product-currency": self.preferred_currency or "USD",
+            "referer": f"{self._build_portal_base_url(self.db_executor.env)}/",
+            "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+        }
+        deadline = time.time() + timeout_seconds
+        attempt = 0
+        last_result = None
+        poll_history = []
+        while time.time() < deadline:
+            attempt += 1
+            result = self._do_get_custom(url, f"轮询 credit-offer/status 第{attempt}次", headers=headers)
+            last_result = result
+            payload = result.get("response_json") or {}
+            status = ((payload.get("data") or {}).get("status") if isinstance(payload, dict) else None) or ""
+            poll_history.append({
+                "attempt": attempt,
+                "success": bool(result.get("success")),
+                "status": status or None,
+                "status_code": result.get("status_code"),
+                "error": result.get("error") or result.get("error_message"),
+            })
+            if result.get("success") and str(status).upper() == "SUBMITTED":
+                result["status"] = status
+                result["poll_attempts"] = attempt
+                result["poll_history"] = poll_history[-10:]
+                return result
+            time.sleep(interval_seconds)
+
+        application_unique_id = self.application_unique_id
+        limit_application_unique_id = self.dpu_limit_application_id
+        lender_approved_offer_id = self.credit_offer_lender_approved_offer_id or self.lender_approved_offer_id
+        if application_unique_id and limit_application_unique_id and lender_approved_offer_id:
+            return {
+                "success": True,
+                "status": "ASSUMED_READY_AFTER_POLL_TIMEOUT",
+                "warning": "credit-offer/status did not return SUBMITTED before timeout, but DB identifiers required by webhook tail are available",
+                "application_unique_id": application_unique_id,
+                "limit_application_unique_id": limit_application_unique_id,
+                "lender_approved_offer_id": lender_approved_offer_id,
+                "last_result": last_result,
+                "poll_attempts": attempt,
+                "poll_history": poll_history[-10:],
+            }
+
+        error = "credit-offer/status 未在限定时间内到达 SUBMITTED"
+        if isinstance(last_result, dict):
+            last_result["success"] = False
+            last_result["error"] = error
+            last_result["poll_attempts"] = attempt
+            last_result["poll_history"] = poll_history[-10:]
+            return last_result
+        return {"success": False, "error": error, "poll_attempts": attempt, "poll_history": poll_history[-10:]}
+
+    @staticmethod
+    def _generate_prc_id_number() -> str:
+        weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+        check_codes = "10X98765432"
+        area_code = "440106"
+        birth_date = "19900603"
+        sequence = f"{random.randint(1, 999):03d}"
+        body = f"{area_code}{birth_date}{sequence}"
+        checksum = sum(int(value) * weight for value, weight in zip(body, weights)) % 11
+        return f"{body}{check_codes[checksum]}"
+
+    def _build_director_info_payload(
+        self,
+        currency: Optional[str] = None,
+        funder_resource: Optional[str] = None,
+        name_cn: Optional[str] = None,
+        address_detail: Optional[str] = None,
+    ) -> dict:
+        if (currency or self.preferred_currency or "").upper() == "CNY" and (funder_resource or "").upper() == "DOWSURE":
+            return {
+                "step": "2",
+                "isDraft": False,
+                "data": {
+                    "persons": [
+                        {
+                            "position": "LEGAL_REPRESENTATIVE",
+                            "nameCn": name_cn or "   ",
+                            "nameEn": "Mi",
+                            "mobileNumber": {
+                                "countryCode": "+86",
+                                "number": self.phone_number,
+                            },
+                            "dowsurePersonInfoExtend": {
+                                "idNumber": self._generate_prc_id_number(),
+                                "idCardStartDate": "02/06/2026",
+                                "idCardEndDate": "",
+                                "longTermFlag": "true",
+                                "addressDetail": address_detail or "           ",
+                            },
+                            "dateOfBirth": "03/06/2026",
+                            "id": "73f006d1f66b4a18ac0ff3789055d33e",
+                        }
+                    ],
+                    "guarantorList": [],
+                },
+            }
+
+        return {
+            "step": "2",
+            "isDraft": False,
+            "data": {
+                "persons": [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "businessKey": None,
+                        "equityRatio": 100,
+                        "position": "DIRECTOR_SHAREHOLDER_UBO",
+                        "roles": ["DIRECTOR", "SHAREHOLDER", "UBO"],
+                        "nameCn": "    ",
+                        "nameEn": "LAUTSZ LAN",
+                        "firstChiName": None,
+                        "lastChiName": None,
+                        "frontDocName": "PRC ID-Front@3x-2Sh4SffG.png",
+                        "backDocName": "PRC ID-Back@3x-DPHeKKi2.png",
+                        "idDocumentType": "PRC_RESIDENT_ID_CARD",
+                        "idDocumentFrontUrl": "uploads/default/default/default/file_20260608101214_084c1c663cdb.png",
+                        "idDocumentBackUrl": "uploads/default/default/default/file_20260608101217_b73417787427.png",
+                        "idDocumentFrontFile": None,
+                        "idDocumentBackFile": None,
+                        "dateOfBirth": "01/06/2026",
+                        "nationality": "China",
+                        "mobileNumber": {"countryCode": "+86", "number": "15533906473"},
+                        "emailAddress": "15533906473@qq.com",
+                        "countryAndRegion": "",
+                        "adressLine": "",
+                        "secAdressLine": "",
+                        "city": "",
+                        "postalCode": "",
+                        "percentageOfShares": 100,
+                        "idFrontFlag": True,
+                        "idBackFlag": True,
+                        "addStatus": "API",
+                        "hsbcPersonInfoExtend": None,
+                        "dowsurePersonInfoExtend": None,
+                        "guarantorList": None,
+                        "mobileNumber.number": "15533906473",
+                    }
+                ]
+            },
+        }
 
     def _ensure_sp_auth_active_from_manual_offer(self, seller_id: Optional[str] = None) -> dict:
         """Normalize SP auth rows so each seller ends with one canonical ACTIVE token."""
@@ -483,30 +1556,46 @@ class WebDPUMockService(DPUMockService):
         }
         return json.dumps({k: v for k, v in summary.items() if v is not None}, indent=2, ensure_ascii=False)
 
-    def _do_post_webhook(self, data: dict, label: str) -> dict:
+    def _do_post_webhook(self, data: dict, label: str, headers: Optional[dict] = None) -> dict:
         """统一的 webhook POST 发送 + 日志 + 结果封装"""
+        request_headers = headers or {"Content-Type": "application/json"}
+        request_info = {
+            "method": "POST",
+            "url": self.api_config.webhook_url,
+            "headers": request_headers,
+            "body": data,
+        }
         log.info("=" * 60)
         log.info(f"【{label}】完整请求信息")
         log.info("=" * 60)
         log.info("请求方法: POST")
         log.info(f"请求URL: {self.api_config.webhook_url}")
+        log.info("请求Headers:")
+        log.info(json.dumps(request_info["headers"], indent=2, ensure_ascii=False))
         log.info("请求Body（JSON）:")
         log.info(json.dumps(data, indent=2, ensure_ascii=False))
         log.info("=" * 60)
 
         try:
-            response = http_requests.post(self.api_config.webhook_url, json=data, timeout=30)
+            response = http_requests.post(self.api_config.webhook_url, json=data, headers=request_headers, timeout=30)
             log.info(f"\n【{label}】完整响应信息")
             log.info("=" * 60)
             log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            log.info(self._format_http_headers_for_log(response.headers))
             log.info(f"响应Body: {response.text}")
             log.info("=" * 60)
 
             success = response.status_code == 200
+            response_body = self._format_http_body_for_log(response.text)
+            response_json = None
+            try:
+                response_json = response.json()
+            except ValueError:
+                response_json = None
             if success:
                 log.info(f"{label}成功")
             else:
-                body_for_log = self._format_http_body_for_log(response.text)
                 headers_for_log = self._format_http_headers_for_log(response.headers)
                 request_summary = self._summarize_webhook_request(data)
                 log.error(
@@ -514,34 +1603,69 @@ class WebDPUMockService(DPUMockService):
                     f"请求URL: {self.api_config.webhook_url}\n"
                     f"请求摘要:\n{request_summary}\n"
                     f"响应Headers:\n{headers_for_log}\n"
-                    f"响应Body:\n{body_for_log}"
+                    f"响应Body:\n{response_body}"
                 )
             return {
                 "success": success,
                 "status_code": response.status_code,
                 "response": response.text,
-                "response_body": self._format_http_body_for_log(response.text),
+                "response_body": response_body,
+                "response_headers": dict(response.headers),
+                "response_json": response_json,
+                "request_info": request_info,
+                "response_info": {
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "body": response_body,
+                    "json": response_json,
+                },
             }
         except http_requests.exceptions.RequestException as e:
             detail = [f"【{label}】请求异常: {type(e).__name__}: {e}", f"请求URL: {self.api_config.webhook_url}"]
+            response_info = None
             if getattr(e, "response", None) is not None:
+                response_body = self._format_http_body_for_log(e.response.text)
+                response_json = None
+                try:
+                    response_json = e.response.json()
+                except ValueError:
+                    response_json = None
+                response_info = {
+                    "status_code": e.response.status_code,
+                    "headers": dict(e.response.headers),
+                    "body": response_body,
+                    "json": response_json,
+                }
                 detail.extend([
                     f"响应状态码: {e.response.status_code}",
                     f"响应Headers:\n{self._format_http_headers_for_log(e.response.headers)}",
-                    f"响应Body:\n{self._format_http_body_for_log(e.response.text)}",
+                    f"响应Body:\n{response_body}",
                 ])
             log.error("\n".join(detail))
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False,
+                "error": str(e),
+                "error_message": str(e),
+                "request_info": request_info,
+                "response_info": response_info,
+            }
 
     def _do_post_custom(self, url: str, label: str, json_data: dict = None,
                         params: dict = None, headers: dict = None) -> dict:
         """统一的自定义 URL POST 发送"""
+        request_info = {
+            "method": "POST",
+            "url": url,
+            "headers": headers or {},
+            "params": params,
+            "body": json_data,
+        }
         log.info("=" * 60)
         log.info(f"【{label}】完整请求信息")
         log.info("=" * 60)
         log.info("请求方法: POST")
         log.info(f"请求URL: {url}")
-        if json_data:
+        if json_data is not None:
             log.info(f"请求Body（JSON）: {json.dumps(json_data, indent=2, ensure_ascii=False)}")
         if params:
             log.info(f"请求Params: {params}")
@@ -551,7 +1675,7 @@ class WebDPUMockService(DPUMockService):
 
         try:
             kwargs = {"timeout": 30}
-            if json_data:
+            if json_data is not None:
                 kwargs["json"] = json_data
             if params:
                 kwargs["params"] = params
@@ -577,19 +1701,203 @@ class WebDPUMockService(DPUMockService):
                 "status_code": response.status_code,
                 "response": response.text,
                 "response_body": response_body,
+                "response_headers": dict(response.headers),
                 "response_json": response_payload if isinstance(response_payload, dict) else None,
                 "error_message": business_error,
+                "request_info": request_info,
+                "response_info": {
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "body": response_body,
+                    "json": response_payload if isinstance(response_payload, dict) else None,
+                },
             }
         except http_requests.exceptions.RequestException as e:
             detail = [f"【{label}】请求异常: {type(e).__name__}: {e}", f"请求URL: {url}"]
+            response_info = None
             if getattr(e, "response", None) is not None:
+                response_body = self._format_http_body_for_log(e.response.text)
+                response_json = None
+                try:
+                    response_json = e.response.json()
+                except ValueError:
+                    response_json = None
+                response_info = {
+                    "status_code": e.response.status_code,
+                    "headers": dict(e.response.headers),
+                    "body": response_body,
+                    "json": response_json,
+                }
                 detail.extend([
                     f"响应状态码: {e.response.status_code}",
                     f"响应Headers:\n{self._format_http_headers_for_log(e.response.headers)}",
-                    f"响应Body:\n{self._format_http_body_for_log(e.response.text)}",
+                    f"响应Body:\n{response_body}",
                 ])
             log.error("\n".join(detail))
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False,
+                "error": str(e),
+                "error_message": str(e),
+                "request_info": request_info,
+                "response_info": response_info,
+            }
+
+    def _do_post_custom_with_retry(
+        self,
+        url: str,
+        label: str,
+        json_data: dict = None,
+        params: dict = None,
+        headers: dict = None,
+        attempts: int = 2,
+        interval_seconds: int = 2,
+        require_json_data: bool = False,
+    ) -> dict:
+        """POST helper with a small retry for transient REG gateway timeouts."""
+        last_result = None
+        for attempt in range(1, max(1, attempts) + 1):
+            retry_label = label if attempt == 1 else f"{label} retry {attempt}"
+            result = self._do_post_custom(
+                url,
+                retry_label,
+                json_data=json_data,
+                params=params,
+                headers=headers,
+            )
+            result["attempt"] = attempt
+            last_result = result
+            retryable_empty_data = False
+            if result.get("success") and require_json_data:
+                response_payload = result.get("response_json") or {}
+                response_data = response_payload.get("data") if isinstance(response_payload, dict) else None
+                if response_data in (None, "", [], {}):
+                    result["success"] = False
+                    result["error"] = f"{label} response data is empty"
+                    result["error_message"] = result["error"]
+                    retryable_empty_data = True
+            if result.get("success"):
+                return result
+            error_text = str(result.get("error") or result.get("error_message") or "")
+            if (
+                not retryable_empty_data
+                and "timed out" not in error_text.lower()
+                and "timeout" not in error_text.lower()
+            ):
+                return result
+            if attempt < attempts:
+                time.sleep(interval_seconds)
+        return last_result or {"success": False, "error": f"{label} failed without result"}
+
+    def _do_get_custom(self, url: str, label: str, params: dict = None, headers: dict = None) -> dict:
+        """统一的自定义 URL GET 发送"""
+        request_info = {
+            "method": "GET",
+            "url": url,
+            "headers": headers or {},
+            "params": params,
+            "body": None,
+        }
+        log.info("=" * 60)
+        log.info(f"【{label}】完整请求信息")
+        log.info("=" * 60)
+        log.info("请求方法: GET")
+        log.info(f"请求URL: {url}")
+        if params:
+            log.info(f"请求Params: {params}")
+        if headers:
+            log.info(f"请求Headers: {json.dumps(headers, ensure_ascii=False)}")
+        log.info("=" * 60)
+
+        try:
+            kwargs = {"timeout": 30}
+            if params:
+                kwargs["params"] = params
+            if headers:
+                kwargs["headers"] = headers
+            response = http_requests.get(url, **kwargs)
+            success, response_payload, business_error = self._interpret_api_success(response)
+            response_body = self._format_http_body_for_log(response.text)
+            log.info(f"【{label}】响应状态码: {response.status_code}")
+            log.info(f"【{label}】响应Body: {response_body}")
+            if not success:
+                error_suffix = f"\n业务错误: {business_error}" if business_error else ""
+                log.error(
+                    f"{label}失败 | 状态码={response.status_code}\n"
+                    f"请求URL: {url}\n"
+                    f"响应Payload:\n{json.dumps(response_payload, indent=2, ensure_ascii=False) if isinstance(response_payload, dict) else response_body}\n"
+                    f"响应Headers:\n{self._format_http_headers_for_log(response.headers)}\n"
+                    f"响应Body:\n{response_body}"
+                    f"{error_suffix}"
+                )
+            return {
+                "success": success,
+                "status_code": response.status_code,
+                "response": response.text,
+                "response_body": response_body,
+                "response_headers": dict(response.headers),
+                "response_json": response_payload if isinstance(response_payload, dict) else None,
+                "error_message": business_error,
+                "request_info": request_info,
+                "response_info": {
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "body": response_body,
+                    "json": response_payload if isinstance(response_payload, dict) else None,
+                },
+            }
+        except http_requests.exceptions.RequestException as e:
+            response_info = None
+            if getattr(e, "response", None) is not None:
+                response_body = self._format_http_body_for_log(e.response.text)
+                response_json = None
+                try:
+                    response_json = e.response.json()
+                except ValueError:
+                    response_json = None
+                response_info = {
+                    "status_code": e.response.status_code,
+                    "headers": dict(e.response.headers),
+                    "body": response_body,
+                    "json": response_json,
+                }
+            log.error(f"{label}请求异常: {type(e).__name__}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "error_message": str(e),
+                "request_info": request_info,
+                "response_info": response_info,
+            }
+
+    def _do_get_custom_with_retry(
+        self,
+        url: str,
+        label: str,
+        params: dict = None,
+        headers: dict = None,
+        attempts: int = 2,
+        interval_seconds: int = 2,
+    ) -> dict:
+        """GET helper with a small retry for transient REG gateway timeouts."""
+        last_result = None
+        for attempt in range(1, max(1, attempts) + 1):
+            retry_label = label if attempt == 1 else f"{label} retry {attempt}"
+            result = self._do_get_custom(
+                url,
+                retry_label,
+                params=params,
+                headers=headers,
+            )
+            result["attempt"] = attempt
+            last_result = result
+            if result.get("success"):
+                return result
+            error_text = str(result.get("error") or result.get("error_message") or "")
+            if "timed out" not in error_text.lower() and "timeout" not in error_text.lower():
+                return result
+            if attempt < attempts:
+                time.sleep(interval_seconds)
+        return last_result or {"success": False, "error": f"{label} failed without result"}
 
     # ======================== 1. SP-3PL 关联 ========================
 
@@ -616,8 +1924,76 @@ class WebDPUMockService(DPUMockService):
     # ======================== 2. 核保 ========================
 
     def get_dowsure_merchant_accounts(self) -> dict:
-        """Return SP merchant accounts that can be used by the DOWSURE underwritten webhook."""
-        accounts = self._get_sp_merchant_accounts_for_dowsure()
+        """Return the latest SP merchant accounts available for DOWSURE underwriting."""
+        auth_rows = self.db_executor.execute_query_all(
+            "SELECT authorization_id, merchant_account_id, status, created_at, updated_at "
+            "FROM dpu_auth_token "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND authorization_party = 'SP' "
+            "AND authorization_id IS NOT NULL "
+            "AND authorization_id != '' "
+            "ORDER BY created_at DESC"
+        )
+        accounts = []
+        seen_authorization_ids = set()
+        for row in auth_rows or []:
+            authorization_id = row.get("authorization_id")
+            if not authorization_id or authorization_id in seen_authorization_ids:
+                continue
+            seen_authorization_ids.add(authorization_id)
+            merchant_account_id = row.get("merchant_account_id")
+            limit_row = None
+            if merchant_account_id:
+                limit_row = self.db_executor.execute_query(
+                    "SELECT merchant_account_id, created_at, updated_at "
+                    "FROM dpu_merchant_account_limit "
+                    f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                    f"AND merchant_account_id = {self._sql_literal(merchant_account_id)} "
+                    "ORDER BY created_at DESC LIMIT 1"
+                )
+            if not limit_row:
+                limit_row = self.db_executor.execute_query(
+                    "SELECT merchant_account_id, created_at, updated_at "
+                    "FROM dpu_merchant_account_limit "
+                    f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                    f"AND merchant_account_id = {self._sql_literal(authorization_id)} "
+                    "ORDER BY created_at DESC LIMIT 1"
+                )
+            resolved_merchant_account_id = (
+                (limit_row or {}).get("merchant_account_id")
+                or merchant_account_id
+                or ""
+            )
+            accounts.append({
+                "merchantAccountId": authorization_id,
+                "merchant_account_id": resolved_merchant_account_id,
+                "status": row.get("status"),
+                "created_at": row.get("created_at"),
+                "updated_at": (limit_row or {}).get("updated_at") or row.get("updated_at"),
+                "merchantAccountLimit": None,
+            })
+
+        if not accounts:
+            limit_rows = self.db_executor.execute_query_all(
+                "SELECT merchant_account_id, created_at, updated_at "
+                "FROM dpu_merchant_account_limit "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                "AND merchant_account_id IS NOT NULL "
+                "AND merchant_account_id != '' "
+                "ORDER BY created_at DESC"
+            )
+            for row in limit_rows or []:
+                merchant_account_id = row.get("merchant_account_id")
+                if not merchant_account_id:
+                    continue
+                accounts.append({
+                    "merchantAccountId": merchant_account_id,
+                    "merchant_account_id": merchant_account_id,
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("updated_at"),
+                    "merchantAccountLimit": None,
+                })
+
         return {
             "success": True,
             "merchant_id": self.merchant_id,
@@ -632,6 +2008,7 @@ class WebDPUMockService(DPUMockService):
             return super().mock_underwritten_status()
 
         underwritten_status = status
+        limit_application_unique_id = self.dpu_limit_application_id or "DEFAULT_LIMIT_APP_ID"
         data = self._build_common_webhook_data(
             "underwrittenLimit.completed",
             underwritten_status,
@@ -639,7 +2016,8 @@ class WebDPUMockService(DPUMockService):
                 "dpuMerchantAccountId": [
                     {"MerchantAccountId": self.dpu_auth_token_seller_id}
                 ] if self.dpu_auth_token_seller_id else [],
-                "dpuLimitApplicationId": self.dpu_limit_application_id,
+                "dpuApplicationId": self.application_unique_id,
+                "dpuLimitApplicationId": limit_application_unique_id,
                 "originalRequestId": "req_EFAL17621784619057169",
                 "status": underwritten_status,
                 "credit": {
@@ -649,20 +2027,26 @@ class WebDPUMockService(DPUMockService):
                     "baseRateType": "FIXED",
                     "creditLimit": {
                         "currency": self.preferred_currency,
-                        "underwrittenAmount": {"currency": self.preferred_currency, "amount": amount}
+                        "underwrittenAmount": {"currency": self.preferred_currency, "amount": amount},
+                        "availableLimit": {"currency": self.preferred_currency, "amount": 0.00},
+                        "signedLimit": {"currency": self.preferred_currency, "amount": 0.00},
+                        "watermark": {"currency": self.preferred_currency, "amount": 0.00},
                     }
                 }
             }
         )
         result = self._do_post_webhook(data, "核保状态")
-        result.update({"amount": amount, "status": underwritten_status})
+        result.update({
+            "amount": amount,
+            "status": underwritten_status,
+            "limit_application_unique_id": limit_application_unique_id,
+        })
         return result
 
     # ======================== 3. 审批 ========================
 
     def mock_underwritten_status_dowsure(
         self,
-        amount: int = None,
         status: str = None,
         merchant_accounts: Optional[list[dict]] = None,
     ) -> dict:
@@ -674,12 +2058,13 @@ class WebDPUMockService(DPUMockService):
             return {"success": False, "error": f"Unsupported DOWSURE underwritten status: {status}"}
 
         if not merchant_accounts:
+            dowsure_accounts = self.get_dowsure_merchant_accounts()
             merchant_accounts = [
                 {
                     "merchantAccountId": item["merchantAccountId"],
                     "merchantAccountLimit": item.get("merchantAccountLimit"),
                 }
-                for item in self._get_sp_merchant_accounts_for_dowsure()
+                for item in dowsure_accounts.get("accounts", [])
             ]
 
         clean_accounts = []
@@ -701,7 +2086,7 @@ class WebDPUMockService(DPUMockService):
             for item in clean_accounts
             if item["merchantAccountLimit"] is not None
         )
-        underwritten_amount = total_underwritten_amount if amount is None else float(amount)
+        underwritten_amount = total_underwritten_amount
         underwritten_status = status
         data = self._build_common_webhook_data(
             "underwrittenLimit.completed",
@@ -734,7 +2119,15 @@ class WebDPUMockService(DPUMockService):
                 },
             },
         )
-        result = self._do_post_webhook(data, "DOWSURE核保状态")
+        result = self._do_post_webhook(
+            data,
+            "DOWSURE核保状态",
+            headers={
+                "Authorization": "",
+                "Content-Type": "application/json",
+                "Cookie": "Cookie_1=value",
+            },
+        )
         result.update({
             "amount": underwritten_amount,
             "total_merchant_account_limit": total_underwritten_amount,
@@ -743,9 +2136,199 @@ class WebDPUMockService(DPUMockService):
         })
         return result
 
+    # ======================== 18-20. DOWSURE test callbacks ========================
+
+    @staticmethod
+    def _dowsure_headers() -> dict:
+        return {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176",
+            "Content-Type": "application/json",
+        }
+
+    def send_dowsure_credit_result_web(
+        self,
+        application_code: str,
+        amount: float,
+    ) -> dict:
+        """Send DOWSURE credit-result callback without interactive input."""
+        application_code = str(application_code or "").strip()
+        if not application_code:
+            return {"success": False, "error": "applicationCode is required"}
+
+        amount = float(amount)
+        payload = {
+            "applicationCode": application_code,
+            "creditStatus": "APPROVE",
+            "startTime": "2026-05-26 00:00:00",
+            "endTime": "2027-05-26 00:00:00",
+            "term": 12,
+            "termUnit": "MONTH",
+            "apr": 5.4,
+            "creditCode": f"CREDIT_HSEF_TEST_{application_code}",
+            "creditContractNo": "",
+            "amount": amount,
+            "currency": "CNY",
+            "processingFee": 0.00,
+            "reason": "",
+            "isLock": "NO",
+            "creditResultList": [],
+        }
+
+        result = self._do_post_custom(
+            "https://sandbox-api.dowsure.com/saasapi/v1/test/credit-result",
+            "DOWSURE授信结果",
+            json_data=payload,
+            headers=self._dowsure_headers(),
+        )
+        if result.get("success"):
+            self.dowsure_application_code = application_code
+            self.dowsure_credit_contract_no = ""
+        result.update({
+            "applicationCode": application_code,
+            "creditContractNo": "",
+            "amount": amount,
+            "currency": "CNY",
+            "payload": payload,
+        })
+        return result
+
+    def send_dowsure_esign_drawdown_result_web(
+        self,
+        amount: float,
+        processing_fee: float,
+        application_code: Optional[str] = None,
+        credit_contract_no: Optional[str] = None,
+    ) -> dict:
+        """Send DOWSURE eSign and drawdown callback without interactive input."""
+        application_code = str(application_code or self.dowsure_application_code or "").strip()
+        credit_contract_no = str(credit_contract_no if credit_contract_no is not None else self.dowsure_credit_contract_no or "")
+        if not application_code:
+            return {
+                "success": False,
+                "error": "applicationCode is required. Please run DOWSURE credit result first or input it manually.",
+            }
+
+        amount = float(amount)
+        processing_fee = float(processing_fee)
+        loan_code = f"LOAN_{random.randint(10000, 99999)}"
+        payload = {
+            "applicationCode": application_code,
+            "creditContractNo": credit_contract_no,
+            "loanCode": loan_code,
+            "loanContractNo": "",
+            "amount": amount,
+            "startTime": "2026-05-27 12:00:00",
+            "endTime": "2027-05-27 12:00:00",
+            "term": 12,
+            "termUnit": "MONTH",
+            "apr": 5.4,
+            "currency": "CNY",
+            "processingFee": processing_fee,
+            "loanStatus": "REPAYMENT",
+        }
+
+        result = self._do_post_custom(
+            "https://sandbox-api.dowsure.com/saasapi/v1/test/loan",
+            "DOWSURE eSign&drawdown结果",
+            json_data=payload,
+            headers=self._dowsure_headers(),
+        )
+        if result.get("success"):
+            self.dowsure_application_code = application_code
+            self.dowsure_credit_contract_no = credit_contract_no
+            self.dowsure_loan_code = loan_code
+            self.dowsure_loan_contract_no = ""
+        result.update({
+            "applicationCode": application_code,
+            "creditContractNo": credit_contract_no,
+            "loanCode": loan_code,
+            "loanContractNo": "",
+            "amount": amount,
+            "processingFee": processing_fee,
+            "currency": "CNY",
+            "payload": payload,
+        })
+        return result
+
+    def send_dowsure_repayment_result_web(
+        self,
+        payment_principal: float,
+        payment_interest: float,
+        payment_overdue_interest: float,
+        deal_amount: float,
+        surplus_principal: float,
+        application_code: Optional[str] = None,
+        loan_code: Optional[str] = None,
+    ) -> dict:
+        """Send DOWSURE repayment callback without interactive input."""
+        application_code = str(application_code or self.dowsure_application_code or "").strip()
+        loan_code = str(loan_code or self.dowsure_loan_code or "").strip()
+        if not application_code or not loan_code:
+            return {
+                "success": False,
+                "error": "applicationCode/loanCode is required. Please run DOWSURE eSign&drawdown first or input them manually.",
+            }
+
+        payment_principal = float(payment_principal)
+        payment_interest = float(payment_interest)
+        payment_overdue_interest = float(payment_overdue_interest)
+        deal_amount = float(deal_amount)
+        surplus_principal = float(surplus_principal)
+        payload = {
+            "applicationCode": application_code,
+            "currentTerm": 1,
+            "loanCode": loan_code,
+            "loanContractNo": "",
+            "serialNo": f"RPM_{random.randint(10000, 99999)}",
+            "paymentPrincipal": payment_principal,
+            "realPaymentPrincipal": payment_principal,
+            "paymentInterest": payment_interest,
+            "realPaymentInterest": payment_interest,
+            "paymentOverdueInterest": payment_overdue_interest,
+            "realPaymentOverdueInterest": payment_overdue_interest,
+            "dealAmount": deal_amount,
+            "surplusPrincipal": surplus_principal,
+            "dealDate": "2026-05-27 00:00:00",
+            "realDate": "2026-05-27 00:00:00",
+        }
+
+        result = self._do_post_custom(
+            "https://sandbox-api.dowsure.com/saasapi/v1/test/repayment",
+            "DOWSURE还款结果",
+            json_data=payload,
+            headers=self._dowsure_headers(),
+        )
+        result.update({
+            "applicationCode": application_code,
+            "loanCode": loan_code,
+            "loanContractNo": "",
+            "dealAmount": deal_amount,
+            "payload": payload,
+        })
+        return result
+
+    def retry_dowsure_callback_web(self) -> dict:
+        """Retry DOWSURE callback delivery without interactive input."""
+        url = "https://sandbox-api.dowsure.com/saasapi/partner/hsef/internal/result/callback/retry?limit=100"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176",
+        }
+
+        result = self._do_post_custom(
+            url,
+            "DOWSURE重试请求",
+            headers=headers,
+        )
+        result.update({
+            "request_method": "POST",
+            "request_url": url,
+            "request_headers": headers,
+        })
+        return result
+
     def mock_approved_offer_status(self, amount: int = None, status: str = None,
-                                    failure_reason_index: int = None,
-                                    rejection_reason: str = None) -> dict:
+                                   failure_reason_index: int = None,
+                                   rejection_reason: str = None) -> dict:
         """模拟审批状态更新"""
         if amount is None or status is None:
             return super().mock_approved_offer_status()
@@ -808,14 +2391,48 @@ class WebDPUMockService(DPUMockService):
 
     # ======================== 4/5. PSP 开始/完成 ========================
 
-    def _mock_psp_status(self, is_start: bool = True, psp_status: str = None) -> dict:
+    def _mock_psp_status(
+        self,
+        is_start: bool = True,
+        psp_status: str = None,
+        merchant_account_id: Optional[str] = None,
+    ) -> dict:
         """模拟PSP状态更新（参数化版本）"""
         if psp_status is None:
             return super()._mock_psp_status(is_start)
 
         event_type = "psp.verification.started" if is_start else "psp.verification.completed"
 
-        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=not is_start)
+        requested_account_id = str(merchant_account_id or "").strip()
+        sp_auth_info = None
+        if requested_account_id:
+            limit_row = self.db_executor.execute_query(
+                "SELECT psp_status FROM dpu_merchant_account_limit "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                f"AND merchant_account_id = {self._sql_literal(requested_account_id)} "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            if str((limit_row or {}).get("psp_status") or "").upper() == "SUCCESS":
+                return {
+                    "success": False,
+                    "error": f"PSP状态已为SUCCESS，不允许选择 | merchant_account_id={requested_account_id}",
+                }
+            sp_auth_info = self.db_executor.execute_query(
+                "SELECT merchant_id, authorization_id, merchant_account_id, status FROM dpu_auth_token "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                f"AND merchant_account_id = {self._sql_literal(requested_account_id)} "
+                "AND authorization_party = 'SP' "
+                "AND status = 'ACTIVE' "
+                "AND authorization_id IS NOT NULL "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            if not sp_auth_info:
+                return {
+                    "success": False,
+                    "error": f"未查询到可用SP授权记录 | merchant_account_id={requested_account_id}",
+                }
+        else:
+            sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=not is_start)
         if not sp_auth_info:
             return {"success": False, "error": "未查询到SP授权记录"}
 
@@ -846,16 +2463,111 @@ class WebDPUMockService(DPUMockService):
                 self.hsbc_psp_completed_account_ids_in_session.add(merchant_account_id)
                 self.hsbc_psp_pending_account_id_by_merchant.pop(self.merchant_id, None)
 
-        result.update({"status": psp_status, "merchant_account_id": merchant_account_id})
+        result.update({
+            "status": psp_status,
+            "merchant_account_id": merchant_account_id,
+            "selected_merchant_account_id": requested_account_id or None,
+        })
         return result
 
-    def mock_psp_start_status(self, status: str = None) -> dict:
+    def mock_psp_start_status(self, status: str = None, merchant_account_id: Optional[str] = None) -> dict:
         """模拟PSP开始状态"""
-        return self._mock_psp_status(is_start=True, psp_status=status)
+        return self._mock_psp_status(is_start=True, psp_status=status, merchant_account_id=merchant_account_id)
 
-    def mock_psp_completed_status(self, status: str = None) -> dict:
+    def mock_psp_completed_status(self, status: str = None, merchant_account_id: Optional[str] = None) -> dict:
         """模拟PSP完成状态"""
-        return self._mock_psp_status(is_start=False, psp_status=status)
+        return self._mock_psp_status(is_start=False, psp_status=status, merchant_account_id=merchant_account_id)
+
+    def get_psp_authorization_rows(self) -> dict:
+        """Return SP/3PL/PSP status rows grouped by merchant_account_id."""
+        if not self.merchant_id:
+            return {"success": False, "error": "未获取到 merchant_id", "rows": []}
+
+        auth_rows = self.db_executor.execute_query_all(
+            "SELECT merchant_account_id, authorization_party, authorization_id, status, state, "
+            "processing_stage, created_at, updated_at "
+            "FROM dpu_auth_token "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND merchant_account_id IS NOT NULL "
+            "AND merchant_account_id != '' "
+            "AND authorization_party IN ('SP', '3PL') "
+            "ORDER BY merchant_account_id, authorization_party, created_at DESC"
+        )
+
+        limit_rows = self.db_executor.execute_query_all(
+            "SELECT merchant_account_id, psp_status, created_at, updated_at "
+            "FROM dpu_merchant_account_limit "
+            f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+            "AND merchant_account_id IS NOT NULL "
+            "AND merchant_account_id != '' "
+            "ORDER BY merchant_account_id, created_at DESC"
+        )
+
+        grouped: dict[str, dict] = {}
+        for row in auth_rows or []:
+            merchant_account_id = row.get("merchant_account_id")
+            if not merchant_account_id:
+                continue
+            item = grouped.setdefault(
+                merchant_account_id,
+                {
+                    "merchant_account_id": merchant_account_id,
+                    "sp_authorization_id": None,
+                    "sp_status": None,
+                    "three_pl_authorization_id": None,
+                    "three_pl_status": None,
+                    "psp_status": None,
+                    "psp_updated_at": None,
+                },
+            )
+            party = row.get("authorization_party")
+            if party == "SP" and not item.get("sp_status"):
+                item["sp_authorization_id"] = row.get("authorization_id")
+                item["sp_status"] = row.get("status")
+                item["sp_state"] = row.get("state")
+                item["sp_processing_stage"] = row.get("processing_stage")
+            elif party == "3PL" and not item.get("three_pl_status"):
+                item["three_pl_authorization_id"] = row.get("authorization_id")
+                item["three_pl_status"] = row.get("status")
+
+        for row in limit_rows or []:
+            merchant_account_id = row.get("merchant_account_id")
+            if not merchant_account_id:
+                continue
+            item = grouped.setdefault(
+                merchant_account_id,
+                {
+                    "merchant_account_id": merchant_account_id,
+                    "sp_authorization_id": None,
+                    "sp_status": None,
+                    "three_pl_authorization_id": None,
+                    "three_pl_status": None,
+                    "psp_status": None,
+                    "psp_updated_at": None,
+                },
+            )
+            if item.get("psp_status") is None:
+                item["psp_status"] = row.get("psp_status")
+                item["psp_updated_at"] = row.get("updated_at") or row.get("created_at")
+
+        rows = sorted(grouped.values(), key=lambda item: item.get("merchant_account_id") or "")
+        default_selected_merchant_account_id = None
+        default_sp_row = next(
+            (
+                row for row in auth_rows or []
+                if row.get("authorization_party") == "SP"
+                and row.get("status") == "ACTIVE"
+                and row.get("authorization_id")
+            ),
+            None,
+        )
+        if default_sp_row:
+            default_selected_merchant_account_id = default_sp_row.get("merchant_account_id")
+        return {
+            "success": True,
+            "rows": rows,
+            "default_selected_merchant_account_id": default_selected_merchant_account_id,
+        }
 
     # ======================== 6. 电子签 ========================
 
@@ -1176,6 +2888,7 @@ class WebDPUMockService(DPUMockService):
                     "auth_token_source": "missing",
                     "steps": steps,
                 }
+            service.session_user_token = auth_token
 
             generated_selling_partner_id = f"spshouquanfs{random.randint(10000, 99999)}"
             service.generated_selling_partner_id = generated_selling_partner_id
@@ -1187,178 +2900,148 @@ class WebDPUMockService(DPUMockService):
                 "sourceCode": funder_resource,
                 "redirectUrl": f"{WebDPUMockService._build_portal_base_url(env)}/redirect-loading?state={state}",
             }
-            try:
-                sp_auth_response = http_requests.post(
-                    sp_auth_url,
-                    json=sp_auth_payload,
-                    headers={
-                        "Authorization": f"Bearer {auth_token}",
-                        "content-type": "application/json",
-                        "finance-product": "LINE_OF_CREDIT",
-                        "funder-resource": funder_resource,
-                        "product-currency": currency,
-                        "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
-                        "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
-                    },
-                    timeout=30,
+            sp_auth_headers = {
+                "Authorization": f"Bearer {auth_token}",
+                "content-type": "application/json",
+                "finance-product": "LINE_OF_CREDIT",
+                "funder-resource": funder_resource,
+                "product-currency": currency,
+                "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
+                "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+            }
+            sp_auth_result = service._do_post_custom_with_retry(
+                sp_auth_url,
+                "SP auth-url",
+                json_data=sp_auth_payload,
+                headers=sp_auth_headers,
+                attempts=3,
+                require_json_data=True,
+            )
+            sp_auth_response_body = sp_auth_result.get("response_body") or ""
+            sp_auth_payload_result = sp_auth_result.get("response_json")
+            sp_auth_url_recorded = False
+            if not sp_auth_result.get("success"):
+                sp_auth_state_exists = service.db_executor.execute_sql(
+                    "SELECT state FROM dpu_auth_token "
+                    f"WHERE merchant_id = '{session_ctx.merchant_id}' "
+                    "AND authorization_party = 'SP' "
+                    f"AND state = '{state}' "
+                    "ORDER BY created_at DESC LIMIT 1"
                 )
-                sp_auth_response_body = service._format_redirect_body_for_log(sp_auth_response.text)
-                sp_auth_success, sp_auth_payload_result, sp_auth_error = service._interpret_api_success(sp_auth_response)
-                sp_auth_response.raise_for_status()
-                if not sp_auth_success:
-                    raise RuntimeError(sp_auth_error or "sp-auth-url business failed")
-            except http_requests.exceptions.RequestException as exc:
-                return {
-                    "success": False,
-                    "stage": "sp_auth_url",
-                    "error": str(exc),
-                    "register_result": register_result,
-                    "session": {
-                        "session_id": session_ctx.session_id,
-                        "env": session_ctx.env,
-                        "phone_number": session_ctx.phone_number,
-                        "merchant_id": session_ctx.merchant_id,
-                    },
-                    "auth_token_source": auth_token_source,
-                    "state": state,
-                    "steps": steps + [{
+                if sp_auth_state_exists:
+                    sp_auth_result["warning"] = "sp-auth-url response data was empty, but dpu_auth_token.state exists; continue"
+                    steps.append({
                         "step": "SP auth-url",
                         "endpoint": sp_auth_url,
                         "payload": sp_auth_payload,
-                        "result": {
-                            "success": False,
-                            "status_code": exc.response.status_code if getattr(exc, "response", None) is not None else None,
-                            "response_body": None if getattr(exc, "response", None) is None else service._format_redirect_body_for_log(exc.response.text),
-                            "auth_token_source": auth_token_source,
+                        "result": {**sp_auth_result, "selling_partner_id": generated_selling_partner_id, "auth_token_source": auth_token_source, "db_state": sp_auth_state_exists},
+                    })
+                    sp_auth_url_recorded = True
+                else:
+                    return {
+                        "success": False,
+                        "stage": "sp_auth_url",
+                        "error": sp_auth_result.get("error") or sp_auth_result.get("error_message") or "sp-auth-url failed",
+                        "register_result": register_result,
+                        "session": {
+                            "session_id": session_ctx.session_id,
+                            "env": session_ctx.env,
+                            "phone_number": session_ctx.phone_number,
+                            "merchant_id": session_ctx.merchant_id,
                         },
-                    }],
-                }
-            except Exception as exc:
-                return {
-                    "success": False,
-                    "stage": "sp_auth_url",
-                    "error": str(exc),
-                    "register_result": register_result,
-                    "session": {
-                        "session_id": session_ctx.session_id,
-                        "env": session_ctx.env,
-                        "phone_number": session_ctx.phone_number,
-                        "merchant_id": session_ctx.merchant_id,
+                        "auth_token_source": auth_token_source,
+                        "state": state,
+                        "steps": steps + [{
+                            "step": "SP auth-url",
+                            "endpoint": sp_auth_url,
+                            "payload": sp_auth_payload,
+                            "result": {**sp_auth_result, "selling_partner_id": generated_selling_partner_id, "auth_token_source": auth_token_source},
+                        }],
+                    }
+
+            if not sp_auth_url_recorded:
+                steps.append({
+                    "step": "SP auth-url",
+                    "endpoint": sp_auth_url,
+                    "payload": sp_auth_payload,
+                    "result": {
+                        "success": True,
+                        "status_code": sp_auth_result.get("status_code"),
+                        "response_body": sp_auth_response_body,
+                        "response_json": sp_auth_payload_result if isinstance(sp_auth_payload_result, dict) else None,
+                        "selling_partner_id": generated_selling_partner_id,
+                        "auth_token_source": auth_token_source,
                     },
-                    "auth_token_source": auth_token_source,
-                    "state": state,
-                    "steps": steps + [{
-                        "step": "SP auth-url",
-                        "endpoint": sp_auth_url,
-                        "payload": sp_auth_payload,
-                        "result": {
-                            "success": False,
-                            "status_code": sp_auth_response.status_code,
-                            "response_body": sp_auth_response_body,
-                            "response_json": sp_auth_payload_result if isinstance(sp_auth_payload_result, dict) else None,
-                            "auth_token_source": auth_token_source,
-                        },
-                    }],
-                }
-
-            steps.append({
-                "step": "SP auth-url",
-                "endpoint": sp_auth_url,
-                "payload": sp_auth_payload,
-                "result": {
-                    "success": True,
-                    "status_code": sp_auth_response.status_code,
-                    "response_body": sp_auth_response_body,
-                    "response_json": sp_auth_payload_result if isinstance(sp_auth_payload_result, dict) else None,
-                    "selling_partner_id": generated_selling_partner_id,
-                    "auth_token_source": auth_token_source,
-                },
-            })
-
+                })
             sp_auth_result_url = f"{service.api_config.base_url}/dpu-merchant/shop-authorization/v2/sp-shop-auth-result?state={state}"
-            try:
-                sp_auth_result_response = http_requests.get(
-                    sp_auth_result_url,
-                    headers={
-                        "Authorization": f"Bearer {auth_token}",
-                        "finance-product": "LINE_OF_CREDIT",
-                        "product-currency": currency,
-                        "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
-                        "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
-                    },
-                    timeout=30,
+            sp_auth_result_headers = {
+                "Authorization": f"Bearer {auth_token}",
+                "finance-product": "LINE_OF_CREDIT",
+                "product-currency": currency,
+                "referer": f"{WebDPUMockService._build_portal_base_url(env)}/",
+                "x-hsbc-countrycode": "ISO 3166-1 alpha-2",
+            }
+            sp_auth_result = service._do_get_custom_with_retry(
+                sp_auth_result_url,
+                "SP auth-result",
+                headers=sp_auth_result_headers,
+                attempts=2,
+            )
+            sp_auth_result_body = sp_auth_result.get("response_body") or ""
+            sp_auth_result_payload = sp_auth_result.get("response_json")
+            sp_auth_result_recorded = False
+            if not sp_auth_result.get("success"):
+                state_exists = service.db_executor.execute_sql(
+                    "SELECT state FROM dpu_auth_token "
+                    f"WHERE merchant_id = '{session_ctx.merchant_id}' "
+                    "AND authorization_party = 'SP' "
+                    f"AND state = '{state}' "
+                    "ORDER BY created_at DESC LIMIT 1"
                 )
-                sp_auth_result_body = service._format_redirect_body_for_log(sp_auth_result_response.text)
-                sp_auth_result_success, sp_auth_result_payload, sp_auth_result_error = service._interpret_api_success(sp_auth_result_response)
-                sp_auth_result_response.raise_for_status()
-                if not sp_auth_result_success:
-                    raise RuntimeError(sp_auth_result_error or "sp-shop-auth-result business failed")
-            except http_requests.exceptions.RequestException as exc:
-                return {
-                    "success": False,
-                    "stage": "sp_shop_auth_result",
-                    "error": str(exc),
-                    "register_result": register_result,
-                    "session": {
-                        "session_id": session_ctx.session_id,
-                        "env": session_ctx.env,
-                        "phone_number": session_ctx.phone_number,
-                        "merchant_id": session_ctx.merchant_id,
-                    },
-                    "auth_token_source": auth_token_source,
-                    "state": state,
-                    "steps": steps + [{
+                if state_exists:
+                    sp_auth_result["warning"] = "sp-shop-auth-result timed out, but dpu_auth_token.state exists; continue with SP auth callback"
+                    steps.append({
                         "step": "SP auth-result",
                         "endpoint": sp_auth_result_url,
                         "payload": {"state": state},
-                        "result": {
-                            "success": False,
-                            "status_code": exc.response.status_code if getattr(exc, "response", None) is not None else None,
-                            "response_body": None if getattr(exc, "response", None) is None else service._format_redirect_body_for_log(exc.response.text),
-                            "auth_token_source": auth_token_source,
+                        "result": {**sp_auth_result, "auth_token_source": auth_token_source, "db_state": state_exists},
+                    })
+                    sp_auth_result_recorded = True
+                else:
+                    return {
+                        "success": False,
+                        "stage": "sp_shop_auth_result",
+                        "error": sp_auth_result.get("error") or sp_auth_result.get("error_message") or "sp-shop-auth-result failed",
+                        "register_result": register_result,
+                        "session": {
+                            "session_id": session_ctx.session_id,
+                            "env": session_ctx.env,
+                            "phone_number": session_ctx.phone_number,
+                            "merchant_id": session_ctx.merchant_id,
                         },
-                    }],
-                }
-            except Exception as exc:
-                return {
-                    "success": False,
-                    "stage": "sp_shop_auth_result",
-                    "error": str(exc),
-                    "register_result": register_result,
-                    "session": {
-                        "session_id": session_ctx.session_id,
-                        "env": session_ctx.env,
-                        "phone_number": session_ctx.phone_number,
-                        "merchant_id": session_ctx.merchant_id,
-                    },
-                    "auth_token_source": auth_token_source,
-                    "state": state,
-                    "steps": steps + [{
-                        "step": "SP auth-result",
-                        "endpoint": sp_auth_result_url,
-                        "payload": {"state": state},
-                        "result": {
-                            "success": False,
-                            "status_code": sp_auth_result_response.status_code,
-                            "response_body": sp_auth_result_body,
-                            "response_json": sp_auth_result_payload if isinstance(sp_auth_result_payload, dict) else None,
-                            "auth_token_source": auth_token_source,
-                        },
-                    }],
-                }
+                        "auth_token_source": auth_token_source,
+                        "state": state,
+                        "steps": steps + [{
+                            "step": "SP auth-result",
+                            "endpoint": sp_auth_result_url,
+                            "payload": {"state": state},
+                            "result": {**sp_auth_result, "auth_token_source": auth_token_source},
+                        }],
+                    }
 
-            steps.append({
-                "step": "SP auth-result",
-                "endpoint": sp_auth_result_url,
-                "payload": {"state": state},
-                "result": {
-                    "success": True,
-                    "status_code": sp_auth_result_response.status_code,
-                    "response_body": sp_auth_result_body,
-                    "response_json": sp_auth_result_payload if isinstance(sp_auth_result_payload, dict) else None,
-                    "auth_token_source": auth_token_source,
-                },
-            })
+            if not sp_auth_result_recorded:
+                steps.append({
+                    "step": "SP auth-result",
+                    "endpoint": sp_auth_result_url,
+                    "payload": {"state": state},
+                    "result": {
+                        "success": True,
+                        "status_code": sp_auth_result.get("status_code"),
+                        "response_body": sp_auth_result_body,
+                        "response_json": sp_auth_result_payload if isinstance(sp_auth_result_payload, dict) else None,
+                        "auth_token_source": auth_token_source,
+                    },
+                })
 
             db_state_sql = (
                 "SELECT state FROM dpu_auth_token "
@@ -1568,10 +3251,10 @@ class WebDPUMockService(DPUMockService):
                     "steps": steps,
                 }
 
-            redirect_result = service.mock_multi_shop_3pl_redirect()
+            redirect_result = service._run_multishop_3pl_redirect_with_post()
             steps.append({
                 "step": "3PL redirect",
-                "endpoint": "/api/mock/multi-shop-3pl-redirect",
+                "endpoint": "/api/register-and-run-multishop:3pl-redirect",
                 "payload": {"session_id": session_ctx.session_id},
                 "result": redirect_result,
             })
@@ -1643,9 +3326,9 @@ class WebDPUMockService(DPUMockService):
         failure_reason = ""
         if send_status == "FAIL" and failure_reason_index is not None:
             reason_map = {
-                1: "the seller location does not match the lender location",
+                1: "The lender country doesn't match with the Seller reporting country",
                 2: "Active credit approval exists",
-                3: "offer already exists",
+                3: "An offer already exists for the seller for the same partner product combination",
                 4: "others"
             }
             failure_reason = reason_map.get(failure_reason_index, "")
@@ -1673,8 +3356,8 @@ class WebDPUMockService(DPUMockService):
 
     # ======================== 12. 3PL 重定向 ========================
 
-    def mock_multi_shop_3pl_redirect(self) -> dict:
-        """3PL 重定向（多店铺第二步）"""
+    def _run_multishop_3pl_redirect_with_post(self) -> dict:
+        """Run the register-and-bind 3PL redirect flow, including the required POST callback."""
         seller_id = self._resolve_platform_seller_id()
         if not seller_id:
             return {"success": False, "error": "未找到可用的 SP 绑定ID，请先执行SP店铺绑定或确认商户已有记录"}
@@ -1688,37 +3371,33 @@ class WebDPUMockService(DPUMockService):
         full_redirect_url = f"{self.api_config.redirect_url}?offerId={platform_offer_id}"
 
         log.info("=" * 60)
-        log.info("【多店铺-3PL重定向】")
+        log.info("【注册并完成绑店-3PL重定向】")
         log.info("=" * 60)
 
         try:
             response = http_requests.get(self.api_config.redirect_url, params={"offerId": platform_offer_id}, timeout=30)
             response_body = self._format_redirect_body_for_log(response.text)
-            log.info(f"请求URL: {full_redirect_url}")
-            log.info(f"响应状态码: {response.status_code}")
-            log.info(f"响应Body: {response_body}")
+            log.info(f"3PL GET URL: {self.api_config.redirect_url}")
+            log.info(f"3PL GET Params: offerId={platform_offer_id}")
+            log.info(f"3PL GET status: {response.status_code}")
+            log.info(f"3PL GET response: {response_body}")
             response.raise_for_status()
         except http_requests.exceptions.RequestException as e:
-            error_detail = f"3PL重定向失败: {type(e).__name__}: {e}\n  - 请求URL: {full_redirect_url}"
             error_response_body = None
             if getattr(e, "response", None) is not None:
                 error_response_body = self._format_redirect_body_for_log(e.response.text)
-                error_detail += f"\n  - 状态码: {e.response.status_code}"
-                error_detail += f"\n  - 响应Body: {error_response_body}"
-            log.error(error_detail)
+            log.error(f"3PL GET failed: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "error": str(e),
                 "selling_partner_id": seller_id,
                 "platform_offer_id": platform_offer_id,
                 "redirect_url": full_redirect_url,
-                "response_body": error_response_body,
-                "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+                "redirect_get": {
+                    "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+                    "response_body": error_response_body,
+                },
             }
-
-        log.info(f"【多店铺】SP绑定ID：{seller_id}")
-        log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
-        log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
 
         post_payload = {
             "authToken": "mock",
@@ -1780,6 +3459,63 @@ class WebDPUMockService(DPUMockService):
                 "status_code": post_response.status_code,
                 "response_body": post_response_body,
             },
+        }
+
+    def mock_multi_shop_3pl_redirect(self) -> dict:
+        """3PL 重定向（多店铺第二步）"""
+        seller_id = self._resolve_platform_seller_id()
+        if not seller_id:
+            return {"success": False, "error": "未找到可用的 SP 绑定ID，请先执行SP店铺绑定或确认商户已有记录"}
+
+        platform_offer_id = self.get_platform_offer_id(seller_id)
+        if not platform_offer_id:
+            msg = f"seller_id: {seller_id} 无对应platform_offer_id"
+            log.error(msg)
+            return {"success": False, "error": msg}
+
+        full_redirect_url = f"{self.api_config.redirect_url}?offerId={platform_offer_id}"
+
+        log.info("=" * 60)
+        log.info("【多店铺-3PL重定向】")
+        log.info("=" * 60)
+
+        try:
+            response = http_requests.get(self.api_config.redirect_url, params={"offerId": platform_offer_id}, timeout=30)
+            response_body = self._format_redirect_body_for_log(response.text)
+            log.info(f"请求URL: {self.api_config.redirect_url}")
+            log.info(f"请求Params: offerId={platform_offer_id}")
+            log.info(f"响应状态码: {response.status_code}")
+            log.info(f"响应Body: {response_body}")
+            response.raise_for_status()
+        except http_requests.exceptions.RequestException as e:
+            error_detail = f"【多店铺-3PL重定向】请求失败: {type(e).__name__}: {e}\n  - 请求URL: {full_redirect_url}"
+            error_response_body = None
+            if getattr(e, "response", None) is not None:
+                error_response_body = self._format_redirect_body_for_log(e.response.text)
+                error_detail += f"\n  - 状态码: {e.response.status_code}"
+                error_detail += f"\n  - 响应Body: {error_response_body}"
+            log.error(error_detail)
+            return {
+                "success": False,
+                "error": str(e),
+                "selling_partner_id": seller_id,
+                "platform_offer_id": platform_offer_id,
+                "redirect_url": full_redirect_url,
+                "response_body": error_response_body,
+                "status_code": e.response.status_code if getattr(e, "response", None) is not None else None,
+            }
+
+        log.info(f"【多店铺】SP绑定ID：{seller_id}")
+        log.info(f"【多店铺】platform_offer_id：{platform_offer_id}")
+        log.info(f"【多店铺】3PL重定向URL：{full_redirect_url}")
+
+        return {
+            "success": True,
+            "selling_partner_id": seller_id,
+            "platform_offer_id": platform_offer_id,
+            "redirect_url": full_redirect_url,
+            "status_code": response.status_code,
+            "response_body": response_body,
         }
 
     # ======================== 13. 系统事件通知 ========================
@@ -1896,7 +3632,7 @@ class WebDPUMockService(DPUMockService):
 
     # ======================== 14. PSP 开始（HSBC） ========================
 
-    def mock_psp_start_status_hsbc(self) -> dict:
+    def mock_psp_start_status_hsbc(self, merchant_account_id: Optional[str] = None) -> dict:
         """发送HSBC版PSP开始通知"""
         log.info("开始处理PSP开始（HSBC）...")
         return self._send_hsbc_psp_notification_web(
@@ -1904,12 +3640,13 @@ class WebDPUMockService(DPUMockService):
             result="PROCESSING",
             failure_reason=None,
             title="PSP开始（HSBC）",
-            for_completed=False
+            for_completed=False,
+            merchant_account_id=merchant_account_id,
         )
 
     # ======================== 15. PSP 完成（HSBC） ========================
 
-    def mock_psp_completed_status_hsbc(self, result: str = None) -> dict:
+    def mock_psp_completed_status_hsbc(self, result: str = None, merchant_account_id: Optional[str] = None) -> dict:
         """发送HSBC版PSP完成通知"""
         if result is None:
             return super().mock_psp_completed_status_hsbc()
@@ -1921,12 +3658,38 @@ class WebDPUMockService(DPUMockService):
             result=result,
             failure_reason=failure_reason,
             title="PSP完成（HSBC）",
-            for_completed=True
+            for_completed=True,
+            merchant_account_id=merchant_account_id,
         )
 
-    def _get_hsbc_psp_notification_context_web(self, for_completed: bool = False) -> Optional[Dict[str, str]]:
+    def _get_hsbc_psp_notification_context_web(
+        self,
+        for_completed: bool = False,
+        merchant_account_id: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
         """获取HSBC版PSP通知上下文（Web版，不调用 input）"""
-        sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=for_completed)
+        requested_account_id = str(merchant_account_id or "").strip()
+        if requested_account_id:
+            limit_row = self.db_executor.execute_query(
+                "SELECT psp_status FROM dpu_merchant_account_limit "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                f"AND merchant_account_id = {self._sql_literal(requested_account_id)} "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            if str((limit_row or {}).get("psp_status") or "").upper() == "SUCCESS":
+                log.error(f"PSP状态已为SUCCESS，不允许选择 | merchant_account_id={requested_account_id}")
+                return None
+            sp_auth_info = self.db_executor.execute_query(
+                "SELECT merchant_id, authorization_id, merchant_account_id, status FROM dpu_auth_token "
+                f"WHERE merchant_id = {self._sql_literal(self.merchant_id)} "
+                f"AND merchant_account_id = {self._sql_literal(requested_account_id)} "
+                "AND authorization_party = 'SP' "
+                "AND status = 'ACTIVE' "
+                "AND authorization_id IS NOT NULL "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+        else:
+            sp_auth_info = self._select_hsbc_psp_auth_token_info(for_completed=for_completed)
         if not sp_auth_info:
             return None
 
@@ -1943,9 +3706,13 @@ class WebDPUMockService(DPUMockService):
 
     def _send_hsbc_psp_notification_web(self, event_type: str, result: str,
                                          failure_reason: Optional[str], title: str,
-                                         for_completed: bool = False) -> dict:
+                                         for_completed: bool = False,
+                                         merchant_account_id: Optional[str] = None) -> dict:
         """发送HSBC版PSP通知（Web版）"""
-        context = self._get_hsbc_psp_notification_context_web(for_completed=for_completed)
+        context = self._get_hsbc_psp_notification_context_web(
+            for_completed=for_completed,
+            merchant_account_id=merchant_account_id,
+        )
         if not context:
             return {"success": False, "error": "无法获取HSBC PSP通知上下文"}
 
@@ -1983,7 +3750,11 @@ class WebDPUMockService(DPUMockService):
             else:
                 self.hsbc_psp_pending_account_id_by_merchant[self.merchant_id] = context["merchant_account_id"]
 
-        api_result.update({"result": result, "merchant_account_id": context["merchant_account_id"]})
+        api_result.update({
+            "result": result,
+            "merchant_account_id": context["merchant_account_id"],
+            "selected_merchant_account_id": str(merchant_account_id or "").strip() or None,
+        })
         return api_result
 
     # ======================== 注册（静态方法改为实例无关的独立函数） ========================

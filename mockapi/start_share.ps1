@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [int]$PublicPort = 8002,
+    [int]$PublicPort = 8000,
+    [string]$Domain = "",
     [switch]$SkipFrontendBuild
 )
 
@@ -35,7 +36,7 @@ function Stop-NgrokProcesses() {
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
-function Start-NgrokTunnel($publicPort) {
+function Start-NgrokTunnel($publicPort, $domain) {
     $result = [ordered]@{
         Success = $false
         Url = $null
@@ -53,10 +54,16 @@ function Start-NgrokTunnel($publicPort) {
     $errLog = Join-Path $env:TEMP "mockapi-ngrok-share-err.log"
     Remove-Item -LiteralPath $outLog, $errLog -ErrorAction SilentlyContinue
 
+    $argList = if ($domain) {
+        "http $publicPort --domain=$domain --log stdout"
+    } else {
+        "http $publicPort --log stdout"
+    }
+
     Start-Process `
         -WindowStyle Hidden `
         -FilePath "ngrok" `
-        -ArgumentList "http $publicPort --log stdout" `
+        -ArgumentList $argList `
         -WorkingDirectory $projectRoot `
         -RedirectStandardOutput $outLog `
         -RedirectStandardError $errLog
@@ -113,7 +120,7 @@ Write-Host "Local health : $($health.StatusCode) $healthUrl" -ForegroundColor Gr
 Write-Host "Local root   : $($root.StatusCode) $rootUrl" -ForegroundColor Green
 
 Write-Step "Creating ngrok tunnel"
-$tunnel = Start-NgrokTunnel -publicPort $PublicPort
+$tunnel = Start-NgrokTunnel -publicPort $PublicPort -domain $Domain
 
 if (-not $tunnel.Success) {
     Write-Host ""

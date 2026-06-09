@@ -21,6 +21,12 @@ class ConnectResponse(BaseModel):
     phone_number: str
     merchant_id: Optional[str] = None
     preferred_currency: str = "USD"
+    application_unique_id: Optional[str] = None
+    selected_application_unique_id: Optional[str] = None
+    applications: list[dict] = Field(default_factory=list)
+    finance_product_currency: Optional[str] = None
+    lender_code: Optional[str] = None
+    application_status: Optional[str] = None
 
 
 class RegisterResponse(BaseModel):
@@ -34,6 +40,7 @@ class RegisterResponse(BaseModel):
 class EnumsResponse(BaseModel):
     """枚举选项响应（供前端下拉框使用）"""
     environments: list[str]
+    ai_sql_data_sources: list[str] = Field(default_factory=list)
     journeys: list[str]
     currencies: list[str]
     funder_resources: list[str]

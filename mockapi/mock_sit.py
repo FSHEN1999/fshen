@@ -13,6 +13,7 @@ import socket
 import time
 import uuid
 import random
+import threading
 from urllib.parse import urlencode
 from enum import Enum
 from pathlib import Path
@@ -344,6 +345,7 @@ class DatabaseExecutor:
         self.conn: Optional[pymysql.connections.Connection] = None
         self.cursor: Optional[pymysql.cursors.Cursor] = None
         self.env = env
+        self._lock = threading.RLock()
 
     def connect(self) -> None:
         """建立数据库连接"""
@@ -389,25 +391,24 @@ class DatabaseExecutor:
             sql: str,
             retry: int = 3
     ) -> Any:
-        """带重试机制的执行包装器（统一处理连接失效）"""
-        try:
-            # f-string中不能使用反斜杠，需要提前处理
-            sql_display = sql.strip().replace('\n', ' ')
-            log.debug(f"执行SQL: {sql_display}")
-            return func(sql)
-        except OperationalError as e:
-            # 处理常见连接失效错误码
-            if e.args[0] in (2006, 2013, 10054) and retry > 0:
-                log.warning(f"数据库连接失效，剩余{retry}次重连尝试...")
-                self.reconnect()
-                return self._execute_with_retry(func, sql, retry - 1)
-            sql_display = sql.strip().replace('\n', ' ')
-            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
-            raise
-        except Exception as e:
-            sql_display = sql.strip().replace('\n', ' ')
-            log.error(f"SQL执行出错: {e}, SQL: {sql_display}")
-            raise
+        """Execute SQL with retry while serializing access to the PyMySQL connection."""
+        with self._lock:
+            try:
+                sql_display = sql.strip().replace('\n', ' ')
+                log.debug(f"Executing SQL: {sql_display}")
+                return func(sql)
+            except OperationalError as e:
+                if e.args[0] in (2006, 2013, 10054) and retry > 0:
+                    log.warning(f"Database connection lost, retrying {retry} more time(s)...")
+                    self.reconnect()
+                    return self._execute_with_retry(func, sql, retry - 1)
+                sql_display = sql.strip().replace('\n', ' ')
+                log.error(f"SQL execution failed: {e}, SQL: {sql_display}")
+                raise
+            except Exception as e:
+                sql_display = sql.strip().replace('\n', ' ')
+                log.error(f"SQL execution failed: {e}, SQL: {sql_display}")
+                raise
 
     def execute_sql(self, sql: str, retry: int = 3) -> Optional[Any]:
         """执行SQL语句（查询返回第一条结果的第一个字段，其他返回None）"""
@@ -2063,9 +2064,9 @@ class DPUMockService:
         failure_reason = ""
         if send_status == "FAIL":
             reason_map = {
-                "1": "the seller location does not match the lender location",
+                "1": "The lender country doesn't match with the Seller reporting country",
                 "2": "Active credit approval exists",
-                "3": "offer already exists",
+                "3": "An offer already exists for the seller for the same partner product combination",
                 "4": "others"
             }
             prompt = "请选择失败原因：\n" + "\n".join([f"{k}-{v}" for k, v in reason_map.items()]) + "\n"
@@ -2387,6 +2388,60 @@ class DPUMockService:
                     log.error(e.response.text)
             log.info("=" * 60)
 
+    def retry_dowsure_callback(self) -> None:
+        """Retry DOWSURE callback request."""
+        url = "https://sandbox-api.dowsure.com/saasapi/partner/hsef/internal/result/callback/retry?limit=100"
+        headers = {
+            "clientid": "f4527684987a4d48aaf191a03d8a3176"
+        }
+
+        log.info("=" * 60)
+        log.info("【DOWSURE重试请求】完整请求信息")
+        log.info("=" * 60)
+        log.info(f"请求URL: {url}")
+        log.info("请求方法: POST")
+        log.info("请求Headers:")
+        for key, value in headers.items():
+            log.info(f"  {key}: {value}")
+        log.info("=" * 60)
+
+        try:
+            response = requests.post(url, headers=headers, timeout=30)
+
+            log.info("\n【DOWSURE重试请求】完整响应信息")
+            log.info("=" * 60)
+            log.info(f"响应状态码: {response.status_code}")
+            log.info("响应Headers:")
+            for key, value in response.headers.items():
+                log.info(f"  {key}: {value}")
+            log.info("响应Body:")
+            log.info(response.text)
+            log.info("=" * 60)
+
+            if response.status_code == 200:
+                log.info("DOWSURE重试请求发送成功")
+            else:
+                log.error(f"DOWSURE重试请求发送失败 | 状态码={response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            log.error("\n【DOWSURE重试请求】请求异常详细信息")
+            log.info("=" * 60)
+            log.error(f"异常类型: {type(e).__name__}")
+            log.error(f"异常信息: {str(e)}")
+
+            if hasattr(e, 'response') and e.response is not None:
+                log.error(f"响应状态码: {e.response.status_code}")
+                log.error("响应Headers:")
+                for key, value in e.response.headers.items():
+                    log.error(f"  {key}: {value}")
+                log.error("响应Body:")
+                try:
+                    resp_json = e.response.json()
+                    log.error(json.dumps(resp_json, indent=2, ensure_ascii=False))
+                except Exception:
+                    log.error(e.response.text)
+            log.info("=" * 60)
+
     def mock_system_event_notification(self):
         """发送系统事件通知（调用HSBC API）"""
         log.info("开始发送系统事件通知")
@@ -2611,7 +2666,7 @@ def main():
 7 - 放款(drawdown)       8 - 还款开始(repayment_start)  9 - 还款(repayment)
 10 - SP店铺绑定（多店铺第一步）  11 - SP状态更新  12 - 3PL重定向（多店铺第二步）
 13 - 系统事件通知       14 - psp开始（hsbc）      15 - psp完成（hsbc）
-16 - abandon(application.status)
+16 - abandon(application.status)  21 - 重试请求dowsure
 q - 退出
 """
         operation_map = {
@@ -2630,7 +2685,8 @@ q - 退出
             "13": mock_service.mock_system_event_notification,
             "14": mock_service.mock_psp_start_status_hsbc,
             "15": mock_service.mock_psp_completed_status_hsbc,
-            "16": mock_service.mock_application_abandon_status
+            "16": mock_service.mock_application_abandon_status,
+            "21": mock_service.retry_dowsure_callback
         }
 
         # 菜单循环

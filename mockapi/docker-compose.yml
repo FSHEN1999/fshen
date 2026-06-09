@@ -5,6 +5,25 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+    environment:
+      MOCKAPI_DATABASE_URL: postgresql://mockapi:mockapi@postgres:5432/mockapi
     ports:
-      - "8002:8000"
+      - "8000:8000"
+    depends_on:
+      - postgres
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mockapi
+      POSTGRES_USER: mockapi
+      POSTGRES_PASSWORD: mockapi
+    ports:
+      - "54329:5432"
+    volumes:
+      - mockapi-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  mockapi-postgres-data:

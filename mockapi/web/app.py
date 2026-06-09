@@ -5,11 +5,13 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from web.routes import system_routes, register_routes, mock_routes, ws_routes, ai_routes
+from web.routes import system_routes, register_routes, mock_routes, ws_routes, ai_routes, auth_routes, contact_routes
+from web.services.audit_store import audit_store
 from web.services.log_capture import ws_log_handler
 from web.services.session_manager import session_manager
 
@@ -32,6 +34,7 @@ async def lifespan(app: FastAPI):
     if ws_log_handler in mock_logger.handlers:
         mock_logger.removeHandler(ws_log_handler)
 
+    audit_store.init_schema()
     logging.getLogger(__name__).info("DPU Mock Web 应用已启动")
     yield
 
@@ -47,6 +50,29 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logging.getLogger(__name__).exception("Unhandled API error")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "message": f"{type(exc).__name__}: {exc}",
+            "data": {
+                "success": False,
+                "error": f"{type(exc).__name__}: {exc}",
+                "error_message": f"{type(exc).__name__}: {exc}",
+                "request_info": {
+                    "method": request.method,
+                    "url": str(request.url),
+                    "headers": dict(request.headers),
+                },
+                "response_info": None,
+            },
+        },
+    )
 
 
 @app.middleware("http")
@@ -82,6 +108,8 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(system_routes.router)
+app.include_router(auth_routes.router)
+app.include_router(contact_routes.router)
 app.include_router(register_routes.router)
 app.include_router(mock_routes.router)
 app.include_router(ws_routes.router)

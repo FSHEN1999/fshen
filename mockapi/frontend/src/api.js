@@ -9,18 +9,33 @@ const isLocalHost = typeof window !== 'undefined'
 
 const aiClient = axios.create({
   baseURL: '',
-  timeout: 60000,
+  timeout: 150000,
 })
 
 const aiFallbackClient = axios.create({
   baseURL: isLocalHost ? 'http://127.0.0.1:8017' : '',
-  timeout: 60000,
+  timeout: 150000,
 })
+
+function attachErrorPayload(error) {
+  const payload = error?.response?.data
+  if (payload) {
+    error.payload = payload?.data ?? payload
+  }
+  return Promise.reject(error)
+}
+
+client.interceptors.response.use((response) => response, attachErrorPayload)
+aiClient.interceptors.response.use((response) => response, attachErrorPayload)
+aiFallbackClient.interceptors.response.use((response) => response, attachErrorPayload)
 
 function unwrap(response) {
   const payload = response.data
   if (payload?.success === false) {
-    throw new Error(payload.message || 'Request failed')
+    const error = new Error(payload.message || payload.error_message || 'Request failed')
+    error.payload = payload
+    error.response = response
+    throw error
   }
   return payload?.data ?? payload
 }
@@ -35,13 +50,45 @@ export async function fetchEnums() {
   return unwrap(response)
 }
 
-export async function fetchSessions() {
-  const response = await client.get('/api/sessions')
+export async function fetchSessions(sessionId) {
+  const response = await client.get('/api/sessions', {
+    params: sessionId ? { session_id: sessionId } : undefined,
+  })
   return unwrap(response)
 }
 
 export async function fetchLogs(params = {}) {
   const response = await client.get('/api/logs', { params })
+  return unwrap(response)
+}
+
+export async function loginUser(payload) {
+  const response = await client.post('/api/auth/login', payload)
+  return unwrap(response)
+}
+
+export async function registerUser(payload) {
+  const response = await client.post('/api/auth/register', payload)
+  return unwrap(response)
+}
+
+export async function fetchContactIssues() {
+  const response = await client.get('/api/contact-issues')
+  return unwrap(response)
+}
+
+export async function createContactIssue(payload) {
+  const response = await client.post('/api/contact-issues', payload)
+  return unwrap(response)
+}
+
+export async function replyContactIssueApi(issueId, payload) {
+  const response = await client.post(`/api/contact-issues/${issueId}/reply`, payload)
+  return unwrap(response)
+}
+
+export async function deleteContactIssueApi(issueId) {
+  const response = await client.delete(`/api/contact-issues/${issueId}`)
   return unwrap(response)
 }
 
@@ -76,8 +123,22 @@ export async function fetchDowsureMerchantAccounts(sessionId) {
   return unwrap(response)
 }
 
+export async function fetchPspAuthorizationRows(sessionId) {
+  const response = await client.get('/api/mock/psp-authorization-rows', {
+    params: { session_id: sessionId },
+  })
+  return unwrap(response)
+}
+
 export async function runMockOperation(endpoint, payload) {
   const response = await client.post(endpoint, payload)
+  return unwrap(response)
+}
+
+export async function runScenarioApi(endpoint, payload, options = {}) {
+  const response = await client.post(endpoint, payload, {
+    timeout: options.timeout,
+  })
   return unwrap(response)
 }
 
