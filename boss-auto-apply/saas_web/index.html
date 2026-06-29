@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BOSS SaaS MVP 工作台</title>
+    <link rel="stylesheet" href="/app/assets/styles.css?v=20260526-city-area-dual-field" />
+  </head>
+  <body>
+    <div id="loginScreen" class="login-screen" data-mode="login">
+      <div class="login-card">
+        <div class="login-copy">
+          <p class="eyebrow">BOSS Host Runtime</p>
+          <h1 id="authTitle">登录投递工作台</h1>
+          <p id="authSubtitle">使用已注册邮箱和密码进入工作台。</p>
+        </div>
+        <div class="login-form">
+          <label>
+            邮箱
+            <input id="gatewayEmail" type="email" autocomplete="username" />
+          </label>
+          <label>
+            密码
+            <input id="gatewayPassword" type="password" autocomplete="current-password" />
+          </label>
+          <label id="humanCheckField" hidden>
+            真人验证
+            <div id="sliderCaptcha" class="slider-captcha" data-status="idle">
+              <div class="captcha-canvas" aria-hidden="true">
+                <span id="captchaGap" class="captcha-gap"></span>
+                <span id="captchaPiece" class="captcha-piece"></span>
+              </div>
+              <div class="captcha-track">
+                <button id="captchaHandle" class="captcha-handle" type="button" aria-label="拖动滑块完成真人验证">拖动</button>
+                <span id="captchaTrackText">拖动滑块填补空缺</span>
+              </div>
+              <div class="captcha-footer">
+                <span id="humanCheckQuestion">请拖动滑块到缺口位置</span>
+                <button id="refreshHumanCheckBtn" class="text-button" type="button">刷新验证</button>
+              </div>
+              <input id="humanCheckAnswer" type="hidden" autocomplete="off" />
+            </div>
+          </label>
+          <div id="loginError" class="login-error" hidden></div>
+          <button id="gatewayLoginBtn" type="button">登录</button>
+          <div class="login-foot">
+            <span id="authSwitchText">还没有账号？</span>
+            <button id="registerHintBtn" class="text-button" type="button">立即注册</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <template id="appShellTemplate">
+      <div id="appShell" class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">BOSS Host Runtime</p>
+          <h1>投递任务工作台</h1>
+        </div>
+        <div class="status-strip">
+          <button id="agentConfigBtn" class="text-button" type="button">Agent 配置</button>
+          <span id="userStatus" class="badge info">未登录</span>
+        </div>
+      </header>
+
+      <main class="layout single">
+        <section class="workspace">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>1. 上传简历并生成画像</h2>
+                <p>上传简历或粘贴文本后，系统会解析出岗位方向和核心技能。</p>
+              </div>
+            </div>
+            <div class="form-grid two">
+              <label>
+                简历文本
+                <textarea id="resumeText" placeholder="粘贴简历文本…"></textarea>
+              </label>
+              <div class="stack">
+                <label>
+                  简历文件
+                  <input id="resumeFile" type="file" accept=".txt,.md,.pdf,.doc,.docx" />
+                </label>
+                <div id="profilePreview" class="profile-preview">
+                  <strong>画像待生成</strong>
+                  <span>上传或保存简历后自动生成。</span>
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="createResumeBtn" type="button">保存文本并生成画像</button>
+              <button id="uploadResumeBtn" type="button">上传简历并生成画像</button>
+              <button id="parseResumeBtn" class="secondary" type="button">重新生成画像</button>
+            </div>
+          </section>
+
+          <section id="taskSetupPanel" class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>2. 设置投递目标</h2>
+                <p>只需要确认城市、期望薪资和目标投递数，其它配置由画像自动生成。</p>
+              </div>
+            </div>
+            <p id="taskSetupLockHint" class="lock-hint" hidden>先在上方生成画像，再创建投递任务。</p>
+            <div class="form-grid four">
+              <label>
+                城市
+                <span class="city-picker">
+                  <input id="cityInput" value="深圳市" autocomplete="off" />
+                  <div id="citySuggestions" class="city-suggestions" hidden></div>
+                </span>
+              </label>
+              <label>
+                区域
+                <span class="city-picker">
+                  <input id="districtInput" placeholder="全市" autocomplete="off" />
+                  <div id="districtSuggestions" class="city-suggestions district-suggestions" hidden></div>
+                </span>
+              </label>
+              <label>
+                期望薪资 K
+                <input id="expectedSalary" type="number" value="20" min="1" />
+              </label>
+              <label>
+                目标投递数
+                <input id="targetCount" type="number" value="3" min="1" max="500" />
+              </label>
+            </div>
+            <label class="wide">
+              其他要求
+              <textarea id="extraRequirements" rows="3" placeholder="例如：双休、公司人数大于200、希望有年终奖、不接受外包"></textarea>
+            </label>
+            <div class="actions">
+              <button id="createTaskBtn" type="button" disabled>生成投递任务</button>
+            </div>
+          </section>
+
+          <section id="bossLoginPanel" class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>3. 打开 BOSS 登录窗口</h2>
+                <p>先运行 BOSS Local Worker Agent，再打开本机受控 Chrome，在那个窗口中完成 BOSS 登录；登录态用于后续扫描、投递和消息处理。</p>
+              </div>
+              <span id="activeTaskBadge" class="badge info">未选择任务</span>
+            </div>
+            <p id="bossLoginLockHint" class="lock-hint" hidden>先生成投递任务，再进行扫码登录和启动任务。</p>
+            <div class="actions">
+              <a id="prepareLoginBtn" class="button-link disabled" aria-disabled="true" target="_blank" rel="noreferrer">打开 BOSS 登录窗口</a>
+              <button id="startTaskBtn" type="button" disabled>启动任务</button>
+              <a id="autoReplyBtn" class="button-link secondary" href="http://127.0.0.1:8765" target="_blank" rel="noreferrer">启动自动回复</a>
+              <button id="cancelBtn" class="danger" type="button" disabled>取消</button>
+            </div>
+            <div id="taskStatusPanel" class="task-status-panel idle">
+              <div class="task-status-icon" aria-hidden="true">
+                <span class="spinner-ring"></span>
+                <span class="checkmark"></span>
+                <span class="status-dot"></span>
+              </div>
+              <div class="task-status-copy">
+                <strong id="taskStatusTitle">等待启动</strong>
+                <span id="taskStatusText">确认 BOSS Local Worker Agent 已运行，并完成扫码后，可以启动真实投递。</span>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>岗位</th>
+                    <th>公司</th>
+                    <th>薪资</th>
+                    <th>城市</th>
+                    <th>沟通内容</th>
+                  </tr>
+                </thead>
+                <tbody id="jobsBody">
+                  <tr><td colspan="5" class="empty">暂无成功投递记录</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </main>
+      </div>
+    </template>
+
+    <div id="bossLoginDialog" class="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bossLoginDialogTitle">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">BOSS 登录会话</p>
+            <h2 id="bossLoginDialogTitle">BOSS 登录窗口</h2>
+          </div>
+          <button id="bossLoginDialogClose" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-status">
+          <span class="status-dot-inline" aria-hidden="true"></span>
+          <div>
+            <strong id="bossLoginDialogStatus">正在准备扫码会话</strong>
+            <span id="bossLoginDialogHint">请在本机浏览器确认 BOSS 已登录。</span>
+          </div>
+        </div>
+        <div id="bossLoginQrPanel" class="qr-panel" hidden>
+          <img id="bossLoginQrImage" alt="BOSS 登录页" />
+        </div>
+        <div id="bossLocalLoginActions" class="modal-actions" hidden>
+          <button id="bossLocalLoginOpen" type="button">重新打开 BOSS 登录窗口</button>
+          <button id="bossLocalLoginConfirm" type="button">我已完成登录</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <div id="agentConfigDialog" class="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="agentConfigTitle">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Local Agent</p>
+            <h2 id="agentConfigTitle">Agent 配置</h2>
+          </div>
+          <button id="agentConfigClose" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="panel-head">
+          <div>
+            <p>默认预填千问兼容模式。检测通过并保存后，画像生成和自动回复都会优先使用这组 Agent 模型。</p>
+          </div>
+        </div>
+        <div class="form-grid two">
+          <label>
+            API 地址
+            <input id="agentBaseUrl" value="https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1" />
+          </label>
+          <label>
+            模型名称
+            <input id="agentModel" value="qwen3.6-plus" />
+          </label>
+          <label>
+            API Key
+            <input id="agentApiKey" type="text" autocomplete="off" spellcheck="false" />
+          </label>
+        </div>
+        <div id="agentStatus" class="modal-status agent-status" hidden>
+          <span class="status-dot-inline"></span>
+          <div>
+            <strong id="agentStatusTitle">Agent 状态</strong>
+            <span id="agentStatusText">请先检测 Agent。</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="saveAgentConfigBtn" type="button">保存 Agent 配置</button>
+          <button id="checkAgentBtn" class="secondary" type="button">检测 Agent</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app/assets/city_area_data.js?v=20260526-city-area-dual-field"></script>
+    <script src="/app/assets/app.js?v=20260609-upload-error-copy"></script>
+  </body>
+</html>
